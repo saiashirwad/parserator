@@ -175,8 +175,24 @@ export class Parser<Result> {
 	}
 
 	/**
-	 * Creates a parser that delays construction until parse time.
-	 * Useful for recursive parsers.
+	 * Creates a new parser that lazily evaluates the given function.
+	 * This is useful for creating recursive parsers.
+	 *
+	 * @param fn - A function that returns a parser
+	 * @returns A new parser that evaluates the function when parsing
+	 * @template T The type of value produced by the parser
+	 *
+	 * @example
+	 * ```ts
+	 * // Create a recursive parser for nested parentheses
+	 * const parens: Parser<string> = Parser.lazy(() =>
+	 *   between(
+	 *     char('('),
+	 *     char(')'),
+	 *     parens
+	 *   )
+	 * )
+	 * ```
 	 */
 	static lazy<T>(fn: () => Parser<T>): Parser<T> {
 		return new Parser((state) => {
