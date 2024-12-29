@@ -1,18 +1,19 @@
 import {
+	alphabet,
 	char,
+	many1,
 	notFollowedBy,
 	skipSpaces,
 	string,
 } from "./src/parseme/combinators"
+import { integer2 } from "./src/parseme/lexer"
 import { ParserError } from "./src/parseme/parser"
 
 try {
-	const lol = skipSpaces
-		.then(string("hi"))
-		.thenDiscard(skipSpaces)
-		.map((x) => x.split(""))
-		.then(notFollowedBy(char("c")))
-	console.log(lol.parseOrThrow("       hic"))
+	console.log(integer2.run("hi"))
+	// const word = many1(alphabet).map((x) => x.join(""))
+	// const arrayOfWords = many1(word, char(","))
+	// console.log(arrayOfWords.parseOrThrow("hi,hi,hi"))
 	// type BC = {
 	// 	b: string
 	// 	c: string

@@ -127,4 +127,8 @@ export const State = {
 	isAtEnd(state: ParserState): boolean {
 		return state.remaining.length === 0
 	},
+
+	printPosition(state: ParserState): string {
+		return `line ${state.pos.line}, column ${state.pos.column}, offset ${state.pos.offset}`
+	},
 }

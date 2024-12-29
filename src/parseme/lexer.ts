@@ -7,6 +7,7 @@ import {
 	optional,
 } from "./combinators"
 import { Parser } from "./parser"
+import { State } from "./state"
 
 export function skipWhitespace(): Parser<undefined> {
 	return Parser.gen(function* () {
@@ -22,13 +23,16 @@ export function skipWhitespace(): Parser<undefined> {
 export const integer2: Parser<number> = Parser.gen(
 	function* () {
 		const sign = yield* optional(char("-"))
-		const digits = yield* manyN(digit, 2).error(
-			"WUT, i need 2 digits, minimum",
+		const digits = yield* manyN(digit, 2).errorCallback(
+			(error, state) => {
+				console.log(state)
+				return `WUT, i need 2 digits, minimum, at ${State.printPosition(state)}`
+			},
 		)
 		const numStr = (sign ?? "") + digits.join("")
 		return parseInt(numStr, 10)
 	},
-)
+).withName("integer2")
 
 export const float: Parser<number> = Parser.gen(
 	function* () {

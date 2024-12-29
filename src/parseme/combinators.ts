@@ -43,7 +43,7 @@ export function notFollowedBy<T>(parser: Parser<T>) {
 			if (parser.options?.name) {
 				return Parser.error(
 					`Found ${parser.options.name} when it should not appear here`,
-					[parser.options.name],
+					[],
 					state.pos,
 				)
 			}
@@ -271,22 +271,26 @@ export function between<T>(
  * @param count - Minimum number of repetitions required
  * @returns A function that creates a parser matching multiple occurrences
  */
-function many_<T>(count: number) {
-	return (parser: Parser<T>): Parser<T[]> => {
+function many_<S, T>(count: number) {
+	return (
+		parser: Parser<T>,
+		separator?: Parser<S>,
+	): Parser<T[]> => {
 		return Parser.gen(function* () {
 			const acc: T[] = []
 			let next: T | undefined
 
-			// Try to get the first item
 			next = yield* optional(parser)
 
-			// Keep going as long as we find items
 			while (next !== undefined) {
 				acc.push(next)
+				if (separator) {
+					const sepResult = yield* optional(separator)
+					if (!sepResult) break
+				}
 				next = yield* optional(parser)
 			}
 
-			// Check if we have enough items
 			if (acc.length >= count) {
 				return acc
 			}
@@ -304,8 +308,10 @@ function many_<T>(count: number) {
  * @param parser - The parser to repeat
  * @returns A parser that produces an array of all matches
  */
-export const many0 = <T>(parser: Parser<T>) =>
-	many_<T>(0)(parser)
+export const many0 = <S, T>(
+	parser: Parser<T>,
+	separator?: Parser<S>,
+) => many_<S, T>(0)(parser, separator)
 
 /**
  * Creates a parser that matches one or more occurrences of the input parser.
@@ -313,8 +319,10 @@ export const many0 = <T>(parser: Parser<T>) =>
  * @param parser - The parser to repeat
  * @returns A parser that produces an array of all matches (at least one)
  */
-export const many1 = <T>(parser: Parser<T>) =>
-	many_<T>(1)(parser)
+export const many1 = <S, T>(
+	parser: Parser<T>,
+	separator?: Parser<S>,
+) => many_<S, T>(1)(parser, separator)
 
 /**
  * Creates a parser that matches exactly n occurrences of the input parser.
@@ -323,8 +331,11 @@ export const many1 = <T>(parser: Parser<T>) =>
  * @param n - Number of required repetitions
  * @returns A parser that produces an array of exactly n matches
  */
-export const manyN = <T>(parser: Parser<T>, n: number) =>
-	many_<T>(n)(parser)
+export const manyN = <S, T>(
+	parser: Parser<T>,
+	n: number,
+	separator?: Parser<S>,
+) => many_<S, T>(n)(parser, separator)
 
 /**
  * Internal helper function for creating skipping repetition parsers.

@@ -10,17 +10,12 @@ export type ParserContext = {}
 
 type ParserOptions = { name?: string }
 
-export class ParserError extends Error {
+export class ParserError {
 	constructor(
 		public message: string,
 		public expected: string[],
 		public pos: SourcePosition,
-	) {
-		super(message)
-		Object.setPrototypeOf(this, ParserError.prototype)
-		Error.captureStackTrace(this, this.constructor)
-		this.name = this.constructor.name
-	}
+	) {}
 }
 
 export type ParserResult<T> = Either<
@@ -37,6 +32,11 @@ export class Parser<Result> {
 		) => ParserResult<Result>,
 		public options?: ParserOptions,
 	) {}
+
+	withName(name: string) {
+		this.options = { ...this.options, name }
+		return this
+	}
 
 	static succeed<T>(
 		value: T,
@@ -78,7 +78,7 @@ export class Parser<Result> {
 		}, this.options)
 	}
 
-	error2(
+	errorCallback(
 		onError: (
 			error: ParserError,
 			state: ParserState,
