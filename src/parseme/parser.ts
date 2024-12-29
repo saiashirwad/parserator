@@ -12,6 +12,79 @@ export type ParserState = {
 	pos: SourcePosition
 }
 
+// Add static methods to help create and manipulate parser state
+export const State = {
+	// Create a new parser state from input
+	fromInput(input: string): ParserState {
+		return {
+			remaining: input,
+			pos: {
+				line: 1,
+				column: 1,
+				offset: 0,
+			},
+		}
+	},
+
+	// Create a new state by consuming n characters
+	consume(state: ParserState, n: number): ParserState {
+		if (n === 0) return state
+		if (n > state.remaining.length) {
+			throw new Error("Cannot consume more characters than remaining")
+		}
+
+		const consumed = state.remaining.slice(0, n)
+		let { line, column, offset } = state.pos
+
+		for (const char of consumed) {
+			if (char === "\n") {
+				line++
+				column = 1
+			} else {
+				column++
+			}
+			offset++
+		}
+
+		return {
+			remaining: state.remaining.slice(n),
+			pos: { line, column, offset },
+		}
+	},
+
+	// Create a new state by consuming a specific string
+	consumeString(state: ParserState, str: string): ParserState {
+		if (!state.remaining.startsWith(str)) {
+			throw new Error(
+				`Cannot consume "${str}" - input "${state.remaining}" doesn't start with it`,
+			)
+		}
+		return State.consume(state, str.length)
+	},
+
+	// Create a new state by consuming until a predicate is met
+	consumeWhile(
+		state: ParserState,
+		predicate: (char: string) => boolean,
+	): ParserState {
+		let i = 0
+		while (i < state.remaining.length && predicate(state.remaining[i])) {
+			i++
+		}
+		return State.consume(state, i)
+	},
+
+	// Get the next n characters without consuming them
+	peek(state: ParserState, n: number = 1): string {
+		return state.remaining.slice(0, n)
+	},
+
+	// Check if we're at the end of input
+	isAtEnd(state: ParserState): boolean {
+		return state.remaining.length === 0
+	},
+}
+
 export type ParserContext = {}
 
 type ParserOptions = { name?: string }
@@ -34,12 +107,8 @@ export class Parser<Result> {
 		public options?: ParserOptions,
 	) {}
 
-	static succeed<T>(
-		value: T,
-		state: ParserState,
-		consumed?: string,
-	): ParserResult<T> {
-		return Either.right([value, consumeString(state, consumed)])
+	static succeed<T>(value: T, state: ParserState): ParserResult<T> {
+		return Either.right([value, state])
 	}
 
 	static fail(message: string, expected: string[] = []): Parser<unknown> {
@@ -77,7 +146,7 @@ export class Parser<Result> {
 	}
 
 	run(input: string): ParserResult<Result> {
-		const result = this._run(initialState(input))
+		const result = this._run(State.fromInput(input))
 		if (Either.isRight(result)) {
 			return result
 		}
@@ -138,16 +207,16 @@ export class Parser<Result> {
 	}
 
 	zip<B>(parserB: Parser<B>): Parser<readonly [Result, B]> {
-		return new Parser((state) =>
-			Either.match(this._run(state), {
+		return new Parser((state) => {
+			return Either.match(this._run(state), {
 				onRight: ([a, restA]) =>
 					Either.match(parserB._run(restA), {
 						onRight: ([b, restB]) => Either.right([[a, b] as const, restB]),
 						onLeft: Either.left,
 					}),
 				onLeft: Either.left,
-			}),
-		)
+			})
+		})
 	}
 
 	then<B>(parserB: Parser<B>): Parser<B> {
@@ -228,65 +297,5 @@ export class Parser<Result> {
 		}
 
 		return run(iterator.next())
-	}
-}
-
-export function initialState(input: string): ParserState {
-	return {
-		remaining: input,
-		pos: {
-			line: 1,
-			column: 1,
-			offset: 0,
-		},
-	}
-}
-
-export function updatePosition(
-	pos: SourcePosition,
-	consumed: string,
-): SourcePosition {
-	let { line, column, offset } = pos
-	for (const char of consumed) {
-		if (char === "\n") {
-			line++
-			column = 1
-		} else {
-			column++
-		}
-		offset++
-	}
-
-	return {
-		line,
-		column,
-		offset,
-	}
-}
-
-export function updateState(
-	oldState: ParserState,
-	newState: ParserState,
-): ParserState {
-	const consumed = oldState.remaining.slice(
-		0,
-		oldState.remaining.length - newState.remaining.length,
-	)
-	return {
-		...oldState,
-		remaining: oldState.remaining.slice(consumed.length),
-		pos: updatePosition(oldState.pos, consumed),
-	}
-}
-
-export function consumeString(
-	state: ParserState,
-	consumed?: string,
-): ParserState {
-	const newPos = updatePosition(state.pos, consumed ?? "")
-
-	return {
-		remaining: state.remaining.slice(consumed?.length ?? 0),
-		pos: newPos,
 	}
 }
