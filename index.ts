@@ -12,7 +12,7 @@ try {
 		.thenDiscard(skipSpaces)
 		.map((x) => x.split(""))
 		.then(notFollowedBy(char("c")))
-	console.log(lol.parseOrThrow("       hi"))
+	console.log(lol.parseOrThrow("       hic"))
 	// type BC = {
 	// 	b: string
 	// 	c: string
