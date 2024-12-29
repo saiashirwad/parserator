@@ -1,5 +1,5 @@
 {
-  "name": "@texoport/parseme",
+  "name": "parserator",
   "version": "0.1.0",
   "description": "A parser combinator library inspired by Parsec and Effect-TS",
   "main": "dist/index.js",
