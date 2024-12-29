@@ -1,12 +1,76 @@
 {
-  "name": "efflang",
-  "module": "index.ts",
+  "name": "@texoport/parseme",
+  "version": "0.1.0",
+  "description": "A parser combinator library inspired by Parsec and Effect-TS",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./combinators": {
+      "types": "./dist/combinators.d.ts",
+      "import": "./dist/combinators.js"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "import": "./dist/utils.js"
+    },
+    "./state": {
+      "types": "./dist/state.d.ts",
+      "import": "./dist/state.js"
+    },
+    "./parser": {
+      "types": "./dist/parser.d.ts",
+      "import": "./dist/parser.js"
+    },
+    "./lexer": {
+      "types": "./dist/lexer.d.ts",
+      "import": "./dist/lexer.js"
+    },
+    "./either": {
+      "types": "./dist/either.d.ts",
+      "import": "./dist/either.js"
+    },
+    "./debug": {
+      "types": "./dist/debug.d.ts",
+      "import": "./dist/debug.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [
+    "parser",
+    "parser-combinators",
+    "typescript",
+    "functional-programming"
+  ],
+  "author": "",
+  "license": "MIT",
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "typescript": "^5.7.2"
   },
   "peerDependencies": {
     "typescript": "^5.7.2"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/parseme.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/parseme/issues"
+  },
+  "homepage": "https://github.com/yourusername/parseme#readme"
 }

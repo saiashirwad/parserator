@@ -25,7 +25,8 @@
 	"javascript": {
 		"formatter": {
 			"quoteStyle": "double",
-			"semicolons": "asNeeded"
+			"semicolons": "asNeeded",
+			"lineWidth": 60
 		}
 	}
 }

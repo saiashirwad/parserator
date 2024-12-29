@@ -1,27 +1,47 @@
-import { alphabet, many1 } from "./src/parseme/combinators"
+// Core parser functionality
+export {
+	Parser,
+	type ParserResult,
+	type ParserContext,
+	ParserError,
+} from "./src/parser"
+export {
+	State,
+	type ParserState,
+	type SourcePosition,
+} from "./src/state"
+export { Either } from "./src/either"
 
-const lol = many1(alphabet).run("[abcd2323")
-console.log(lol)
+// Combinators
+export {
+	lookAhead,
+	notFollowedBy,
+	string,
+	constString,
+	char,
+	alphabet,
+	digit,
+	sepBy,
+	between,
+	many0,
+	many1,
+	manyN,
+	skipMany0,
+	skipMany1,
+	skipManyN,
+	skipUntil,
+	or,
+	optional,
+	sequence,
+	chain,
+	regex,
+} from "./src/combinators"
 
-// type BC = {
-// 	b: string
-// 	c: string
-// }
+// Debug utilities
+export * from "./src/debug"
 
-// type A = {
-// 	a: string
-// }
+// Lexer utilities
+export * from "./src/lexer"
 
-// const p = Parser.gen(function* () {
-// 	const b = yield* lookAhead(char("b"))
-// 	if (b) {
-// 		yield* char("b").then(notFollowedBy(char("a")))
-// 		const c = yield* char("c").thenDiscard(char(";"))
-// 		return { b, c } as BC
-// 	} else {
-// 		const a = yield* char("a")
-// 		return { a } as A
-// 	}
-// })
-
-// console.log(p.run("ba"))
+// Utility types
+export { type Prettify } from "./src/utils"
