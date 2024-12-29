@@ -20,12 +20,12 @@
     "test": "bun test",
     "docs": "bun typedoc",
     "prepublishOnly": "bun run build && bun test",
-    "publish:patch": "npm version patch && npm publish --access public",
-    "publish:minor": "npm version minor && npm publish --access public",
-    "publish:major": "npm version major && npm publish --access public",
-    "release:patch": "bun run build && bun test && bun run publish:patch",
-    "release:minor": "bun run build && bun test && bun run publish:minor",
-    "release:major": "bun run build && bun test && bun run publish:major"
+    "publish:patch": "bun run build && npm version patch && npm publish --access public",
+    "publish:minor": "bun run build && npm version minor && npm publish --access public",
+    "publish:major": "bun run build && npm version major && npm publish --access public",
+    "release:patch": "bun run build && bun run build && bun test && bun run publish:patch",
+    "release:minor": "bun run build && bun run build && bun test && bun run publish:minor",
+    "release:major": "bun run build && bun run build && bun test && bun run publish:major"
   },
   "keywords": [
     "parser",
