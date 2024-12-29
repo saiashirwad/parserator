@@ -5,12 +5,16 @@ import {
 	many1,
 } from "./src/parseme/combinators"
 
-const str = between(char('"'), char('"'), many1(alphabet))
+const str = between(
+	char('"'),
+	char('"'),
+	many1(alphabet),
+).map((s) => s.join(""))
 
 const manyStrings = between(
 	char("["),
-	many1(str, char(",")),
 	char("]"),
+	many1(str, char(",")),
 )
 
 console.log(

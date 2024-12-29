@@ -254,8 +254,8 @@ export function sepBy<S, T>(
  */
 export function between<T>(
 	start: Parser<any>,
-	parser: Parser<T>,
 	end: Parser<any>,
+	parser: Parser<T>,
 ): Parser<T> {
 	return new Parser((state) => {
 		// Parse opening delimiter
