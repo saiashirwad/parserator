@@ -63,6 +63,8 @@ export const float: Parser<number> = Parser.gen(
 				: "") +
 			(exponentPart ? "e" + exponentPart : "")
 
+		console.log(numStr)
+
 		return parseFloat(numStr)
 	},
 )
