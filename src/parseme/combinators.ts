@@ -102,6 +102,11 @@ export function constString<const T extends string>(str: T): Parser<T> {
  *
  * @param ch - The character to match
  * @returns A parser that matches and consumes a single character
+ * ```ts
+ * const parser = char("a")
+ * parser.run("abc") // Right(["a", {...}])
+ * parser.run("xyz") // Left(error)
+ * ```
  */
 export const char = <T extends string>(ch: T): Parser<T> => {
 	return new Parser(
@@ -123,6 +128,12 @@ export const char = <T extends string>(ch: T): Parser<T> => {
 
 /**
  * A parser that matches any single alphabetic character (a-z, A-Z).
+ *
+ * ```ts
+ * const parser = alphabet
+ * parser.run("abc") // Right(["a", {...}])
+ * parser.run("123") // Left(error)
+ * ```
  */
 export const alphabet = new Parser(
 	(state) => {
@@ -144,6 +155,12 @@ export const alphabet = new Parser(
 
 /**
  * A parser that matches any single digit character (0-9).
+ *
+ * ```ts
+ * const parser = digit
+ * parser.run("123") // Right(["1", {...}])
+ * parser.run("abc") // Left(error)
+ * ```
  */
 export const digit = new Parser(
 	(state) => {
@@ -165,6 +182,12 @@ export const digit = new Parser(
  * @param sepParser - Parser for the separator between elements
  * @param parser - Parser for the elements
  * @returns A parser that produces an array of matched elements
+ *
+ * ```ts
+ * const parser = sepBy(char(','), digit)
+ * parser.run("1,2,3") // Right([["1", "2", "3"], {...}])
+ * parser.run("") // Right([[], {...}])
+ * ```
  */
 export function sepBy<S, T>(
 	sepParser: Parser<S>,
@@ -195,16 +218,22 @@ export function sepBy<S, T>(
  * @param end - The closing delimiter string
  * @param parser - The parser for the content between delimiters
  * @returns A parser that matches content between delimiters
+ *
+ * ```ts
+ * const parser = between('(', ')', digit)
+ * parser.run('(5)') // Right(['5', {...}])
+ * parser.run('5') // Left(error)
+ * ```
  */
 export function between<T>(
-	start: string,
-	end: string,
+	start: Parser<any>,
+	end: Parser<any>,
 	parser: Parser<T>,
 ): Parser<T> {
 	return Parser.gen(function* () {
-		yield* string(start)
+		yield* start
 		const result = yield* parser
-		yield* string(end)
+		yield* end
 		return result
 	})
 }
