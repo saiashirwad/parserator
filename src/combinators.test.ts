@@ -10,7 +10,6 @@ import {
 	sequence,
 	skipSpaces,
 } from "./combinators"
-import type { Last } from "./types"
 
 const stringParser = skipSpaces
 	.then(char('"'))
@@ -39,8 +38,6 @@ test("optional", () => {
 	expect(p.parseOrThrow('"hello"')).toEqual("hello")
 	expect(p.parseOrThrow("123")).toEqual(123)
 })
-
-type lol = Last<[typeof stringParser, typeof integerParser]>
 
 test("sequence", () => {
 	const p = sequence([
