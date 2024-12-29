@@ -1,6 +1,6 @@
-import { Parser, type ParserResult } from "./parser"
-import { State, type ParserState } from "./state"
 import { Either } from "./either"
+import { Parser, type ParserResult } from "./parser"
+import { type ParserState, State } from "./state"
 
 /**
  * Creates a debug output for a parser's current state and result

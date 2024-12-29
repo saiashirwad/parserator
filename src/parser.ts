@@ -4,7 +4,7 @@ import {
 	type ParserState,
 	type SourcePosition,
 } from "./state"
-import type { Prettify } from "./utils"
+import type { Prettify } from "./types"
 
 export type ParserContext = {}
 
@@ -120,12 +120,12 @@ export class Parser<Result> {
 		return result.left
 	}
 
-	parseOrThrow(input: string) {
-		const result = this.parse(State.fromInput(input))
-		if (Either.isRight(result)) {
-			return result.right[0]
+	parseOrThrow(input: string): Result {
+		const result = this.parseOrError(input)
+		if (result instanceof ParserError) {
+			throw new Error(result.message)
 		}
-		throw result.left
+		return result
 	}
 
 	map<B>(f: (a: Result) => B): Parser<B> {

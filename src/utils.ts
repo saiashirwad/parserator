@@ -1,3 +1,1 @@
-export type Prettify<T> = {
-	[K in keyof T]: T[K]
-} & {}
+import { ParserError, type Parser } from "./parser"

@@ -1,10 +1,10 @@
 import {
 	char,
-	or,
 	digit,
 	many1,
 	manyN,
 	optional,
+	or,
 } from "./combinators"
 import { Parser } from "./parser"
 import { State } from "./state"

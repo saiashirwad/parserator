@@ -1,5 +1,5 @@
 import { Either } from "./either"
-import { Parser } from "./parser"
+import { Parser, ParserError } from "./parser"
 import { State } from "./state"
 
 /**
@@ -79,8 +79,7 @@ export const string = (str: string): Parser<string> => {
 			}
 
 			const errorMessage =
-				`Expected ${str}, ` +
-				`but found ${state.remaining.slice(0, 10)}...`
+				`Expected ${str}, ` + `but found ${state.remaining}`
 
 			return Parser.error(errorMessage, [str], state.pos)
 		},
@@ -494,12 +493,13 @@ export const skipSpaces = new Parser(
  * @param parsers - Array of parsers to try
  * @returns A parser that succeeds if any of the input parsers succeed
  */
-export function or<T>(
-	...parsers: Array<Parser<T>>
-): Parser<T> {
+export function or<Parsers extends Parser<any>[]>(
+	...parsers: Parsers
+): Parser<
+	Parsers[number] extends Parser<infer T> ? T : never
+> {
 	return new Parser((state) => {
 		const expectedNames: string[] = []
-
 		for (const parser of parsers) {
 			const result = parser.parse(state)
 			if (Either.isRight(result)) {
@@ -509,7 +509,6 @@ export function or<T>(
 				expectedNames.push(parser.options.name)
 			}
 		}
-
 		return Parser.error(
 			`None of the ${parsers.length} choices could be satisfied`,
 			expectedNames,
