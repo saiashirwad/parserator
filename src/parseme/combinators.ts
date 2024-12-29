@@ -254,14 +254,33 @@ export function sepBy<S, T>(
  */
 export function between<T>(
 	start: Parser<any>,
-	end: Parser<any>,
 	parser: Parser<T>,
+	end: Parser<any>,
 ): Parser<T> {
-	return Parser.gen(function* () {
-		yield* start
-		const result = yield* parser
-		yield* end
-		return result
+	return new Parser((state) => {
+		// Parse opening delimiter
+		const startResult = start.parse(state)
+		if (Either.isLeft(startResult)) {
+			return startResult
+		}
+
+		// Parse content
+		const contentResult = parser.parse(startResult.right[1])
+		if (Either.isLeft(contentResult)) {
+			return contentResult
+		}
+
+		// Parse closing delimiter
+		const endResult = end.parse(contentResult.right[1])
+		if (Either.isLeft(endResult)) {
+			return endResult
+		}
+
+		// Return the content and final state
+		return Parser.succeed(
+			contentResult.right[0],
+			endResult.right[1],
+		)
 	})
 }
 

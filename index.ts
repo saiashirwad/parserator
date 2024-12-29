@@ -1,29 +1,21 @@
 import {
 	alphabet,
+	between,
 	char,
 	many1,
 } from "./src/parseme/combinators"
-import {
-	benchmark,
-	debug,
-	debugState,
-	trace,
-} from "./src/parseme/debug"
 
-const word = benchmark(
-	char('"')
-		.then(many1(alphabet))
-		.thenDiscard(char('"'))
-		.map((result) => result.join("")),
-	"Word Parser",
-).tap((state, result) => debugState("Word", state, result))
+const word = char('"')
+	.then(many1(alphabet))
+	.thenDiscard(char('"'))
+	.map((result) => result.join(""))
 
-// Add debug output to our parsers
-const debuggedWord = debug(word, "Word")
-const manyStrings = trace("Starting array parse")
-	.then(many1(debuggedWord, char(",")))
-	.tap((state, result) =>
-		debugState("Array", state, result),
-	)
+const manyStrings = between(
+	char("["),
+	many1(word, char(",")),
+	char("]"),
+)
 
-console.log(manyStrings.run('"hello","world","test"'))
+console.log(
+	manyStrings.parseOrError('["hello","world","test"]'),
+)
