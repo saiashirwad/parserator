@@ -10,12 +10,17 @@ export type ParserContext = {}
 
 type ParserOptions = { name?: string }
 
-export class ParserError {
+export class ParserError extends Error {
 	constructor(
 		public message: string,
 		public expected: string[],
 		public pos: SourcePosition,
-	) {}
+	) {
+		super(message)
+		Object.setPrototypeOf(this, ParserError.prototype)
+		Error.captureStackTrace(this, this.constructor)
+		this.name = this.constructor.name
+	}
 }
 
 export type ParserResult<T> = Either<
@@ -73,12 +78,17 @@ export class Parser<Result> {
 		}, this.options)
 	}
 
-	error2(onError: (error: ParserError) => string) {
+	error2(
+		onError: (
+			error: ParserError,
+			state: ParserState,
+		) => string,
+	) {
 		return new Parser<Result>((state) => {
 			const result = this._run(state)
 			if (Either.isLeft(result)) {
 				return Parser.error(
-					onError(result.left),
+					onError(result.left, state),
 					result.left.expected,
 					result.left.pos,
 				)
@@ -100,6 +110,22 @@ export class Parser<Result> {
 			)
 		}
 		return result
+	}
+
+	parseOrError(input: string) {
+		const result = this._run(State.fromInput(input))
+		if (Either.isRight(result)) {
+			return result.right[0]
+		}
+		return result.left
+	}
+
+	parseOrThrow(input: string) {
+		const result = this._run(State.fromInput(input))
+		if (Either.isRight(result)) {
+			return result.right[0]
+		}
+		throw result.left
 	}
 
 	map<B>(f: (a: Result) => B): Parser<B> {

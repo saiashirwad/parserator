@@ -1,20 +1,15 @@
-import { convertToObject } from "typescript"
 import {
-	alphabet,
-	char,
-	lookAhead,
-	many1,
-	notFollowedBy,
 	skipSpaces,
+	string,
 } from "./src/parseme/combinators"
-import { Parser } from "./src/parseme/parser"
+import { ParserError } from "./src/parseme/parser"
 
 try {
 	const lol = skipSpaces
-		.then(char("h"))
+		.then(string("hi"))
 		.thenDiscard(skipSpaces)
-		.error("Oops")
-	console.log(lol.run("       j"))
+		.map((x) => x.split(""))
+	console.log(lol.parseOrThrow("       hi"))
 	// type BC = {
 	// 	b: string
 	// 	c: string
@@ -35,7 +30,7 @@ try {
 	// })
 	// console.log(p.run("bc;"))
 } catch (e) {
-	if (e instanceof Error) {
+	if (e instanceof ParserError) {
 		console.log(e.message)
 	}
 }

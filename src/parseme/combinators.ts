@@ -446,7 +446,7 @@ export function optional<T>(
 	parser: Parser<T>,
 ): Parser<T | undefined> {
 	return new Parser((state) => {
-		const result = parser.run(state.remaining)
+		const result = parser._run(state)
 		if (Either.isLeft(result)) {
 			return Parser.succeed(undefined, state)
 		}
