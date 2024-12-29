@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { chain } from "./chain"
+import { chain } from "../src/chain"
 import {
 	alphabet,
 	char,
@@ -12,9 +12,9 @@ import {
 	sepBy,
 	sequence,
 	skipSpaces,
-} from "./combinators"
-import { Either } from "./either"
-import { Parser } from "./parser"
+} from "../src/combinators"
+import { Either } from "../src/either"
+import { Parser } from "../src/parser"
 
 const stringParser = skipSpaces
 	.then(char('"'))

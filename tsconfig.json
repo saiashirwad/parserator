@@ -13,6 +13,6 @@
     "verbatimModuleSyntax": true,
     "emitDeclarationOnly": true
   },
-  "include": ["src/**/*", "index.ts"],
+  "include": ["src/**/*", "index.ts", "tests/combinators.test.ts", "src/lexer.ts"],
   "exclude": ["node_modules", "dist"]
 }

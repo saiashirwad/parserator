@@ -9,34 +9,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    },
-    "./combinators": {
-      "types": "./dist/combinators.d.ts",
-      "default": "./dist/combinators.js"
-    },
-    "./utils": {
-      "types": "./dist/utils.d.ts",
-      "default": "./dist/utils.js"
-    },
-    "./state": {
-      "types": "./dist/state.d.ts",
-      "default": "./dist/state.js"
-    },
-    "./parser": {
-      "types": "./dist/parser.d.ts",
-      "default": "./dist/parser.js"
-    },
-    "./lexer": {
-      "types": "./dist/lexer.d.ts",
-      "default": "./dist/lexer.js"
-    },
-    "./either": {
-      "types": "./dist/either.d.ts",
-      "default": "./dist/either.js"
-    },
-    "./debug": {
-      "types": "./dist/debug.d.ts",
-      "default": "./dist/debug.js"
     }
   },
   "files": [
