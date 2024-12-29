@@ -375,7 +375,7 @@ export const manyN = <S, T>(
  * @param count - Minimum number of repetitions required
  * @returns A function that creates a parser skipping multiple occurrences
  */
-export function skipMany_<T>(count: number) {
+function skipMany_<T>(count: number) {
 	return (parser: Parser<T>): Parser<undefined> => {
 		return Parser.gen(function* () {
 			for (let i = 0; i < count; i++) {
