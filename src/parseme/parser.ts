@@ -1,5 +1,5 @@
-import type { Prettify } from "./utils"
 import { Either } from "./either"
+import type { Prettify } from "./utils"
 
 export type SourcePosition = {
 	line: number
@@ -107,29 +107,6 @@ export class Parser<Result> {
 			})
 		}, this.options)
 	}
-
-	// transform<B>(
-	// 	f: (
-	// 		value: Result,
-	// 		state: ParserState,
-	// 	) => [B, ParserState],
-	// ): Parser<B> {
-	// 	return new Parser<B>((state) => {
-	// 		return Either.match(this._run(state), {
-	// 			onRight: ([value, newState]) => {
-	// 				const [newValue, transformedState] = f(
-	// 					value,
-	// 					newState,
-	// 				);
-	// 				return Either.right([
-	// 					newValue,
-	// 					updateState(newState, transformedState),
-	// 				] as const);
-	// 			},
-	// 			onLeft: Either.left,
-	// 		});
-	// 	});
-	// }
 
 	flatMap<B>(f: (a: Result) => Parser<B>): Parser<B> {
 		return new Parser<B>((state) => {

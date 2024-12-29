@@ -1,5 +1,5 @@
 import { Either } from "./either"
-import { Parser } from "./parser"
+import { consumeString, Parser } from "./parser"
 
 export const string = (str: string): Parser<string> => {
 	return new Parser(
@@ -15,6 +15,10 @@ export const string = (str: string): Parser<string> => {
 		},
 		{ name: str },
 	)
+}
+
+export function constString<const T extends string>(str: T): Parser<T> {
+	return string(str) as any
 }
 
 export const char = <T extends string>(ch: T): Parser<T> => {
@@ -162,16 +166,19 @@ export function skipUntil<T>(parser: Parser<T>): Parser<undefined> {
 	})
 }
 
-// export function skipSpaces(): Parser<undefined> {
-// 	return new Parser((state) => {
-// 		const trimmedInput = state.input.trim();
-// 		return Parser.succeed(undefined, state, trimmedInput);
-// 	});
-// }
 export const skipSpaces = new Parser(
 	(state) => {
-		const trimmedInput = state.input.trim()
-		return Parser.succeed(undefined, state, trimmedInput)
+		let input = state.input
+		let consumed = ""
+		while (true) {
+			if (input[0] !== " ") {
+				break
+			}
+			consumed += " "
+			input = input.slice(1)
+		}
+		const stateAfter = consumeString(state, consumed)
+		return Parser.succeed(undefined, stateAfter, input)
 	},
 	{ name: "skipSpaces" },
 )
