@@ -1,0 +1,22 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts"],
+  "entryPointStrategy": "expand",
+  "out": "docs",
+  "name": "Parserator",
+  "includeVersion": true,
+  "navigationLinks": {
+    "GitHub": "https://github.com/saiashirwad/parserator",
+    "NPM": "https://www.npmjs.com/package/parserator"
+  },
+  "categorizeByGroup": true,
+  "searchInComments": true,
+  "readme": "README.md",
+  "sort": ["source-order"],
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "validation": {
+    "invalidLink": true,
+    "notDocumented": true
+  }
+} 
