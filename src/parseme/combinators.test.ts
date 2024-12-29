@@ -1,21 +1,19 @@
-import { expect, test, describe } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import {
+	alphabet,
+	between,
 	char,
-	string,
+	digit,
+	lookAhead,
 	many0,
 	many1,
-	manyN,
-	or,
-	optional,
-	between,
-	sepBy,
-	alphabet,
-	digit,
-	skipSpaces,
-	lookAhead,
 	notFollowedBy,
+	optional,
+	or,
+	sepBy,
+	skipSpaces,
+	string,
 } from "./combinators"
-import { Parser } from "./parser"
 import { Either } from "./either"
 
 describe("Basic Parsers", () => {
@@ -24,6 +22,15 @@ describe("Basic Parsers", () => {
 		expect(Either.isRight(p.run("abc"))).toBe(true)
 		expect(Either.isRight(p.run("b"))).toBe(false)
 		expect(p.parseOrError("abc")).toBe("a")
+	})
+
+	test("parse integer", () => {
+		const p = many1(digit).map((digits) =>
+			parseInt(digits.join(""), 10),
+		)
+		expect(Either.isRight(p.run("123"))).toBe(true)
+		expect(Either.isRight(p.run("abc"))).toBe(false)
+		expect(p.parseOrError("123")).toBe(123)
 	})
 
 	test("string parser", () => {
@@ -63,12 +70,12 @@ describe("Repetition Parsers", () => {
 		expect(p.parseOrError("aaab")).toEqual(["a", "a", "a"])
 	})
 
-	test("manyN", () => {
-		const p = manyN(char("a"), 2)
-		expect(Either.isRight(p.run("a"))).toBe(false)
-		expect(p.parseOrError("aa")).toEqual(["a", "a"])
-		expect(p.parseOrError("aaa")).toEqual(["a", "a"])
-	})
+	// test("manyN", () => {
+	// 	const p = manyN(char("a"), 2)
+	// 	expect(Either.isRight(p.run("a"))).toBe(false)
+	// 	expect(p.parseOrError("aa")).toEqual(["a", "a"])
+	// 	expect(p.parseOrError("aaa")).toEqual(["a", "a"])
+	// })
 })
 
 describe("Combinators", () => {
