@@ -1,35 +1,27 @@
-import { char, lookAhead, notFollowedBy } from "./src/parseme/combinators"
-import { Parser } from "./src/parseme/parser"
+import { alphabet, many1 } from "./src/parseme/combinators"
 
-// const lol = Parser.gen(function* () {
-// 	const a = yield* parseString
-// 	yield* skipSpaces
-// 	const b = yield* parseBool
-// 	yield* skipSpaces
-// 	const c = yield* parseNumber
+const lol = many1(alphabet).run("[abcd2323")
+console.log(lol)
 
-// 	return { a, b, c }
-// })
-
-// const result = lol.run('"hello" true 123')
-
-// if (result._tag === "Right") {
-// 	console.log(result.right[0])
-// } else {
-// 	console.log(result.left)
+// type BC = {
+// 	b: string
+// 	c: string
 // }
 
-const p = Parser.gen(function* () {
-	const b = yield* lookAhead(char("b"))
-	if (b) {
-		yield* char("b").thenRight(notFollowedBy(char("a")))
-		// yield* notFollowedBy(char("a"))
-		console.log("haha")
-		return { b }
-	} else {
-		const a = yield* char("a")
-		return { a }
-	}
-})
+// type A = {
+// 	a: string
+// }
 
-console.log(p.run("ba"))
+// const p = Parser.gen(function* () {
+// 	const b = yield* lookAhead(char("b"))
+// 	if (b) {
+// 		yield* char("b").then(notFollowedBy(char("a")))
+// 		const c = yield* char("c").thenDiscard(char(";"))
+// 		return { b, c } as BC
+// 	} else {
+// 		const a = yield* char("a")
+// 		return { a } as A
+// 	}
+// })
+
+// console.log(p.run("ba"))

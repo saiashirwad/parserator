@@ -33,7 +33,7 @@ export function notFollowedBy<T>(parser: Parser<T>) {
 export const string = (str: string): Parser<string> => {
 	return new Parser(
 		(state) => {
-			if (str === "" || state.remaining.startsWith(str)) {
+			if (state.remaining.startsWith(str)) {
 				return Parser.succeed(str, state, str)
 			}
 
@@ -54,11 +54,7 @@ export const char = <T extends string>(ch: T): Parser<T> => {
 	return new Parser(
 		(state) => {
 			if (ch.length !== 1) {
-				return Parser.error(
-					"char parser expects a single character",
-					[ch],
-					state.pos,
-				)
+				return Parser.error("Incorrect usage of char parser.", [ch], state.pos)
 			}
 			if (state.remaining[0] === ch) {
 				return Parser.succeed(ch, state, ch)
@@ -159,7 +155,7 @@ function many_<T>(count: number) {
 	}
 }
 
-export const many = <T>(parser: Parser<T>) => many_<T>(0)(parser)
+export const zeroOrMore = <T>(parser: Parser<T>) => many_<T>(0)(parser)
 export const many1 = <T>(parser: Parser<T>) => many_<T>(1)(parser)
 export const manyN = <T>(parser: Parser<T>, n: number) => many_<T>(n)(parser)
 

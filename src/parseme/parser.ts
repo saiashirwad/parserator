@@ -150,11 +150,11 @@ export class Parser<Result> {
 		)
 	}
 
-	thenRight<B>(parserB: Parser<B>): Parser<B> {
+	then<B>(parserB: Parser<B>): Parser<B> {
 		return this.zip(parserB).map(([_, b]) => b)
 	}
 
-	thenLeft<B>(parserB: Parser<B>): Parser<Result> {
+	thenDiscard<B>(parserB: Parser<B>): Parser<Result> {
 		return this.zip(parserB).map(([a, _]) => a)
 	}
 
