@@ -1,4 +1,6 @@
 import {
+	char,
+	notFollowedBy,
 	skipSpaces,
 	string,
 } from "./src/parseme/combinators"
@@ -9,6 +11,7 @@ try {
 		.then(string("hi"))
 		.thenDiscard(skipSpaces)
 		.map((x) => x.split(""))
+		.then(notFollowedBy(char("c")))
 	console.log(lol.parseOrThrow("       hi"))
 	// type BC = {
 	// 	b: string
