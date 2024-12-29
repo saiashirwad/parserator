@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import { chain } from "./chain"
 import {
 	alphabet,
 	char,
@@ -12,8 +13,8 @@ import {
 	skipSpaces,
 	string,
 } from "./combinators"
-import { chain } from "./chain"
-import { Parser } from "./parser"
+import { Either } from "./either"
+import { Parser, ParserError } from "./parser"
 
 const stringParser = skipSpaces
 	.then(char('"'))
@@ -75,28 +76,12 @@ test("chain", () => {
 		if (s.length !== s.items.length) {
 			return yield* Parser.fail("Length mismatch")
 		}
-		// if (s.length !== s.items.length) {
-		// 	return yield* Parser.fail("Length mismatch")
-		// }
 		return s.items
 	})
-	console.log(
-		lengthPrefixedList.parseOrError(
-			'2 ["foo", "bar", "baz"]',
-		),
-	)
 
-	type a = never | number
-
-	// expect(
-	// 	lengthPrefixedList.parseOrThrow('2 ["foo", "bar"]'),
-	// ).toEqual(["foo", "bar"])
-	// expect(() =>
-	// 	lengthPrefixedList.parseOrThrow('2 ["foo"]'),
-	// ).toThrow() // Too few items
-	// expect(() =>
-	// 	lengthPrefixedList.parseOrThrow(
-	// 		'2 ["foo", "bar", "baz"]',
-	// 	),
-	// ).toThrow() // Too many items
+	expect(p.parseOrError('2 ["foo", "bar"]')).toEqual([
+		"foo",
+		"bar",
+	])
+	expect(Either.isLeft(p.run('2 ["foo"]'))).toEqual(true)
 })
