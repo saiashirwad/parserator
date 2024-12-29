@@ -571,28 +571,6 @@ export function sequence<Parsers extends Parser<any>[]>(
 	})
 }
 
-// /**
-//  * Creates a parser that chains two parsers together, where the second parser
-//  * depends on the result of the first parser.
-//  *
-//  * @param parser - The first parser to run
-//  * @param fn - Function that takes the result of the first parser and returns a new parser
-//  * @returns A parser that chains the two parsers together
-//  */
-// export const chain = <T, U>(
-// 	parser: Parser<T>,
-// 	fn: (value: T) => Parser<U>,
-// ): Parser<U> => {
-// 	return new Parser((state) => {
-// 		const result = parser.parse(state)
-// 		if (Either.isLeft(result)) {
-// 			return result
-// 		}
-// 		const [value, newState] = result.right
-// 		return fn(value).parse(newState)
-// 	})
-// }
-
 /**
  * Creates a parser that matches input against a regular expression.
  * The regex must match at the start of the input.
@@ -601,9 +579,15 @@ export function sequence<Parsers extends Parser<any>[]>(
  * @returns A parser that matches the regex pattern
  */
 export const regex = (re: RegExp): Parser<string> => {
+	// Create a new RegExp without global flag to ensure consistent behavior
+	const nonGlobalRe = new RegExp(
+		re.source,
+		re.flags.replace("g", ""),
+	)
+
 	return new Parser(
 		(state) => {
-			const match = re.exec(state.remaining)
+			const match = nonGlobalRe.exec(state.remaining)
 			if (match && match.index === 0) {
 				const value = match[0]
 				return Parser.succeed(value, state)

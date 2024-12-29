@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { chain } from "./chain"
 import {
 	alphabet,
@@ -8,13 +8,13 @@ import {
 	manyN,
 	optional,
 	or,
+	regex,
 	sepBy,
 	sequence,
 	skipSpaces,
-	string,
 } from "./combinators"
 import { Either } from "./either"
-import { Parser, ParserError } from "./parser"
+import { Parser } from "./parser"
 
 const stringParser = skipSpaces
 	.then(char('"'))
@@ -60,8 +60,6 @@ test("sequence", () => {
 })
 
 test("chain", () => {
-	// Chain can be used to build parsers where each step depends on previous values
-	// Here's an example of parsing a list with a specified length
 	const lengthPrefixedList = chain(
 		integerParser,
 		(length) =>
@@ -84,4 +82,21 @@ test("chain", () => {
 		"bar",
 	])
 	expect(Either.isLeft(p.run('2 ["foo"]'))).toEqual(true)
+})
+
+describe("regex", () => {
+	test("should match at the start of the input", () => {
+		const p = regex(/foo/)
+		expect(p.parseOrThrow("foo")).toEqual("foo")
+	})
+
+	test("should not match at the start of the input", () => {
+		const p = regex(/foo/)
+		expect(Either.isLeft(p.run("bar"))).toEqual(true)
+	})
+
+	test("should match at the start of the input with global flag", () => {
+		const p = regex(/foo/g)
+		expect(p.parseOrThrow("foo")).toEqual("foo")
+	})
 })
