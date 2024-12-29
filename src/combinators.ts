@@ -1,5 +1,5 @@
 import { Either } from "./either"
-import { Parser, ParserError } from "./parser"
+import { Parser } from "./parser"
 import { State } from "./state"
 
 /**
@@ -536,6 +536,10 @@ export function optional<T>(
 	})
 }
 
+type LastParser<T> = T extends [...any[], Parser<infer L>]
+	? L
+	: never
+
 /**
  * Creates a parser that runs multiple parsers in sequence.
  * Returns the result of the last parser in the sequence.
@@ -543,11 +547,11 @@ export function optional<T>(
  * @param parsers - Array of parsers to run in sequence
  * @returns A parser that succeeds if all parsers succeed in sequence
  */
-export function sequence<T>(
-	parsers: Parser<T>[],
-): Parser<T> {
+export function sequence<Parsers extends Parser<any>[]>(
+	parsers: [...Parsers],
+): Parser<LastParser<Parsers>> {
 	return new Parser((state) => {
-		const results: T[] = []
+		const results: Parsers[] = []
 		let currentState = state
 
 		for (const parser of parsers) {

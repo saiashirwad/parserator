@@ -1,13 +1,16 @@
-import { describe, expect, test } from "bun:test"
+import { expect, test } from "bun:test"
 import {
 	alphabet,
 	char,
 	digit,
 	many1,
+	optional,
 	or,
 	sepBy,
+	sequence,
 	skipSpaces,
 } from "./combinators"
+import type { Last } from "./types"
 
 const stringParser = skipSpaces
 	.then(char('"'))
@@ -16,38 +19,40 @@ const stringParser = skipSpaces
 	.map((s) => s.join(""))
 
 const integerParser = skipSpaces
-	.then(digit)
-	.map((s) => parseInt(s))
+	.then(many1(digit))
+	.map((s) => parseInt(s.join("")))
 
-describe("SepBy", () => {
-	test("sepBy simple", () => {
-		const p = sepBy(char(","), digit)
-		expect(p.parseOrThrow("1,2,3")).toEqual(["1", "2", "3"])
-	})
+test("sepBy string array", () => {
+	const p = char("[")
+		.then(sepBy(char(","), or(stringParser, integerParser)))
+		.thenDiscard(char("]"))
+	console.log(p.parseOrThrow('["hello", 2, "foo"]'))
+	expect(p.parseOrThrow('["hello", 2, "foo"]')).toEqual([
+		"hello",
+		2,
+		"foo",
+	])
+})
 
-	test("sepBy empty", () => {
-		const p = sepBy(char(","), digit)
-		expect(p.parseOrThrow("")).toEqual([])
-	})
+test("optional", () => {
+	const p = optional(or(stringParser, integerParser))
+	expect(p.parseOrThrow('"hello"')).toEqual("hello")
+	expect(p.parseOrThrow("123")).toEqual(123)
+})
 
-	test("sepBy compound parser", () => {
-		const p = sepBy(char(","), stringParser)
-		expect(
-			p.parseOrThrow('"hello", "world", "foo"'),
-		).toEqual(["hello", "world", "foo"])
-	})
+type lol = Last<[typeof stringParser, typeof integerParser]>
 
-	test("sepBy string array", () => {
-		const p = char("[")
-			.then(
-				sepBy(char(","), or(stringParser, integerParser)),
-			)
-			.thenDiscard(char("]"))
-		console.log(p.parseOrThrow('["hello", 2, "foo"]'))
-		expect(p.parseOrThrow('["hello", 2, "foo"]')).toEqual([
-			"hello",
-			2,
-			"foo",
-		])
-	})
+test("sequence", () => {
+	const p = sequence([
+		stringParser,
+		skipSpaces,
+		char(","),
+		skipSpaces,
+		integerParser,
+		skipSpaces,
+		char(","),
+		skipSpaces,
+		integerParser,
+	])
+	console.log(p.parseOrThrow('"hello", 123, 456'))
 })
