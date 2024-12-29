@@ -155,7 +155,7 @@ function many_<T>(count: number) {
 	}
 }
 
-export const zeroOrMore = <T>(parser: Parser<T>) => many_<T>(0)(parser)
+export const many0 = <T>(parser: Parser<T>) => many_<T>(0)(parser)
 export const many1 = <T>(parser: Parser<T>) => many_<T>(1)(parser)
 export const manyN = <T>(parser: Parser<T>, n: number) => many_<T>(n)(parser)
 

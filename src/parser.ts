@@ -1,7 +1,7 @@
 import {
 	alphabet,
 	constString,
-	many,
+	many1,
 	or,
 	skipSpaces,
 } from "./parseme/combinators"
@@ -11,7 +11,7 @@ import { Type } from "./syntax"
 
 export const parseString = Parser.gen(function* () {
 	yield* skipSpaces
-	const result = yield* many(alphabet)
+	const result = yield* many1(alphabet)
 	yield* skipSpaces
 	return Type("TString", { value: result.join("") })
 })

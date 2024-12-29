@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { Parser } from "./parser"
-import { alphabet, char, many, optional, skipSpaces } from "./combinators"
+import { alphabet, char, many1, optional, skipSpaces } from "./combinators"
 import { Either } from "./either"
 
 test("char", () => {
@@ -14,7 +14,7 @@ test("char", () => {
 })
 
 test("many", () => {
-	const p = many(char("a"))
+	const p = many1(char("a"))
 	const result = p.run("aaaa")
 
 	if (result._tag === "Right") {
@@ -27,10 +27,10 @@ test("many", () => {
 
 test("string array", () => {
 	const str = char('"')
-		.zip(many(alphabet).map((a) => a.join("")))
+		.zip(many1(alphabet).map((a) => a.join("")))
 		.zip(char('"'))
 		.map(([a, _]) => a[1])
-	const strings = many(str.zip(optional(char(","))).map(([a, _]) => a))
+	const strings = many1(str.zip(optional(char(","))).map(([a, _]) => a))
 	const arr = char("[")
 		.zip(strings)
 		.zip(char("]"))
