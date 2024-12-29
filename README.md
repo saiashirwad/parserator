@@ -5,6 +5,15 @@
 
 A TypeScript parser combinator library inspired by [Parsec](https://github.com/haskell/parsec) and [Effect-TS](https://github.com/Effect-ts/Effect). Write parsers using a clean, generator-based syntax or compose them using functional combinators.
 
+## Features
+
+* 🎯 **Generator Syntax**: Write parsers using a clean, async-like syntax
+* 🔧 **Functional Combinators**: Compose parsers using functional programming patterns
+* 🎭 **Type-Safe**: Full TypeScript support with precise type inference
+* 📦 **Zero Dependencies**: No external dependencies, just pure TypeScript
+* 🐛 **Great Error Messages**: Helpful error messages with source positions
+* 🚀 **Fast?**: I wouldn't know, this could be the slowest thing in the known universe.
+
 ## Examples
 
 ```ts
@@ -58,15 +67,6 @@ export const float: Parser<number> = Parser.gen(
 )
 
 ```
-
-## Features
-
-* 🎯 **Generator Syntax**: Write parsers using a clean, async-like syntax
-* 🔧 **Functional Combinators**: Compose parsers using functional programming patterns
-* 🎭 **Type-Safe**: Full TypeScript support with precise type inference
-* 📦 **Zero Dependencies**: No external dependencies, just pure TypeScript
-* 🐛 **Great Error Messages**: Helpful error messages with source positions
-* 🚀 **Fast?**: I wouldn't know, this could be the slowest thing in the known universe.
 
 ## Installation
 
