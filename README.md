@@ -3,6 +3,9 @@
 > **Warning**
 > This library is currently in early development and the API is subject to change. There are *several* bugs. Please don't use, even at your own risk. I am absolutely responsible for any bugs, so holler at me at [@texoport.in](https://bsky.app/profile/texoport.in).
 
+> **Warning**
+> I just let Cursor have a go at writing this placeholder README. I can't attest to the quality of the generated docs. 
+
 A TypeScript parser combinator library inspired by [Parsec](https://github.com/haskell/parsec) and [Effect-TS](https://github.com/Effect-ts/Effect). Write parsers using a clean, generator-based syntax or compose them using functional combinators.
 
 ## Features
