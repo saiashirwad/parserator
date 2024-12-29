@@ -220,22 +220,41 @@ export function sepBy<S, T>(
 	sepParser: Parser<S>,
 	parser: Parser<T>,
 ): Parser<T[]> {
-	return Parser.gen(function* () {
-		const acc: Array<T> = []
-		const firstResult = yield* optional(parser)
-		if (firstResult) {
-			acc.push(firstResult)
-			while (true) {
-				const sepResult = yield* optional(sepParser)
-				if (!sepResult) {
-					return acc
-				}
-				const result = yield* parser
-				acc.push(result)
-			}
+	return new Parser((state) => {
+		const results: T[] = []
+		let currentState = state
+
+		// Try to parse first item
+		const firstResult = parser.parse(currentState)
+		if (Either.isLeft(firstResult)) {
+			// Empty list is valid for sepBy
+			return Parser.succeed(results, state)
 		}
-		return acc
-	}) as Parser<T[]>
+
+		// Add first item and continue
+		results.push(firstResult.right[0])
+		currentState = firstResult.right[1]
+
+		// Parse remaining items
+		while (true) {
+			// Try to parse separator
+			const sepResult = sepParser.parse(currentState)
+			if (Either.isLeft(sepResult)) {
+				break
+			}
+			currentState = sepResult.right[1]
+
+			// Try to parse next item
+			const itemResult = parser.parse(currentState)
+			if (Either.isLeft(itemResult)) {
+				return itemResult
+			}
+			results.push(itemResult.right[0])
+			currentState = itemResult.right[1]
+		}
+
+		return Parser.succeed(results, currentState)
+	})
 }
 
 /**
@@ -377,17 +396,29 @@ export const manyN = <S, T>(
  */
 function skipMany_<T>(count: number) {
 	return (parser: Parser<T>): Parser<undefined> => {
-		return Parser.gen(function* () {
-			for (let i = 0; i < count; i++) {
-				const result = yield* optional(parser)
-				if (!result) {
-					return yield* Parser.fail(
-						`Expected at least ${count} occurrences, but only found ${i}`,
-					)
+		return new Parser((state) => {
+			let currentState = state
+			let successes = 0
+
+			while (true) {
+				const result = parser.parse(currentState)
+				if (Either.isLeft(result)) {
+					break
 				}
+				successes++
+				currentState = result.right[1]
 			}
-			return undefined
-		}) as Parser<undefined>
+
+			if (successes >= count) {
+				return Parser.succeed(undefined, currentState)
+			}
+
+			return Parser.error(
+				`Expected at least ${count} occurrences, but only found ${successes}`,
+				[],
+				state.pos,
+			)
+		})
 	}
 }
 
@@ -430,13 +461,18 @@ export const skipManyN = <T>(
 export function skipUntil<T>(
 	parser: Parser<T>,
 ): Parser<undefined> {
-	return Parser.gen(function* () {
-		while (true) {
-			const result = yield* optional(parser)
-			if (!result) {
-				return undefined
+	return new Parser((state) => {
+		let currentState = state
+
+		while (!State.isAtEnd(currentState)) {
+			const result = parser.parse(currentState)
+			if (Either.isRight(result)) {
+				return Parser.succeed(undefined, result.right[1])
 			}
+			currentState = State.consume(currentState, 1)
 		}
+
+		return Parser.succeed(undefined, currentState)
 	})
 }
 
@@ -461,21 +497,25 @@ export const skipSpaces = new Parser(
 export function or<T>(
 	...parsers: Array<Parser<T>>
 ): Parser<T> {
-	return Parser.gen(function* () {
+	return new Parser((state) => {
+		const expectedNames: string[] = []
+
 		for (const parser of parsers) {
-			const result = yield* optional(parser)
-			if (result) {
+			const result = parser.parse(state)
+			if (Either.isRight(result)) {
 				return result
+			}
+			if (parser.options?.name) {
+				expectedNames.push(parser.options.name)
 			}
 		}
 
-		return yield* Parser.fail(
+		return Parser.error(
 			`None of the ${parsers.length} choices could be satisfied`,
-			parsers
-				.filter((x) => x.options?.name != null)
-				.map((p) => p.options?.name ?? ""),
+			expectedNames,
+			state.pos,
 		)
-	}) as Parser<T>
+	})
 }
 
 /**

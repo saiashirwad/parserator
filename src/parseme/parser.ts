@@ -174,6 +174,17 @@ export class Parser<Result> {
 		return Parser.pure({})
 	}
 
+	/**
+	 * Creates a parser that delays construction until parse time.
+	 * Useful for recursive parsers.
+	 */
+	static lazy<T>(fn: () => Parser<T>): Parser<T> {
+		return new Parser((state) => {
+			const parser = fn()
+			return parser.parse(state)
+		})
+	}
+
 	zip<B>(parserB: Parser<B>): Parser<readonly [Result, B]> {
 		return new Parser((state) => {
 			return Either.match(this.parse(state), {
