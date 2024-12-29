@@ -276,29 +276,42 @@ function many_<S, T>(count: number) {
 		parser: Parser<T>,
 		separator?: Parser<S>,
 	): Parser<T[]> => {
-		return Parser.gen(function* () {
-			const acc: T[] = []
-			let next: T | undefined
+		return new Parser((state) => {
+			const results: T[] = []
+			let currentState = state
 
-			next = yield* optional(parser)
-
-			while (next !== undefined) {
-				acc.push(next)
-				if (separator) {
-					const sepResult = yield* optional(separator)
-					if (!sepResult) break
+			while (true) {
+				// Try to parse the next item
+				const itemResult = parser.parse(currentState)
+				if (Either.isLeft(itemResult)) {
+					break
 				}
-				next = yield* optional(parser)
+
+				// Add the item and update state
+				const [value, newState] = itemResult.right
+				results.push(value)
+				currentState = newState
+
+				// If we have a separator, try to parse it
+				if (separator) {
+					const sepResult = separator.parse(currentState)
+					if (Either.isLeft(sepResult)) {
+						break
+					}
+					currentState = sepResult.right[1]
+				}
 			}
 
-			if (acc.length >= count) {
-				return acc
+			if (results.length >= count) {
+				return Parser.succeed(results, currentState)
 			}
 
-			return yield* Parser.fail(
-				`Expected at least ${count} occurrences, but only found ${acc.length}`,
+			return Parser.error(
+				`Expected at least ${count} occurrences, but only found ${results.length}`,
+				[],
+				state.pos,
 			)
-		}) as Parser<T[]>
+		})
 	}
 }
 

@@ -248,6 +248,26 @@ export class Parser<Result> {
 		return yield this
 	}
 
+	/**
+	 * Adds a tap point to observe the current state and result during parsing.
+	 * Useful for debugging parser behavior.
+	 *
+	 * @param callback - Function called with current state and result
+	 * @returns The same parser with the tap point added
+	 */
+	tap(
+		callback: (
+			state: ParserState,
+			result: ParserResult<Result>,
+		) => void,
+	): Parser<Result> {
+		return new Parser((state) => {
+			const result = this.parse(state)
+			callback(state, result)
+			return result
+		}, this.options)
+	}
+
 	static gen<Yielded, Returned>(
 		f: ($: {
 			<A>(_: Parser<A>): Parser<A>

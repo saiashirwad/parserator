@@ -2,37 +2,32 @@ import {
 	alphabet,
 	char,
 	many1,
-	notFollowedBy,
-	skipSpaces,
-	string,
 } from "./src/parseme/combinators"
-import { integer2 } from "./src/parseme/lexer"
-import { ParserError } from "./src/parseme/parser"
+import { Either } from "./src/parseme/either"
+import { State } from "./src/parseme/state"
 
-try {
-	console.log(integer2.run("hi"))
-	// const word = many1(alphabet).map((x) => x.join(""))
-	// const arrayOfWords = many1(word, char(","))
-	// console.log(arrayOfWords.parseOrThrow("hi,hi,hi"))
-	// type BC = {
-	// 	b: string
-	// 	c: string
-	// }
-	// type A = {
-	// 	a: string
-	// }
-	// const p = Parser.gen(function* () {
-	// 	const b = yield* lookAhead(char("b"))
-	// 	if (b) {
-	// 		yield* char("b").then(notFollowedBy(char("a")))
-	// 		const c = yield* char("c").thenDiscard(char(";"))
-	// 		return { b, c } as BC
-	// 	} else {
-	// 		const a = yield* char("a")
-	// 		return { a } as A
-	// 	}
-	// })
-	// console.log(p.run("bc;"))
-} catch (e) {
-	console.log(e)
-}
+const word = char('"')
+	.then(many1(alphabet))
+	.thenDiscard(char('"'))
+	.map((result) => result.join(""))
+	.tap((state, result) => {
+		console.log("\n=== Parsing Word ===")
+		console.log("Position:", State.printPosition(state))
+		console.log(
+			"Input:",
+			JSON.stringify(
+				state.remaining.slice(0, 20) +
+					(state.remaining.length > 20 ? "..." : ""),
+			),
+		)
+		console.log(
+			"Result:",
+			Either.isRight(result)
+				? `Success: "${result.right[0]}"`
+				: `Error: ${result.left.message}`,
+		)
+		console.log("=".repeat(40))
+	})
+const manyStrings = many1(word, char(","))
+
+console.log(manyStrings.run('"hello","world","test"'))
