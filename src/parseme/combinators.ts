@@ -363,10 +363,11 @@ export function skipUntil<T>(parser: Parser<T>): Parser<undefined> {
  * A parser that skips any number of space characters.
  */
 export const skipSpaces = new Parser(
-	(state) => {
-		const newState = State.consumeWhile(state, (char) => char === " ")
-		return Parser.succeed(undefined, newState)
-	},
+	(state) =>
+		Parser.succeed(
+			undefined,
+			State.consumeWhile(state, (char) => char === " "),
+		),
 	{ name: "skipSpaces" },
 )
 

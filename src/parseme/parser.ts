@@ -13,8 +13,16 @@ export type ParserState = {
 }
 
 // Add static methods to help create and manipulate parser state
+/**
+ * Utility object containing static methods for creating and manipulating parser state.
+ */
 export const State = {
-	// Create a new parser state from input
+	/**
+	 * Creates a new parser state from an input string.
+	 *
+	 * @param input - The input string to parse
+	 * @returns A new parser state initialized at the start of the input
+	 */
 	fromInput(input: string): ParserState {
 		return {
 			remaining: input,
@@ -26,7 +34,14 @@ export const State = {
 		}
 	},
 
-	// Create a new state by consuming n characters
+	/**
+	 * Creates a new state by consuming n characters from the current state.
+	 *
+	 * @param state - The current parser state
+	 * @param n - Number of characters to consume
+	 * @returns A new state with n characters consumed and position updated
+	 * @throws Error if attempting to consume more characters than remaining
+	 */
 	consume(state: ParserState, n: number): ParserState {
 		if (n === 0) return state
 		if (n > state.remaining.length) {
@@ -52,7 +67,14 @@ export const State = {
 		}
 	},
 
-	// Create a new state by consuming a specific string
+	/**
+	 * Creates a new state by consuming a specific string from the current state.
+	 *
+	 * @param state - The current parser state
+	 * @param str - The string to consume
+	 * @returns A new state with the string consumed and position updated
+	 * @throws Error if the input doesn't start with the specified string
+	 */
 	consumeString(state: ParserState, str: string): ParserState {
 		if (!state.remaining.startsWith(str)) {
 			throw new Error(
@@ -62,7 +84,13 @@ export const State = {
 		return State.consume(state, str.length)
 	},
 
-	// Create a new state by consuming until a predicate is met
+	/**
+	 * Creates a new state by consuming characters while a predicate is true.
+	 *
+	 * @param state - The current parser state
+	 * @param predicate - Function that tests each character
+	 * @returns A new state with matching characters consumed
+	 */
 	consumeWhile(
 		state: ParserState,
 		predicate: (char: string) => boolean,
@@ -74,12 +102,23 @@ export const State = {
 		return State.consume(state, i)
 	},
 
-	// Get the next n characters without consuming them
+	/**
+	 * Gets the next n characters from the input without consuming them.
+	 *
+	 * @param state - The current parser state
+	 * @param n - Number of characters to peek (default: 1)
+	 * @returns The next n characters as a string
+	 */
 	peek(state: ParserState, n: number = 1): string {
 		return state.remaining.slice(0, n)
 	},
 
-	// Check if we're at the end of input
+	/**
+	 * Checks if the parser has reached the end of input.
+	 *
+	 * @param state - The current parser state
+	 * @returns True if at end of input, false otherwise
+	 */
 	isAtEnd(state: ParserState): boolean {
 		return state.remaining.length === 0
 	},
