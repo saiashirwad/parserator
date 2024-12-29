@@ -1,16 +1,19 @@
 import { expect, test } from "bun:test"
 import {
 	alphabet,
-	chain,
 	char,
 	digit,
 	many1,
+	manyN,
 	optional,
 	or,
 	sepBy,
 	sequence,
 	skipSpaces,
+	string,
 } from "./combinators"
+import { chain } from "./chain"
+import { Parser } from "./parser"
 
 const stringParser = skipSpaces
 	.then(char('"'))
@@ -56,8 +59,44 @@ test("sequence", () => {
 })
 
 test("chain", () => {
-	const p = chain(stringParser, (s) =>
-		integerParser.map((n) => s.repeat(n)),
+	// Chain can be used to build parsers where each step depends on previous values
+	// Here's an example of parsing a list with a specified length
+	const lengthPrefixedList = chain(
+		integerParser,
+		(length) =>
+			skipSpaces
+				.then(char("["))
+				.then(manyN(stringParser, length, char(",")))
+				.thenDiscard(char("]"))
+				.map((items) => ({ items, length })),
 	)
-	console.log(p.parseOrThrow('"hello" 2'))
+	const p = Parser.gen(function* () {
+		const s = yield* lengthPrefixedList
+		if (s.length !== s.items.length) {
+			return yield* Parser.fail("Length mismatch")
+		}
+		// if (s.length !== s.items.length) {
+		// 	return yield* Parser.fail("Length mismatch")
+		// }
+		return s.items
+	})
+	console.log(
+		lengthPrefixedList.parseOrError(
+			'2 ["foo", "bar", "baz"]',
+		),
+	)
+
+	type a = never | number
+
+	// expect(
+	// 	lengthPrefixedList.parseOrThrow('2 ["foo", "bar"]'),
+	// ).toEqual(["foo", "bar"])
+	// expect(() =>
+	// 	lengthPrefixedList.parseOrThrow('2 ["foo"]'),
+	// ).toThrow() // Too few items
+	// expect(() =>
+	// 	lengthPrefixedList.parseOrThrow(
+	// 		'2 ["foo", "bar", "baz"]',
+	// 	),
+	// ).toThrow() // Too many items
 })

@@ -48,8 +48,8 @@ export class Parser<Result> {
 	static fail(
 		message: string,
 		expected: string[] = [],
-	): Parser<unknown> {
-		return new Parser<unknown>((state) => {
+	): Parser<never> {
+		return new Parser<never>((state) => {
 			return Parser.error(message, expected, state.pos)
 		})
 	}

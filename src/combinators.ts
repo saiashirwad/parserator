@@ -571,27 +571,27 @@ export function sequence<Parsers extends Parser<any>[]>(
 	})
 }
 
-/**
- * Creates a parser that chains two parsers together, where the second parser
- * depends on the result of the first parser.
- *
- * @param parser - The first parser to run
- * @param fn - Function that takes the result of the first parser and returns a new parser
- * @returns A parser that chains the two parsers together
- */
-export const chain = <T, U>(
-	parser: Parser<T>,
-	fn: (value: T) => Parser<U>,
-): Parser<U> => {
-	return new Parser((state) => {
-		const result = parser.parse(state)
-		if (Either.isLeft(result)) {
-			return result
-		}
-		const [value, newState] = result.right
-		return fn(value).parse(newState)
-	})
-}
+// /**
+//  * Creates a parser that chains two parsers together, where the second parser
+//  * depends on the result of the first parser.
+//  *
+//  * @param parser - The first parser to run
+//  * @param fn - Function that takes the result of the first parser and returns a new parser
+//  * @returns A parser that chains the two parsers together
+//  */
+// export const chain = <T, U>(
+// 	parser: Parser<T>,
+// 	fn: (value: T) => Parser<U>,
+// ): Parser<U> => {
+// 	return new Parser((state) => {
+// 		const result = parser.parse(state)
+// 		if (Either.isLeft(result)) {
+// 			return result
+// 		}
+// 		const [value, newState] = result.right
+// 		return fn(value).parse(newState)
+// 	})
+// }
 
 /**
  * Creates a parser that matches input against a regular expression.
