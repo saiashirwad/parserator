@@ -1,7 +1,5 @@
-import ts from "typescript"
-
+import { char, lookAhead, notFollowedBy } from "./src/parseme/combinators"
 import { Parser } from "./src/parseme/parser"
-import { alphabet, char, many, skipSpaces } from "./src/parseme/combinators"
 
 // const lol = Parser.gen(function* () {
 // 	const a = yield* parseString
@@ -22,9 +20,16 @@ import { alphabet, char, many, skipSpaces } from "./src/parseme/combinators"
 // }
 
 const p = Parser.gen(function* () {
-	// yield* skipSpaces
-	const a = yield* char("a")
-	return a
+	const b = yield* lookAhead(char("b"))
+	if (b) {
+		yield* char("b")
+		yield* notFollowedBy(char("a"))
+		console.log("haha")
+		return { b }
+	} else {
+		const a = yield* char("a")
+		return { a }
+	}
 })
 
-console.log(p.run("2"))
+console.log(p.run("ba"))

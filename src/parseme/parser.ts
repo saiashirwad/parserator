@@ -8,9 +8,11 @@ export type SourcePosition = {
 }
 
 export type ParserState = {
-	input: string
+	remaining: string
 	pos: SourcePosition
 }
+
+export type ParserContext = {}
 
 type ParserOptions = { name?: string }
 
@@ -80,7 +82,6 @@ export class Parser<Result> {
 			return result
 		}
 		if (this.errorMessage) {
-			console.log(this)
 			return Parser.error(
 				this.errorMessage,
 				result.left.expected,
@@ -224,7 +225,7 @@ export class Parser<Result> {
 
 export function initialState(input: string): ParserState {
 	return {
-		input,
+		remaining: input,
 		pos: {
 			line: 1,
 			column: 1,
@@ -259,13 +260,13 @@ export function updateState(
 	oldState: ParserState,
 	newState: ParserState,
 ): ParserState {
-	const consumed = oldState.input.slice(
+	const consumed = oldState.remaining.slice(
 		0,
-		oldState.input.length - newState.input.length,
+		oldState.remaining.length - newState.remaining.length,
 	)
 	return {
 		...oldState,
-		input: oldState.input.slice(consumed.length),
+		remaining: oldState.remaining.slice(consumed.length),
 		pos: updatePosition(oldState.pos, consumed),
 	}
 }
@@ -277,7 +278,7 @@ export function consumeString(
 	const newPos = updatePosition(state.pos, consumed ?? "")
 
 	return {
-		input: state.input.slice(consumed?.length ?? 0),
+		remaining: state.remaining.slice(consumed?.length ?? 0),
 		pos: newPos,
 	}
 }

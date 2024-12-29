@@ -1,13 +1,12 @@
-import { Parser } from "./parseme/parser"
 import {
 	alphabet,
-	char,
 	constString,
 	many,
 	or,
 	skipSpaces,
 } from "./parseme/combinators"
 import { float } from "./parseme/lexer"
+import { Parser } from "./parseme/parser"
 import { Type } from "./syntax"
 
 export const parseString = Parser.gen(function* () {
