@@ -16,7 +16,7 @@ import { State } from "./state"
  */
 export function lookAhead<T>(parser: Parser<T>) {
 	return new Parser((state) => {
-		const result = parser._run(state)
+		const result = parser.parse(state)
 		if (Either.isRight(result)) {
 			return Parser.succeed(result.right[0], state)
 		}
@@ -38,7 +38,7 @@ export function lookAhead<T>(parser: Parser<T>) {
  */
 export function notFollowedBy<T>(parser: Parser<T>) {
 	return new Parser((state) => {
-		const result = parser._run(state)
+		const result = parser.parse(state)
 		if (Either.isRight(result)) {
 			if (parser.options?.name) {
 				return Parser.error(
@@ -446,7 +446,7 @@ export function optional<T>(
 	parser: Parser<T>,
 ): Parser<T | undefined> {
 	return new Parser((state) => {
-		const result = parser._run(state)
+		const result = parser.parse(state)
 		if (Either.isLeft(result)) {
 			return Parser.succeed(undefined, state)
 		}
@@ -469,7 +469,7 @@ export function sequence<T>(
 		let currentState = state
 
 		for (const parser of parsers) {
-			const result = parser._run(currentState)
+			const result = parser.parse(currentState)
 			if (Either.isLeft(result)) {
 				return result
 			}
@@ -498,12 +498,12 @@ export const chain = <T, U>(
 	fn: (value: T) => Parser<U>,
 ): Parser<U> => {
 	return new Parser((state) => {
-		const result = parser._run(state)
+		const result = parser.parse(state)
 		if (Either.isLeft(result)) {
 			return result
 		}
 		const [value, newState] = result.right
-		return fn(value)._run(newState)
+		return fn(value).parse(newState)
 	})
 }
 
