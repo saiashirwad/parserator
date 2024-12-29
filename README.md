@@ -47,10 +47,11 @@ import { char, many1, sepBy, between } from 'parserator'
 
 // Parse a comma-separated list of 'a's between parentheses: (a,a,a)
 const listParser = between(
-  char("("),
-  char(")"),
+  char("("), char(")"),
   sepBy(char(","), char("a"))
 )
 
 listParser.run("(a,a,a)") // Right([["a", "a", "a"], ...])
 ```
+
+# more docs coming soon!
