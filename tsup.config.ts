@@ -8,5 +8,8 @@ export default defineConfig({
 	outDir: "dist",
 	sourcemap: true,
 	clean: true,
-	dts: true,
+	dts: {
+		resolve: true,
+		entry: "src/index.ts",
+	},
 })

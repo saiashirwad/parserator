@@ -1,10 +1,12 @@
-import { build } from "bun"
+import { copyFile } from "node:fs/promises"
+import { join } from "node:path"
 
-await build({
-	entrypoints: ["./src/index.ts"],
-	outdir: "./dist",
-	target: "node",
-	format: "esm",
-	external: ["typescript"],
-	sourcemap: "external",
-})
+async function main() {
+	// Copy the .d.ts file to .d.cts for CommonJS
+	await copyFile(
+		join("dist", "index.d.ts"),
+		join("dist", "index.d.cts"),
+	)
+}
+
+main().catch(console.error)

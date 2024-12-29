@@ -7,9 +7,14 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     }
   },
   "files": [
@@ -17,16 +22,16 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && bun build.ts",
     "test": "bun test",
     "docs": "bun typedoc",
     "prepublishOnly": "bun run build && bun test",
     "publish:patch": "bun run build && npm version patch && npm publish --access public",
     "publish:minor": "bun run build && npm version minor && npm publish --access public",
     "publish:major": "bun run build && npm version major && npm publish --access public",
-    "release:patch": "bun run build && bun run build && bun test && bun run publish:patch",
-    "release:minor": "bun run build && bun run build && bun test && bun run publish:minor",
-    "release:major": "bun run build && bun run build && bun test && bun run publish:major"
+    "release:patch": "bun run build && bun test && bun run publish:patch",
+    "release:minor": "bun run build && bun test && bun run publish:minor",
+    "release:major": "bun run build && bun test && bun run publish:major"
   },
   "keywords": [
     "parser",
