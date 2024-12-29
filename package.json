@@ -1,43 +1,42 @@
 {
-  "name": "parserator",
+  "name": "@texoport/parseme",
   "version": "0.1.0",
   "description": "A parser combinator library inspired by Parsec and Effect-TS",
-  "main": "dist/index.js",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "default": "./dist/index.js"
     },
     "./combinators": {
       "types": "./dist/combinators.d.ts",
-      "import": "./dist/combinators.js"
+      "default": "./dist/combinators.js"
     },
     "./utils": {
       "types": "./dist/utils.d.ts",
-      "import": "./dist/utils.js"
+      "default": "./dist/utils.js"
     },
     "./state": {
       "types": "./dist/state.d.ts",
-      "import": "./dist/state.js"
+      "default": "./dist/state.js"
     },
     "./parser": {
       "types": "./dist/parser.d.ts",
-      "import": "./dist/parser.js"
+      "default": "./dist/parser.js"
     },
     "./lexer": {
       "types": "./dist/lexer.d.ts",
-      "import": "./dist/lexer.js"
+      "default": "./dist/lexer.js"
     },
     "./either": {
       "types": "./dist/either.d.ts",
-      "import": "./dist/either.js"
+      "default": "./dist/either.js"
     },
     "./debug": {
       "types": "./dist/debug.d.ts",
-      "import": "./dist/debug.js"
+      "default": "./dist/debug.js"
     }
   },
   "files": [
@@ -46,8 +45,14 @@
   ],
   "scripts": {
     "build": "tsc",
-    "prepublishOnly": "npm run build",
-    "test": "echo \"No tests specified\" && exit 0"
+    "test": "bun test",
+    "prepublishOnly": "bun run build && bun test",
+    "publish:patch": "npm version patch && npm publish --access public",
+    "publish:minor": "npm version minor && npm publish --access public",
+    "publish:major": "npm version major && npm publish --access public",
+    "release:patch": "bun run build && bun test && bun run publish:patch",
+    "release:minor": "bun run build && bun test && bun run publish:minor",
+    "release:major": "bun run build && bun test && bun run publish:major"
   },
   "keywords": [
     "parser",
@@ -55,22 +60,22 @@
     "typescript",
     "functional-programming"
   ],
-  "author": "",
+  "author": "texoport",
   "license": "MIT",
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
-    "@types/bun": "latest",
+    "@types/bun": "^1.1.10",
     "typescript": "^5.7.2"
   },
   "peerDependencies": {
-    "typescript": "^4.9.0"
+    "typescript": "^5.7.2"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/parseme.git"
+    "url": "git+https://github.com/texoport/parseme.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/parseme/issues"
+    "url": "https://github.com/texoport/parseme/issues"
   },
-  "homepage": "https://github.com/yourusername/parseme#readme"
+  "homepage": "https://github.com/texoport/parseme#readme"
 }
