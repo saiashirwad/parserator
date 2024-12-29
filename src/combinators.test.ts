@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import {
 	alphabet,
+	chain,
 	char,
 	digit,
 	many1,
@@ -20,12 +21,12 @@ const stringParser = skipSpaces
 const integerParser = skipSpaces
 	.then(many1(digit))
 	.map((s) => parseInt(s.join("")))
+	.error("Expected an integer")
 
 test("sepBy string array", () => {
 	const p = char("[")
 		.then(sepBy(char(","), or(stringParser, integerParser)))
 		.thenDiscard(char("]"))
-	console.log(p.parseOrThrow('["hello", 2, "foo"]'))
 	expect(p.parseOrThrow('["hello", 2, "foo"]')).toEqual([
 		"hello",
 		2,
@@ -51,5 +52,12 @@ test("sequence", () => {
 		skipSpaces,
 		integerParser,
 	])
-	console.log(p.parseOrThrow('"hello", 123, 456'))
+	expect(p.parseOrThrow('"hello", 123, 23')).toEqual(23)
+})
+
+test("chain", () => {
+	const p = chain(stringParser, (s) =>
+		integerParser.map((n) => s.repeat(n)),
+	)
+	console.log(p.parseOrThrow('"hello" 2'))
 })
