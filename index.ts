@@ -33,7 +33,5 @@ try {
 	// })
 	// console.log(p.run("bc;"))
 } catch (e) {
-	if (e instanceof ParserError) {
-		console.log(e.message)
-	}
+	console.log(e)
 }
