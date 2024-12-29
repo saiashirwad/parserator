@@ -1,6 +1,12 @@
 import { expect, test } from "bun:test"
 import { Parser } from "./parser"
-import { alphabet, char, many1, optional, skipSpaces } from "./combinators"
+import {
+	alphabet,
+	char,
+	many1,
+	optional,
+	skipSpaces,
+} from "./combinators"
 import { Either } from "./either"
 
 test("char", () => {
@@ -30,7 +36,9 @@ test("string array", () => {
 		.zip(many1(alphabet).map((a) => a.join("")))
 		.zip(char('"'))
 		.map(([a, _]) => a[1])
-	const strings = many1(str.zip(optional(char(","))).map(([a, _]) => a))
+	const strings = many1(
+		str.zip(optional(char(","))).map(([a, _]) => a),
+	)
 	const arr = char("[")
 		.zip(strings)
 		.zip(char("]"))

@@ -10,8 +10,11 @@ import {
 import { Parser } from "./src/parseme/parser"
 
 try {
-	const lol = skipSpaces.then(char("h")).thenDiscard(skipSpaces)
-	console.log(lol.run("       h"))
+	const lol = skipSpaces
+		.then(char("h"))
+		.thenDiscard(skipSpaces)
+		.error("Oops")
+	console.log(lol.run("       j"))
 	// type BC = {
 	// 	b: string
 	// 	c: string

@@ -16,8 +16,13 @@ export const parseString = Parser.gen(function* () {
 	return Type("TString", { value: result.join("") })
 })
 
-export const parseNumber = float.map((value) => Type("TNumber", { value }))
+export const parseNumber = float.map((value) =>
+	Type("TNumber", { value }),
+)
 
-export const parseBool = or(constString("true"), constString("false")).map(
-	(value) => Type("TBoolean", { value: value === "true" }),
+export const parseBool = or(
+	constString("true"),
+	constString("false"),
+).map((value) =>
+	Type("TBoolean", { value: value === "true" }),
 )

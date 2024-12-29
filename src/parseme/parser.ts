@@ -1,128 +1,10 @@
 import { Either } from "./either"
+import {
+	State,
+	type ParserState,
+	type SourcePosition,
+} from "./state"
 import type { Prettify } from "./utils"
-
-export type SourcePosition = {
-	line: number
-	column: number
-	offset: number
-}
-
-export type ParserState = {
-	remaining: string
-	pos: SourcePosition
-}
-
-// Add static methods to help create and manipulate parser state
-/**
- * Utility object containing static methods for creating and manipulating parser state.
- */
-export const State = {
-	/**
-	 * Creates a new parser state from an input string.
-	 *
-	 * @param input - The input string to parse
-	 * @returns A new parser state initialized at the start of the input
-	 */
-	fromInput(input: string): ParserState {
-		return {
-			remaining: input,
-			pos: {
-				line: 1,
-				column: 1,
-				offset: 0,
-			},
-		}
-	},
-
-	/**
-	 * Creates a new state by consuming n characters from the current state.
-	 *
-	 * @param state - The current parser state
-	 * @param n - Number of characters to consume
-	 * @returns A new state with n characters consumed and position updated
-	 * @throws Error if attempting to consume more characters than remaining
-	 */
-	consume(state: ParserState, n: number): ParserState {
-		if (n === 0) return state
-		if (n > state.remaining.length) {
-			throw new Error("Cannot consume more characters than remaining")
-		}
-
-		const consumed = state.remaining.slice(0, n)
-		let { line, column, offset } = state.pos
-
-		for (const char of consumed) {
-			if (char === "\n") {
-				line++
-				column = 1
-			} else {
-				column++
-			}
-			offset++
-		}
-
-		return {
-			remaining: state.remaining.slice(n),
-			pos: { line, column, offset },
-		}
-	},
-
-	/**
-	 * Creates a new state by consuming a specific string from the current state.
-	 *
-	 * @param state - The current parser state
-	 * @param str - The string to consume
-	 * @returns A new state with the string consumed and position updated
-	 * @throws Error if the input doesn't start with the specified string
-	 */
-	consumeString(state: ParserState, str: string): ParserState {
-		if (!state.remaining.startsWith(str)) {
-			throw new Error(
-				`Cannot consume "${str}" - input "${state.remaining}" doesn't start with it`,
-			)
-		}
-		return State.consume(state, str.length)
-	},
-
-	/**
-	 * Creates a new state by consuming characters while a predicate is true.
-	 *
-	 * @param state - The current parser state
-	 * @param predicate - Function that tests each character
-	 * @returns A new state with matching characters consumed
-	 */
-	consumeWhile(
-		state: ParserState,
-		predicate: (char: string) => boolean,
-	): ParserState {
-		let i = 0
-		while (i < state.remaining.length && predicate(state.remaining[i])) {
-			i++
-		}
-		return State.consume(state, i)
-	},
-
-	/**
-	 * Gets the next n characters from the input without consuming them.
-	 *
-	 * @param state - The current parser state
-	 * @param n - Number of characters to peek (default: 1)
-	 * @returns The next n characters as a string
-	 */
-	peek(state: ParserState, n: number = 1): string {
-		return state.remaining.slice(0, n)
-	},
-
-	/**
-	 * Checks if the parser has reached the end of input.
-	 *
-	 * @param state - The current parser state
-	 * @returns True if at end of input, false otherwise
-	 */
-	isAtEnd(state: ParserState): boolean {
-		return state.remaining.length === 0
-	},
-}
 
 export type ParserContext = {}
 
@@ -136,35 +18,56 @@ export class ParserError {
 	) {}
 }
 
-export type ParserResult<T> = Either<[T, ParserState], ParserError>
+export type ParserResult<T> = Either<
+	[T, ParserState],
+	ParserError
+>
 
 export class Parser<Result> {
 	private errorMessage: string | null = null
 
 	constructor(
-		public _run: (state: ParserState) => ParserResult<Result>,
+		public _run: (
+			state: ParserState,
+		) => ParserResult<Result>,
 		public options?: ParserOptions,
 	) {}
 
-	static succeed<T>(value: T, state: ParserState): ParserResult<T> {
+	static succeed<T>(
+		value: T,
+		state: ParserState,
+	): ParserResult<T> {
 		return Either.right([value, state])
 	}
 
-	static fail(message: string, expected: string[] = []): Parser<unknown> {
+	static fail(
+		message: string,
+		expected: string[] = [],
+	): Parser<unknown> {
 		return new Parser<unknown>((state) => {
 			return Parser.error(message, expected, state.pos)
 		})
 	}
 
-	static error(message: string, expected: string[], pos: SourcePosition) {
-		return Either.left(new ParserError(message, expected, pos))
+	static error(
+		message: string,
+		expected: string[],
+		pos: SourcePosition,
+	) {
+		return Either.left(
+			new ParserError(message, expected, pos),
+		)
 	}
 
 	error(message: string): Parser<Result> {
 		return new Parser<Result>((state) => {
 			const result = this._run(state)
 			if (Either.isLeft(result)) {
-				return Parser.error(message, result.left.expected, result.left.pos)
+				return Parser.error(
+					message,
+					result.left.expected,
+					result.left.pos,
+				)
 			}
 			return result
 		}, this.options)
@@ -250,7 +153,8 @@ export class Parser<Result> {
 			return Either.match(this._run(state), {
 				onRight: ([a, restA]) =>
 					Either.match(parserB._run(restA), {
-						onRight: ([b, restB]) => Either.right([[a, b] as const, restB]),
+						onRight: ([b, restB]) =>
+							Either.right([[a, b] as const, restB]),
 						onLeft: Either.left,
 					}),
 				onLeft: Either.left,
@@ -287,7 +191,8 @@ export class Parser<Result> {
 			}
 			return Either.match(result, {
 				onRight: ([value, newState]) => {
-					const nextParser = other instanceof Parser ? other : other(value)
+					const nextParser =
+						other instanceof Parser ? other : other(value)
 					return Either.match(nextParser._run(newState), {
 						onRight: ([b, finalState]) =>
 							Either.right([
@@ -309,7 +214,11 @@ export class Parser<Result> {
 		}, this.options)
 	}
 
-	*[Symbol.iterator](): Generator<Parser<Result>, Result, any> {
+	*[Symbol.iterator](): Generator<
+		Parser<Result>,
+		Result,
+		any
+	> {
 		return yield this
 	}
 
@@ -320,7 +229,9 @@ export class Parser<Result> {
 	): Parser<Returned> {
 		const iterator = f((_: any) => new Parser(_))
 		function run(
-			state: IteratorYieldResult<Yielded> | IteratorReturnResult<Returned>,
+			state:
+				| IteratorYieldResult<Yielded>
+				| IteratorReturnResult<Returned>,
 		): Parser<Returned> {
 			if (state.done) {
 				if (state.value instanceof Parser) {
@@ -330,7 +241,9 @@ export class Parser<Result> {
 			}
 			const value = state.value
 			if (value instanceof Parser) {
-				return value.flatMap((result) => run(iterator.next(result)))
+				return value.flatMap((result) =>
+					run(iterator.next(result)),
+				)
 			}
 			throw new Error("Expected a Parser")
 		}
