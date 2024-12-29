@@ -150,6 +150,14 @@ export class Parser<Result> {
 		)
 	}
 
+	thenRight<B>(parserB: Parser<B>): Parser<B> {
+		return this.zip(parserB).map(([_, b]) => b)
+	}
+
+	thenLeft<B>(parserB: Parser<B>): Parser<Result> {
+		return this.zip(parserB).map(([a, _]) => a)
+	}
+
 	bind<K extends string, B>(
 		k: K,
 		other: Parser<B> | ((a: Result) => Parser<B>),

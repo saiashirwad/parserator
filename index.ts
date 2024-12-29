@@ -22,8 +22,8 @@ import { Parser } from "./src/parseme/parser"
 const p = Parser.gen(function* () {
 	const b = yield* lookAhead(char("b"))
 	if (b) {
-		yield* char("b")
-		yield* notFollowedBy(char("a"))
+		yield* char("b").thenRight(notFollowedBy(char("a")))
+		// yield* notFollowedBy(char("a"))
 		console.log("haha")
 		return { b }
 	} else {
