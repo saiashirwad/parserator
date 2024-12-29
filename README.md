@@ -8,7 +8,7 @@ A parser combinator library inspired by [Parsec](https://github.com/haskell/pars
 ## Installation
 
 ```bash
-npm install @texoport/parserator
+npm install parserator
 ```
 
 ## Usage
