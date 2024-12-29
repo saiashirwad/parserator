@@ -60,7 +60,7 @@
     "typescript",
     "functional-programming"
   ],
-  "author": "texoport",
+  "author": "Sai (https://bsky.app/profile/texoport.in)",
   "license": "MIT",
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
@@ -72,10 +72,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/texoport/parseme.git"
+    "url": "git+https://github.com/saiashirwad/parserator.git"
   },
   "bugs": {
-    "url": "https://github.com/texoport/parseme/issues"
+    "url": "https://github.com/saiashirwad/parserator/issues"
   },
-  "homepage": "https://github.com/texoport/parseme#readme"
+  "homepage": "https://github.com/saiashirwad/parserator#readme"
 }

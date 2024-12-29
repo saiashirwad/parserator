@@ -1,4 +1,4 @@
-# Parseme
+# Parserator
 
 > **Warning**
 > This library is currently in early development and the API is subject to change. Don't use, even at your own risk.
@@ -8,7 +8,7 @@ A parser combinator library inspired by [Parsec](https://github.com/haskell/pars
 ## Installation
 
 ```bash
-npm install @texoport/parseme
+npm install @texoport/parserator
 ```
 
 ## Usage
