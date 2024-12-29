@@ -175,7 +175,7 @@ export function skipMany_<T>(count: number) {
 	}
 }
 
-export const skipMany = <T>(parser: Parser<T>) => skipMany_<T>(0)(parser)
+export const skipMany0 = <T>(parser: Parser<T>) => skipMany_<T>(0)(parser)
 export const skipMany1 = <T>(parser: Parser<T>) => skipMany_<T>(1)(parser)
 export const skipManyN = <T>(parser: Parser<T>, n: number) =>
 	skipMany_<T>(n)(parser)
