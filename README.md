@@ -318,7 +318,9 @@ The core Parser class that represents a parsing computation.
 
 * `many1<T>(parser: Parser<T>, separator?: Parser<any>): Parser<T[]>` - Creates a parser that matches one or more occurrences of the input parser.
 
-* `manyN<T>(parser: Parser<T>, n: number, separator?: Parser<any>): Parser<T[]>` - Creates a parser that matches exactly n occurrences of the input parser.
+* `manyN<T>(parser: Parser<T>, n: number, separator?: Parser<any>): Parser<T[]>` - Creates a parser that matches at least n occurrences of the input parser.
+
+* `manyNExact<T>(parser: Parser<T>, n: number, separator?: Parser<any>): Parser<T[]>` - Creates a parser that matches exactly n occurrences of the input parser.
 
 #### Sequencing and Choice
 

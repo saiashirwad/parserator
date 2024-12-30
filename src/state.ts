@@ -1,3 +1,5 @@
+import type { ParserContext } from "./parser"
+
 export type SourcePosition = {
 	line: number
 	column: number
@@ -7,6 +9,7 @@ export type SourcePosition = {
 export type ParserState = {
 	remaining: string
 	pos: SourcePosition
+	context: ParserContext
 }
 
 // Add static methods to help create and manipulate parser state
@@ -20,7 +23,10 @@ export const State = {
 	 * @param input - The input string to parse
 	 * @returns A new parser state initialized at the start of the input
 	 */
-	fromInput(input: string): ParserState {
+	fromInput(
+		input: string,
+		context: ParserContext = {},
+	): ParserState {
 		return {
 			remaining: input,
 			pos: {
@@ -28,6 +34,7 @@ export const State = {
 				column: 1,
 				offset: 0,
 			},
+			context,
 		}
 	},
 
@@ -63,6 +70,7 @@ export const State = {
 		return {
 			remaining: state.remaining.slice(n),
 			pos: { line, column, offset },
+			context: state.context,
 		}
 	},
 

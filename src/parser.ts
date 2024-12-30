@@ -1,4 +1,5 @@
 import { Either } from "./either"
+import { debug } from "./debug"
 import {
 	State,
 	type ParserState,
@@ -6,9 +7,11 @@ import {
 } from "./state"
 import type { Prettify } from "./types"
 
-export type ParserContext = {}
+export type ParserContext = {
+	debug?: boolean
+}
 
-type ParserOptions = { name?: string }
+export type ParserOptions = { name?: string }
 
 export class ParserError {
 	constructor(
@@ -23,13 +26,11 @@ export type ParserResult<T> = Either<
 	ParserError
 >
 
-export class Parser<Result> {
+export class Parser<r> {
 	private errorMessage: string | null = null
 
 	constructor(
-		public parse: (
-			state: ParserState,
-		) => ParserResult<Result>,
+		public parse: (state: ParserState) => ParserResult<r>,
 		public options?: ParserOptions,
 	) {}
 
@@ -37,6 +38,8 @@ export class Parser<Result> {
 		this.options = { ...this.options, name }
 		return this
 	}
+
+	static getState() {}
 
 	static succeed<T>(
 		value: T,
@@ -64,8 +67,8 @@ export class Parser<Result> {
 		)
 	}
 
-	error(message: string): Parser<Result> {
-		return new Parser<Result>((state) => {
+	error(message: string): Parser<r> {
+		return new Parser<r>((state) => {
 			const result = this.parse(state)
 			if (Either.isLeft(result)) {
 				return Parser.error(
@@ -84,7 +87,7 @@ export class Parser<Result> {
 			state: ParserState,
 		) => string,
 	) {
-		return new Parser<Result>((state) => {
+		return new Parser<r>((state) => {
 			const result = this.parse(state)
 			if (Either.isLeft(result)) {
 				return Parser.error(
@@ -97,8 +100,13 @@ export class Parser<Result> {
 		}, this.options)
 	}
 
-	run(input: string): ParserResult<Result> {
-		const result = this.parse(State.fromInput(input))
+	run(
+		input: string,
+		context: ParserContext = {},
+	): ParserResult<r> {
+		const result = this.parse(
+			State.fromInput(input, context),
+		)
 		if (Either.isRight(result)) {
 			return result
 		}
@@ -114,23 +122,37 @@ export class Parser<Result> {
 		return result
 	}
 
-	parseOrError(input: string) {
-		const result = this.parse(State.fromInput(input))
+	withTrace(label: string): Parser<r> {
+		return new Parser((state) => {
+			if (!state.context?.debug) {
+				return this.parse(state)
+			}
+			return debug(this, label).parse(state)
+		}, this.options)
+	}
+
+	parseOrError(input: string, context: ParserContext = {}) {
+		const result = this.parse(
+			State.fromInput(input, context),
+		)
 		if (Either.isRight(result)) {
 			return result.right[0]
 		}
 		return result.left
 	}
 
-	parseOrThrow(input: string): Result {
-		const result = this.parseOrError(input)
+	parseOrThrow(
+		input: string,
+		context: ParserContext = {},
+	): r {
+		const result = this.parseOrError(input, context)
 		if (result instanceof ParserError) {
 			throw new Error(result.message)
 		}
 		return result
 	}
 
-	map<B>(f: (a: Result) => B): Parser<B> {
+	map<B>(f: (a: r) => B): Parser<B> {
 		return new Parser<B>((state) => {
 			const result = this.parse(state)
 			if (Either.isLeft(result) && this.errorMessage) {
@@ -148,7 +170,7 @@ export class Parser<Result> {
 		}, this.options)
 	}
 
-	flatMap<B>(f: (a: Result) => Parser<B>): Parser<B> {
+	flatMap<B>(f: (a: r) => Parser<B>): Parser<B> {
 		return new Parser<B>((state) => {
 			const result = this.parse(state)
 			if (Either.isLeft(result) && this.errorMessage) {
@@ -203,7 +225,7 @@ export class Parser<Result> {
 		})
 	}
 
-	zip<B>(parserB: Parser<B>): Parser<readonly [Result, B]> {
+	zip<B>(parserB: Parser<B>): Parser<readonly [r, B]> {
 		return new Parser((state) => {
 			return Either.match(this.parse(state), {
 				onRight: ([a, restA]) =>
@@ -221,16 +243,16 @@ export class Parser<Result> {
 		return this.zip(parserB).map(([_, b]) => b)
 	}
 
-	thenDiscard<B>(parserB: Parser<B>): Parser<Result> {
+	thenDiscard<B>(parserB: Parser<B>): Parser<r> {
 		return this.zip(parserB).map(([a, _]) => a)
 	}
 
 	bind<K extends string, B>(
 		k: K,
-		other: Parser<B> | ((a: Result) => Parser<B>),
+		other: Parser<B> | ((a: r) => Parser<B>),
 	): Parser<
 		Prettify<
-			Result & {
+			r & {
 				[k in K]: B
 			}
 		>
@@ -255,7 +277,7 @@ export class Parser<Result> {
 									...(value as object),
 									[k]: b,
 								} as Prettify<
-									Result & {
+									r & {
 										[k in K]: B
 									}
 								>,
@@ -269,11 +291,7 @@ export class Parser<Result> {
 		}, this.options)
 	}
 
-	*[Symbol.iterator](): Generator<
-		Parser<Result>,
-		Result,
-		any
-	> {
+	*[Symbol.iterator](): Generator<Parser<r>, r, any> {
 		return yield this
 	}
 
@@ -287,9 +305,9 @@ export class Parser<Result> {
 	tap(
 		callback: (
 			state: ParserState,
-			result: ParserResult<Result>,
+			result: ParserResult<r>,
 		) => void,
-	): Parser<Result> {
+	): Parser<r> {
 		return new Parser((state) => {
 			const result = this.parse(state)
 			callback(state, result)

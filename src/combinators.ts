@@ -379,17 +379,41 @@ export const many1 = <S, T>(
 ) => many_<S, T>(1)(parser, separator)
 
 /**
- * Creates a parser that matches exactly n occurrences of the input parser.
+ * Creates a parser that matches at least n occurrences of the input parser.
  *
  * @param parser - The parser to repeat
  * @param n - Number of required repetitions
- * @returns A parser that produces an array of exactly n matches
+ * @returns A parser that produces an array of at least n matches
  */
 export const manyN = <S, T>(
 	parser: Parser<T>,
 	n: number,
 	separator?: Parser<S>,
 ) => many_<S, T>(n)(parser, separator)
+
+/**
+ * Creates a parser that matches exactly n occurrences of the input parser.
+ *
+ * @param parser - The parser to repeat
+ * @param n - Number of required repetitions
+ * @param separator - Optional parser to match between occurrences
+ * @returns A parser that produces an array of exactly n matches
+ */
+
+export const manyNExact = <S, T>(
+	parser: Parser<T>,
+	n: number,
+	separator?: Parser<S>,
+) =>
+	Parser.gen(function* () {
+		const results = yield* manyN(parser, n, separator)
+		if (results.length !== n) {
+			return yield* Parser.fail(
+				`Expected exactly ${n} occurrences, but found ${results.length}`,
+			)
+		}
+		return results
+	})
 
 /**
  * Internal helper function for creating skipping repetition parsers.
