@@ -16,12 +16,15 @@ import { State } from "./state"
  */
 export function lookAhead<T>(parser: Parser<T>) {
 	return new Parser((state) => {
-		const result = parser.parse(state)
-		if (Either.isRight(result)) {
-			console.log(result.value)
-			return Parser.succeed(result.right[0], state)
-		}
-		return Parser.succeed(undefined, state)
+		// if (Either.isRight(result)) {
+		// 	return Parser.succeed(result.value[0], state)
+		// }
+		// return Parser.succeed(undefined, state)
+		const result = Either.gen(function* () {
+			const result = yield* parser.parse(state)
+			return result
+		})
+		return result
 	})
 }
 
