@@ -379,11 +379,11 @@ export const many1 = <S, T>(
 ) => many_<S, T>(1)(parser, separator)
 
 /**
- * Creates a parser that matches exactly n occurrences of the input parser.
+ * Creates a parser that matches at least n occurrences of the input parser.
  *
  * @param parser - The parser to repeat
  * @param n - Number of required repetitions
- * @returns A parser that produces an array of exactly n matches
+ * @returns A parser that produces an array of at least n matches
  */
 export const manyN = <S, T>(
 	parser: Parser<T>,
