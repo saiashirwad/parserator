@@ -97,4 +97,18 @@ const rip = Either.gen(function* () {
 	return a + b
 })
 
-console.log(rip)
+function hi(
+	aa: Either<number, string>,
+	bb: Either<number, string>,
+) {
+	return Either.gen(function* () {
+		const a = yield* aa
+		const b = yield* bb
+		if (a > b) {
+			return yield* Either.left("a is greater than b")
+		}
+		return a + b
+	})
+}
+
+console.log(hi(bbb, bbb))
