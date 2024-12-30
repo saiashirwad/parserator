@@ -246,7 +246,11 @@ export function sepBy<S, T>(
 			// Try to parse next item
 			const itemResult = parser.parse(currentState)
 			if (Either.isLeft(itemResult)) {
-				return itemResult
+				return Parser.error(
+					itemResult.left.message,
+					itemResult.left.expected,
+					itemResult.left.pos,
+				)
 			}
 			results.push(itemResult.right[0])
 			currentState = itemResult.right[1]
