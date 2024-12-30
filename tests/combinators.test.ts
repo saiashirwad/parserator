@@ -138,21 +138,6 @@ describe("many combinators", () => {
 		expect(Either.isLeft(digits.run("abc"))).toBe(true)
 	})
 
-	// test("manyN requires exact number of matches", () => {
-	// 	const threeDigits = manyN(digit, 3).thenDiscard(
-	// 		lookAhead(or(char("\n"), Parser.pure(undefined))),
-	// 	)
-	// 	expect(threeDigits.parseOrThrow("123")).toEqual([
-	// 		"1",
-	// 		"2",
-	// 		"3",
-	// 	])
-	// 	expect(Either.isLeft(threeDigits.run("12"))).toBe(true)
-	// 	expect(Either.isLeft(threeDigits.run("1234"))).toBe(
-	// 		true,
-	// 	)
-	// })
-
 	test("manyN with separator", () => {
 		const threeDigitsComma = manyN(
 			digit,
@@ -336,7 +321,7 @@ describe("error recovery", () => {
 		const result = assignment.run("foo = bar")
 		expect(Either.isLeft(result)).toBe(true)
 		if (Either.isLeft(result)) {
-			// console.log(result.left.message)
+			console.log(result.left.message)
 			// expect(result.left.message).toBe("Expected number")
 		}
 	})
