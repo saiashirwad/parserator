@@ -3,7 +3,7 @@ export type Either<R, L> = Left<L, R> | Right<R, L>
 export class Left<L, R = never> {
 	readonly _tag = "Left"
 	constructor(public readonly left: L) {}
-	*[Symbol.iterator](): Generator<Left<L, R>, L, any> {
+	*[Symbol.iterator](): Generator<Either<R, L>, R, any> {
 		return yield this
 	}
 }
@@ -11,17 +11,25 @@ export class Left<L, R = never> {
 export class Right<R, L> {
 	readonly _tag = "Right"
 	constructor(public readonly right: R) {}
-	*[Symbol.iterator](): Generator<Right<R, L>, R, any> {
+	*[Symbol.iterator](): Generator<Either<R, L>, R, any> {
 		return yield this
 	}
 }
 
+// export class GenEither<R, L> {
+// 	constructor(readonly op: Either<R, L>) {}
+
+// 	*[Symbol.iterator](): Generator<GenEither<R, L>, R, any> {
+// 		return yield this
+// 	}
+// }
+
 export const Either = {
-	left<L, R = never>(l: L): Left<L, R> {
+	left<L, R = never>(l: L): Either<R, L> {
 		return new Left(l)
 	},
 
-	right<R, L = never>(r: R): Right<R, L> {
+	right<R, L = never>(r: R): Either<R, L> {
 		return new Right(r)
 	},
 
@@ -47,6 +55,23 @@ export const Either = {
 		}
 		return patterns.onRight(either.right)
 	},
+
+	gen<R, L>(
+		f: () => Generator<Either<R, L>, R, any>,
+	): Either<R, L> {
+		const iterator = f()
+		let current = iterator.next()
+
+		while (!current.done) {
+			const either = current.value
+			if (Either.isLeft(either)) {
+				return either
+			}
+			current = iterator.next(either.right)
+		}
+
+		return Either.right(current.value)
+	},
 }
 
 function lol(e: Either<number, string>) {
@@ -56,9 +81,20 @@ function lol(e: Either<number, string>) {
 	console.log(e.right)
 }
 
-const a: Either<string, number> = Either.left(2)
+const aaa: Either<number, string> = Either.left<
+	string,
+	number
+>("error message")
 
-const result = Either.match(a, {
-	onLeft: (left) => left,
-	onRight: (right) => right,
+const bbb: Either<number, string> = Either.right<
+	number,
+	string
+>(2)
+
+const rip = Either.gen(function* () {
+	const a = yield* aaa
+	const b = yield* bbb
+	return a + b
 })
+
+console.log(rip)
