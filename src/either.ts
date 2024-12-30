@@ -35,13 +35,13 @@ export const Either = {
 		return either._tag === "Right"
 	},
 
-	match<R, L, RResult, LResult>(
+	match<R, L, T>(
 		either: Either<R, L>,
 		patterns: {
-			onLeft: (left: L) => LResult
-			onRight: (right: R) => RResult
+			onLeft: (left: L) => T
+			onRight: (right: R) => T
 		},
-	): LResult | RResult {
+	): T {
 		if (Either.isLeft(either)) {
 			return patterns.onLeft(either.left)
 		}
@@ -65,3 +65,16 @@ export const Either = {
 		return Either.right(current.value)
 	},
 }
+
+const fn = (
+	a: Either<number, string>,
+	b: Either<number, string>,
+) =>
+	Either.gen(function* () {
+		const a_ = yield* a
+		const b_ = yield* b
+		if (a_ > b_) {
+			return yield* Either.left("a is greater than b")
+		}
+		return a_ + b_
+	})
