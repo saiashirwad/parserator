@@ -16,14 +16,6 @@ export class Right<R, L> {
 	}
 }
 
-// export class GenEither<R, L> {
-// 	constructor(readonly op: Either<R, L>) {}
-
-// 	*[Symbol.iterator](): Generator<GenEither<R, L>, R, any> {
-// 		return yield this
-// 	}
-// }
-
 export const Either = {
 	left<L, R = never>(l: L): Either<R, L> {
 		return new Left(l)
@@ -73,42 +65,3 @@ export const Either = {
 		return Either.right(current.value)
 	},
 }
-
-function lol(e: Either<number, string>) {
-	if (Either.isLeft(e)) {
-		return e.left
-	}
-	console.log(e.right)
-}
-
-const aaa: Either<number, string> = Either.left<
-	string,
-	number
->("error message")
-
-const bbb: Either<number, string> = Either.right<
-	number,
-	string
->(2)
-
-const rip = Either.gen(function* () {
-	const a = yield* aaa
-	const b = yield* bbb
-	return a + b
-})
-
-function hi(
-	aa: Either<number, string>,
-	bb: Either<number, string>,
-) {
-	return Either.gen(function* () {
-		const a = yield* aa
-		const b = yield* bb
-		if (a > b) {
-			return yield* Either.left("a is greater than b")
-		}
-		return a + b
-	})
-}
-
-console.log(hi(bbb, bbb))
