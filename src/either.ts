@@ -1,42 +1,77 @@
-export type Either<R, L> = Left<L> | Right<R>
+export class Either<R, L> {
+	readonly _tag: "Left" | "Right"
+	public value: L | R
 
-export class Left<L> {
-	readonly _tag = "Left"
-	constructor(public readonly left: L) {}
-}
+	private constructor(tag: "Left", value: L)
+	private constructor(tag: "Right", value: R)
+	private constructor(tag: "Left" | "Right", value: L | R) {
+		this._tag = tag
+		this.value = value
+	}
 
-export class Right<R> {
-	readonly _tag = "Right"
-	constructor(public readonly right: R) {}
-}
+	static left<L, R = never>(left: L): Either<R, L> {
+		return new Either("Left", left)
+	}
 
-export const Either = {
-	left<L, R = never>(l: L): Either<R, L> {
-		return new Left(l)
-	},
+	static right<R, L = never>(right: R): Either<R, L> {
+		return new Either("Right", right)
+	}
 
-	right<R, L = never>(r: R): Either<R, L> {
-		return new Right(r)
-	},
-
-	isLeft<R, L>(either: Either<R, L>): either is Left<L> {
+	static isLeft<R, L>(
+		either: Either<R, L>,
+	): either is Either<R, L> & { _tag: "Left" } {
 		return either._tag === "Left"
-	},
+	}
 
-	isRight<R, L>(either: Either<R, L>): either is Right<R> {
+	static isRight<R, L>(
+		either: Either<R, L>,
+	): either is Either<R, L> & { _tag: "Right" } {
 		return either._tag === "Right"
-	},
+	}
 
-	match<R, L, B>(
+	static match<R, L, B>(
 		either: Either<R, L>,
 		patterns: {
 			onLeft: (left: L) => B
 			onRight: (right: R) => B
 		},
 	): B {
-		if (Either.isLeft(either)) {
-			return patterns.onLeft(either.left)
+		return Either.isLeft(either)
+			? patterns.onLeft(either.value as L)
+			: patterns.onRight(either.value as R)
+	}
+
+	*[Symbol.iterator](): Generator<Either<R, L>, R, any> {
+		return yield this
+	}
+
+	static gen<R, L>(
+		f: () => Generator<Either<R, L>, R, any>,
+	): Either<R, L> {
+		const iterator = f()
+		let current = iterator.next()
+
+		while (!current.done) {
+			const either = current.value
+			if (Either.isLeft(either)) {
+				return either
+			}
+			current = iterator.next(either.value as R)
 		}
-		return patterns.onRight(either.right)
-	},
+
+		return Either.right(current.value)
+	}
 }
+
+const ea: Either<number, string> = Either.gen(function* () {
+	const a: number = yield* Either.right(5)
+	const b: number = yield* Either.right(3)
+	return a + b
+})
+
+const eb: Either<number, string> = Either.gen(function* () {
+	const a = yield* ea
+	const aa = yield* ea
+	yield* Either.left("error")
+	return a + aa
+})
