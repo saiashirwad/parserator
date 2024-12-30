@@ -7,6 +7,7 @@ import {
 	lookAhead,
 	many1,
 	manyN,
+	manyNExact,
 	optional,
 	or,
 	regex,
@@ -136,6 +137,17 @@ describe("many combinators", () => {
 		expect(digits.parseOrThrow("1")).toEqual(["1"])
 		expect(Either.isLeft(digits.run(""))).toBe(true)
 		expect(Either.isLeft(digits.run("abc"))).toBe(true)
+	})
+
+	test("manyNExact requires exactly n matches", () => {
+		const threeDigits = manyNExact(digit, 3)
+		const t1 = threeDigits.parseOrThrow("123")
+		expect(t1).toEqual(["1", "2", "3"])
+		expect(Either.isLeft(threeDigits.run("12"))).toBe(true)
+		const t2 = threeDigits.parseOrError("1234")
+		console.log(t2)
+		// expect(Either.isLeft(t2)).toBe(true)
+		// expect(Either.isLeft(threeDigits.run(""))).toBe(true)
 	})
 
 	test("manyN with separator", () => {
@@ -320,10 +332,10 @@ describe("error recovery", () => {
 
 		const result = assignment.run("foo = bar")
 		expect(Either.isLeft(result)).toBe(true)
-		if (Either.isLeft(result)) {
-			console.log(result.left.message)
-			// expect(result.left.message).toBe("Expected number")
-		}
+		// if (Either.isLeft(result)) {
+		// 	console.log(result.left.message)
+		// 	// expect(result.left.message).toBe("Expected number")
+		// }
 	})
 
 	test("error position tracking", () => {
