@@ -254,6 +254,7 @@ The core Parser class that represents a parsing computation.
 * `flatMap<B>(f: (a: T) => Parser<B>): Parser<B>` - Chain parsers
 * `error(message: string): Parser<T>` - Set error message
 * `errorCallback(cb: (error: ParserError, state: ParserState) => string): Parser<T>` - Custom error handling
+* `tap(callback: (state: ParserState, result: ParserResult<T>) => void): Parser<T>` - Adds a tap point to observe the current state and result during parsing
 * `withName(name: string): Parser<T>` - Name the parser for better errors
 
 #### Static Methods
@@ -261,42 +262,118 @@ The core Parser class that represents a parsing computation.
 * `Parser.gen<T>(f: () => Generator<Parser<any>, T>): Parser<T>` - Create parser using generator syntax
 * `Parser.succeed<T>(value: T): Parser<T>` - Create always-succeeding parser
 * `Parser.fail(message: string): Parser<never>` - Create always-failing parser
-* `Parser.lazy<T>(f: () => Parser<T>): Parser<T>` - Create recursive parser
+* `Parser.lazy<T>(f: () => Parser<T>): Parser<T>` - Creates a new parser that lazily evaluates the given function. This is useful for creating recursive parsers.
 
 ### Combinators
 
 #### Basic Parsers
 
-* `char(c: string): Parser<string>` - Match single character
-* `string(s: string): Parser<string>` - Match exact string
-* `regex(re: RegExp): Parser<string>` - Match regex pattern
-* `alphabet: Parser<string>` - Match any letter
-* `digit: Parser<string>` - Match any digit
+* `char(ch: string): Parser<string>` - Creates a parser that matches a single character.
+  
+
+```ts
+  const parser = char("a")
+  parser.run("abc") // Right(["a", {...}])
+  parser.run("xyz") // Left(error)
+  ```
+
+* `string(str: string): Parser<string>` - Creates a parser that matches an exact string in the input.
+  
+
+```ts
+  const parser = string("hello")
+  parser.run("hello world") // Right(["hello", {...}])
+  parser.run("goodbye") // Left(error)
+  ```
+
+* `regex(re: RegExp): Parser<string>` - Creates a parser that matches input against a regular expression. The regex must match at the start of the input.
+  
+
+```ts
+  const parser = regex(/[0-9]+/)
+  parser.run("123abc") // Right(["123", {...}])
+  ```
+
+* `alphabet: Parser<string>` - A parser that matches any single alphabetic character (a-z, A-Z).
+  
+
+```ts
+  const parser = alphabet
+  parser.run("abc") // Right(["a", {...}])
+  parser.run("123") // Left(error)
+  ```
+
+* `digit: Parser<string>` - A parser that matches any single digit character (0-9).
+  
+
+```ts
+  const parser = digit
+  parser.run("123") // Right(["1", {...}])
+  parser.run("abc") // Left(error)
+  ```
 
 #### Repetition
 
-* `many0<T>(parser: Parser<T>): Parser<T[]>` - Match zero or more
-* `many1<T>(parser: Parser<T>): Parser<T[]>` - Match one or more
-* `manyN<T>(parser: Parser<T>, n: number): Parser<T[]>` - Match exact count
+* `many0<T>(parser: Parser<T>, separator?: Parser<any>): Parser<T[]>` - Creates a parser that matches zero or more occurrences of the input parser.
 
-#### Sequencing
+* `many1<T>(parser: Parser<T>, separator?: Parser<any>): Parser<T[]>` - Creates a parser that matches one or more occurrences of the input parser.
 
-* `sequence<T>(parsers: Parser<T>[]): Parser<T>` - Run parsers in sequence
-* `between<T>(open: Parser<any>, close: Parser<any>, parser: Parser<T>): Parser<T>` - Match between delimiters
-* `sepBy<T>(sep: Parser<any>, parser: Parser<T>): Parser<T[]>` - Match separated values
+* `manyN<T>(parser: Parser<T>, n: number, separator?: Parser<any>): Parser<T[]>` - Creates a parser that matches exactly n occurrences of the input parser.
 
-#### Choice and Optional
+#### Sequencing and Choice
 
-* `or<T>(...parsers: Parser<T>[]): Parser<T>` - Try multiple parsers
-* `optional<T>(parser: Parser<T>): Parser<T | undefined>` - Make parser optional
+* `sequence<Parsers extends Parser<any>[]>(parsers: [...Parsers]): Parser<LastParser<Parsers>>` - Creates a parser that runs multiple parsers in sequence. Returns the result of the last parser in the sequence.
+
+* `between<T>(start: Parser<any>, end: Parser<any>, parser: Parser<T>): Parser<T>` - Creates a parser that matches content between two string delimiters.
+  
+
+```ts
+  const parser = between('(', ')', digit)
+  parser.run('(5)') // Right(['5', {...}])
+  parser.run('5') // Left(error)
+  ```
+
+* `sepBy<S, T>(sepParser: Parser<S>, parser: Parser<T>): Parser<T[]>` - Creates a parser that matches zero or more occurrences of elements separated by a separator.
+  
+
+```ts
+  const parser = sepBy(char(','), digit)
+  parser.run("1,2,3") // Right([["1", "2", "3"], {...}])
+  parser.run("") // Right([[], {...}])
+  ```
+
+* `or<Parsers extends Parser<any>[]>(...parsers: Parsers): Parser<T>` - Creates a parser that tries multiple parsers in order until one succeeds.
+
+* `optional<T>(parser: Parser<T>): Parser<T | undefined>` - Creates a parser that optionally matches the input parser. If the parser fails, returns undefined without consuming input.
 
 #### Look-ahead and Skipping
 
-* `lookAhead<T>(parser: Parser<T>): Parser<T>` - Look ahead without consuming
-* `skipSpaces: Parser<undefined>` - Skip whitespace
-* `skipMany0<T>(parser: Parser<T>): Parser<undefined>` - Skip zero or more
-* `skipMany1<T>(parser: Parser<T>): Parser<undefined>` - Skip one or more
-* `skipManyN<T>(parser: Parser<T>, n: number): Parser<undefined>` - Skip exact count
+* `lookAhead<T>(parser: Parser<T>): Parser<T>` - Creates a parser that looks ahead in the input stream without consuming any input. The parser will succeed with the result of the given parser but won't advance the input position.
+  
+
+```ts
+  const parser = lookAhead(char('a'))
+  parser.run('abc') // Right(['a', {...}])
+  // Input position remains at 'abc', 'a' is not consumed
+  ```
+
+* `skipSpaces: Parser<undefined>` - A parser that skips any number of space characters.
+
+* `skipMany0<T>(parser: Parser<T>): Parser<undefined>` - Creates a parser that skips zero or more occurrences of the input parser.
+
+* `skipMany1<T>(parser: Parser<T>): Parser<undefined>` - Creates a parser that skips one or more occurrences of the input parser.
+
+* `skipManyN<T>(parser: Parser<T>, n: number): Parser<undefined>` - Creates a parser that skips exactly n occurrences of the input parser.
+
+* `skipUntil<T>(parser: Parser<T>): Parser<undefined>` - Creates a parser that skips input until the given parser succeeds.
+
+#### Debug Tools
+
+* `debug<T>(parser: Parser<T>, label: string): Parser<T>` - Adds debug output to a parser.
+
+* `trace(label: string): Parser<void>` - Creates a parser that logs its input state and continues.
+
+* `debugState(label: string, state: ParserState, result: ParserResult<any>, options?: { inputPreviewLength?: number, separator?: string })` - Creates a debug output for a parser's current state and result.
 
 ## Contributing
 
