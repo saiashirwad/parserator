@@ -102,12 +102,14 @@ export class Parser<Result> {
 		if (Either.isRight(result)) {
 			return result
 		}
-		if (this.errorMessage) {
-			return Parser.error(
-				this.errorMessage,
-				result.left.expected,
-				result.left.pos,
-			)
+		if (Either.isLeft(result)) {
+			if (this.errorMessage) {
+				return Parser.error(
+					this.errorMessage,
+					result.left.expected,
+					result.left.pos,
+				)
+			}
 		}
 		return result
 	}

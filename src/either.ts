@@ -1,13 +1,19 @@
-export type Either<R, L> = Left<L> | Right<R>
+export type Either<R, L> = Left<L, R> | Right<R, L>
 
-export class Left<L> {
+export class Left<L, R = never> {
 	readonly _tag = "Left"
 	constructor(public readonly left: L) {}
+	*[Symbol.iterator](): Generator<Either<R, L>, R, any> {
+		return yield this
+	}
 }
 
-export class Right<R> {
+export class Right<R, L> {
 	readonly _tag = "Right"
 	constructor(public readonly right: R) {}
+	*[Symbol.iterator](): Generator<Either<R, L>, R, any> {
+		return yield this
+	}
 }
 
 export const Either = {
@@ -19,24 +25,43 @@ export const Either = {
 		return new Right(r)
 	},
 
-	isLeft<R, L>(either: Either<R, L>): either is Left<L> {
+	isLeft<R, L>(either: Either<R, L>): either is Left<L, R> {
 		return either._tag === "Left"
 	},
 
-	isRight<R, L>(either: Either<R, L>): either is Right<R> {
+	isRight<R, L>(
+		either: Either<R, L>,
+	): either is Right<R, L> {
 		return either._tag === "Right"
 	},
 
-	match<R, L, B>(
+	match<R, L, T>(
 		either: Either<R, L>,
 		patterns: {
-			onLeft: (left: L) => B
-			onRight: (right: R) => B
+			onLeft: (left: L) => T
+			onRight: (right: R) => T
 		},
-	): B {
+	): T {
 		if (Either.isLeft(either)) {
 			return patterns.onLeft(either.left)
 		}
 		return patterns.onRight(either.right)
+	},
+
+	gen<R, L>(
+		f: () => Generator<Either<R, L>, R, any>,
+	): Either<R, L> {
+		const iterator = f()
+		let current = iterator.next()
+
+		while (!current.done) {
+			const either = current.value
+			if (Either.isLeft(either)) {
+				return either
+			}
+			current = iterator.next(either.right)
+		}
+
+		return Either.right(current.value)
 	},
 }

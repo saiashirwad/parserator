@@ -2,11 +2,18 @@ export type Maybe<A> = None | Some<A>
 
 export class None {
 	readonly _tag = "None"
+	constructor() {}
+	*[Symbol.iterator](): Generator<None, never, never> {
+		return yield this
+	}
 }
 
 export class Some<A> {
 	readonly _tag = "Some"
 	constructor(public readonly value: A) {}
+	*[Symbol.iterator](): Generator<Some<A>, A, never> {
+		return yield this
+	}
 }
 
 export class GenMaybe<A> {
@@ -71,15 +78,3 @@ export const Maybe = {
 		return Maybe.some(current.value)
 	},
 }
-
-// const hi: Maybe<number> = Maybe.none()
-// const there: Maybe<number> = Maybe.some(5)
-
-// const lol = Maybe.gen(function* ($) {
-// 	const a = yield* $(there)
-// 	const b = yield* $(hi)
-
-// 	return a + b
-// })
-
-// console.log(lol)
