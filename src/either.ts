@@ -28,13 +28,13 @@ export class Either<R, L> {
 
 	static isLeft<R, L>(
 		either: Either<R, L>,
-	): either is Either<R, L> & Left<L> {
+	): either is Either<never, L> {
 		return either._tag === "Left"
 	}
 
 	static isRight<R, L>(
 		either: Either<R, L>,
-	): either is Either<R, L> & Right<R> {
+	): either is Either<R, never> {
 		return either._tag === "Right"
 	}
 

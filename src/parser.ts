@@ -70,8 +70,8 @@ export class Parser<Result> {
 			if (Either.isLeft(result)) {
 				return Parser.error(
 					message,
-					result.left.expected,
-					result.left.pos,
+					result.value.expected,
+					result.value.pos,
 				)
 			}
 			return result
@@ -88,9 +88,9 @@ export class Parser<Result> {
 			const result = this.parse(state)
 			if (Either.isLeft(result)) {
 				return Parser.error(
-					onError(result.left, state),
-					result.left.expected,
-					result.left.pos,
+					onError(result.value, state),
+					result.value.expected,
+					result.value.pos,
 				)
 			}
 			return result
@@ -102,12 +102,14 @@ export class Parser<Result> {
 		if (Either.isRight(result)) {
 			return result
 		}
-		if (this.errorMessage) {
-			return Parser.error(
-				this.errorMessage,
-				result.left.expected,
-				result.left.pos,
-			)
+		if (Either.isLeft(result)) {
+			if (this.errorMessage) {
+				return Parser.error(
+					this.errorMessage,
+					result.value.expected,
+					result.value.pos,
+				)
+			}
 		}
 		return result
 	}
@@ -115,9 +117,9 @@ export class Parser<Result> {
 	parseOrError(input: string) {
 		const result = this.parse(State.fromInput(input))
 		if (Either.isRight(result)) {
-			return result.right[0]
+			return result.value[0]
 		}
-		return result.left
+		return result.value
 	}
 
 	parseOrThrow(input: string): Result {
