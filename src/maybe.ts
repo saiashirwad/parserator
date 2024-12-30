@@ -16,20 +16,12 @@ export class Some<A> {
 	}
 }
 
-export class GenMaybe<A> {
-	constructor(readonly op: Maybe<A>) {}
-
-	*[Symbol.iterator](): Generator<GenMaybe<A>, A, any> {
-		return yield this
-	}
-}
-
 export const Maybe = {
 	none<A = never>(): Maybe<A> {
 		return new None()
 	},
 
-	some<A>(value: A) {
+	some<A>(value: A): Maybe<A> {
 		return new Some(value)
 	},
 
@@ -41,34 +33,25 @@ export const Maybe = {
 		return maybe._tag === "Some"
 	},
 
-	match<A, B>(
+	match<A, T>(
 		maybe: Maybe<A>,
 		patterns: {
-			onNone: () => B
-			onSome: (value: A) => B
+			onNone: () => T
+			onSome: (value: A) => T
 		},
-	): B {
+	): T {
 		if (Maybe.isNone(maybe)) {
 			return patterns.onNone()
 		}
 		return patterns.onSome(maybe.value)
 	},
 
-	of<A>(value: Maybe<A>): GenMaybe<A> {
-		return new GenMaybe(value)
-	},
-
-	gen<T>(
-		f: (
-			adapter: <A>(m: Maybe<A>) => GenMaybe<A>,
-		) => Generator<GenMaybe<any>, T, any>,
-	): Maybe<T> {
-		const adapter = <A>(m: Maybe<A>) => new GenMaybe(m)
-		const iterator = f(adapter)
+	gen<T>(f: () => Generator<Maybe<T>, T, any>): Maybe<T> {
+		const iterator = f()
 		let current = iterator.next()
 
 		while (!current.done) {
-			const maybe = current.value.op
+			const maybe = current.value
 			if (Maybe.isNone(maybe)) {
 				return maybe
 			}
