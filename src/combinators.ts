@@ -391,6 +391,15 @@ export const manyN = <S, T>(
 	separator?: Parser<S>,
 ) => many_<S, T>(n)(parser, separator)
 
+/**
+ * Creates a parser that matches exactly n occurrences of the input parser.
+ *
+ * @param parser - The parser to repeat
+ * @param n - Number of required repetitions
+ * @param separator - Optional parser to match between occurrences
+ * @returns A parser that produces an array of exactly n matches
+ */
+
 export const manyNExact = <S, T>(
 	parser: Parser<T>,
 	n: number,
