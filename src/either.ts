@@ -65,16 +65,3 @@ export const Either = {
 		return Either.right(current.value)
 	},
 }
-
-const fn = (
-	a: Either<number, string>,
-	b: Either<number, string>,
-) =>
-	Either.gen(function* () {
-		const a_ = yield* a
-		const b_ = yield* b
-		if (a_ > b_) {
-			return yield* Either.left("a is greater than b")
-		}
-		return a_ + b_
-	})

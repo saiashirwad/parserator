@@ -71,15 +71,3 @@ export const Maybe = {
 		return Maybe.some(current.value)
 	},
 }
-
-// const hi: Maybe<number> = Maybe.none()
-// const there: Maybe<number> = Maybe.some(5)
-
-// const lol = Maybe.gen(function* ($) {
-// 	const a = yield* $(there)
-// 	const b = yield* $(hi)
-
-// 	return a + b
-// })
-
-// console.log(lol)
