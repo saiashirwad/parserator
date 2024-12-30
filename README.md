@@ -328,7 +328,7 @@ The core Parser class that represents a parsing computation.
   
 
 ```ts
-  const parser = between('(', ')', digit)
+  const parser = between(char('('), char(')'), digit)
   parser.run('(5)') // Right(['5', {...}])
   parser.run('5') // Left(error)
   ```
