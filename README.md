@@ -8,14 +8,17 @@
 
 A TypeScript parser combinator library inspired by [Parsec](https://github.com/haskell/parsec) and [Effect-TS](https://github.com/Effect-ts/Effect). Write parsers using a clean, generator-based syntax or compose them using functional combinators.
 
-## Features
+## Table of Contents
 
-* 🎯 **Generator Syntax**: Write parsers using a clean, async-like syntax
-* 🔧 **Functional Combinators**: Compose parsers using functional programming patterns
-* 🎭 **Type-Safe**: Full TypeScript support with precise type inference
-* 📦 **Zero Dependencies**: No external dependencies, just pure TypeScript
-* 🐛 **Great Error Messages**: Helpful error messages with source positions
-* 🚀 **Fast?**: I wouldn't know, this could be the slowest thing in the known universe.
+* [Installation](#installation)
+* [Basic Usage](#basic-usage)
+* [Generator Syntax](#generator-syntax)
+* [Primitive Parsers](#primitive-parsers)
+* [Combinators](#combinators)
+* [Error Handling](#error-handling)
+* [Debugging](#debugging)
+* [Advanced Usage](#advanced-usage)
+* [API Reference](#api-reference)
 
 ## Installation
 
@@ -23,9 +26,24 @@ A TypeScript parser combinator library inspired by [Parsec](https://github.com/h
 npm install parserator
 ```
 
-## Quick Start
+## Basic Usage
 
-### Generator Syntax
+```typescript
+import { Parser, char, many1, digit } from 'parserator'
+
+// Create a simple number parser
+const numberParser = many1(digit).map(digits => parseInt(digits.join(""), 10))
+
+// Parse a string
+const result = numberParser.run("123")
+// Right([123, {...}])
+
+// Handle errors
+const error = numberParser.run("abc")
+// Left(ParserError: Expected digit but found 'a')
+```
+
+## Generator Syntax
 
 Write parsers using a clean, generator-based syntax that feels like async/await:
 
@@ -34,14 +52,21 @@ import { Parser, char, many1, digit, optional } from 'parserator'
 
 // Parse a floating point number
 const float = Parser.gen(function* () {
+  // Parse optional sign
   const sign = yield* optional(char("-"))
+  
+  // Parse integer part
   const intPart = yield* many1(digit)
+  
+  // Parse optional fractional part
   const fractionalPart = yield* optional(
     Parser.gen(function* () {
       yield* char(".")
       return yield* many1(digit)
     })
   )
+  
+  // Parse optional exponent
   const exponentPart = yield* optional(
     Parser.gen(function* () {
       yield* char("e")
@@ -51,6 +76,7 @@ const float = Parser.gen(function* () {
     })
   )
 
+  // Combine parts
   const numStr = 
     (sign ?? "") + 
     intPart.join("") + 
@@ -61,156 +87,123 @@ const float = Parser.gen(function* () {
 })
 
 float.run("123.456e-7") // Right([1.23456e-5, ...])
-float.run("abc") // Left(ParserError: Expected digit but found 'a')
 ```
 
-### Core Combinators
+## Primitive Parsers
 
-Parserator provides a rich set of combinators for building complex parsers:
-
-#### Basic Parsers
-
-* `char(c)`: Match a single character
-  
+### Character Parsers
 
 ```typescript
-  char("a").run("abc") // Right(["a", ...])
-  ```
+import { char, string, regex, alphabet, digit } from 'parserator'
 
-* `string(s)`: Match an exact string
-  
+// Match a single character
+char("a").run("abc") // Right(["a", ...])
 
-```typescript
-  string("hello").run("hello world") // Right(["hello", ...])
-  ```
+// Match an exact string
+string("hello").run("hello world") // Right(["hello", ...])
 
-* `regex(re)`: Match a regular expression at the start of input
-  
+// Match using regex
+regex(/[0-9]+/).run("123abc") // Right(["123", ...])
 
-```typescript
-  regex(/[0-9]+/).run("123abc") // Right(["123", ...])
-  ```
+// Match any letter
+alphabet.run("abc") // Right(["a", ...])
 
-* `alphabet`: Match any alphabetic character (a-z, A-Z)
-  
+// Match any digit
+digit.run("123") // Right(["1", ...])
+```
 
-```typescript
-  alphabet.run("abc") // Right(["a", ...])
-  ```
+## Combinators
 
-* `digit`: Match any digit (0-9)
-  
+### Repetition
 
 ```typescript
-  digit.run("123") // Right(["1", ...])
-  ```
+import { many0, many1, manyN, digit } from 'parserator'
 
-#### Repetition
+// Match zero or more
+many0(digit).run("123abc") // Right([["1","2","3"], ...])
 
-* `many0(parser)`: Match zero or more occurrences
-  
+// Match one or more
+many1(digit).run("123abc") // Right([["1","2","3"], ...])
 
-```typescript
-  many0(digit).run("123abc") // Right([["1","2","3"], ...])
-  ```
+// Match exact number
+manyN(digit, 2).run("123") // Right([["1","2"], ...])
+```
 
-* `many1(parser)`: Match one or more occurrences
-  
-
-```typescript
-  many1(digit).run("123abc") // Right([["1","2","3"], ...])
-  ```
-
-* `manyN(parser, n)`: Match exactly n occurrences
-  
+### Sequencing and Choice
 
 ```typescript
-  manyN(digit, 2).run("123") // Right([["1","2"], ...])
-  ```
+import { sequence, or, between, sepBy } from 'parserator'
 
-#### Combinators
+// Run parsers in sequence
+sequence([char("a"), char("b")]).run("abc")
+// Right(["b", ...])
 
-* `optional(parser)`: Make a parser optional
-  
+// Try multiple parsers
+or(char("a"), char("b")).run("abc")
+// Right(["a", ...])
 
-```typescript
-  optional(char("-")).run("123") // Right([undefined, ...])
-  ```
+// Match between delimiters
+between(char("("), char(")"), digit).run("(5)")
+// Right(["5", ...])
 
-* `or(...parsers)`: Try multiple parsers in order
-  
+// Match separated values
+sepBy(char(","), digit).run("1,2,3")
+// Right([["1","2","3"], ...])
+```
 
-```typescript
-  or(char("a"), char("b")).run("abc") // Right(["a", ...])
-  ```
-
-* `sequence([parser1, parser2, ...])`: Run parsers in sequence
-  
-
-```typescript
-  sequence([char("a"), char("b")]).run("abc") // Right(["b", ...])
-  ```
-
-* `between(start, end, parser)`: Match content between delimiters
-  
+### Look-ahead and Skipping
 
 ```typescript
-  between(char("("), char(")"), digit).run("(5)") // Right(["5", ...])
-  ```
+import { lookAhead, skipSpaces } from 'parserator'
 
-* `sepBy(separator, parser)`: Match items separated by a separator
-  
+// Look ahead without consuming
+lookAhead(char("a")).run("abc")
+// Right(["a", ...]) // Position stays at "abc"
 
-```typescript
-  sepBy(char(","), digit).run("1,2,3") // Right([["1","2","3"], ...])
-  ```
+// Skip whitespace
+skipSpaces.then(char("a")).run("   abc")
+// Right(["a", ...])
+```
 
-#### Look-ahead and Skipping
+## Error Handling
 
-* `lookAhead(parser)`: Look ahead without consuming input
-  
-
-```typescript
-  lookAhead(char("a")).run("abc") // Right(["a", ...]) // Position stays at "abc"
-  ```
-
-* `skipSpaces`: Skip any number of space characters
-  
+Customize error messages and add error callbacks:
 
 ```typescript
-  skipSpaces.then(char("a")).run("   abc") // Right(["a", ...])
-  ```
-
-### Error Handling
-
-Parsers can be customized with error messages and callbacks:
-
-```typescript
-const parser = many1(digit).error("Expected at least one digit")
+const parser = many1(digit)
+  .error("Expected at least one digit")
   .errorCallback((error, state) => {
-    return `Error at line ${state.pos.line}, column ${state.pos.column}: ${error.message}`
+    return `Error at ${state.pos.line}:${state.pos.column}: ${error.message}`
   })
+
+parser.run("abc")
+// Left(ParserError: Error at 1:1: Expected at least one digit)
 ```
 
-### Debugging
+## Debugging
 
-Debug tools help inspect parser behavior:
+Debug tools to inspect parser behavior:
 
 ```typescript
 import { debug, trace } from 'parserator'
 
+// Add debug output
 const debuggedParser = debug(parser, "number-parser")
-const tracedParser = trace("Before parsing number").then(parser)
+
+// Add trace points
+const tracedParser = trace("Before parsing number")
+  .then(parser)
 ```
 
-### Advanced Examples
+## Advanced Usage
 
-#### JSON Array Parser
+### JSON Array Parser
 
 ```typescript
 const jsonArray = Parser.gen(function* () {
   yield* char("[")
   yield* skipSpaces
+  
   const items = yield* sepBy(
     char(","),
     Parser.gen(function* () {
@@ -220,32 +213,93 @@ const jsonArray = Parser.gen(function* () {
       return value
     })
   )
+  
   yield* skipSpaces
   yield* char("]")
   return items
 })
 
 jsonArray.run('["hello", 123, "world"]')
+// Right([["hello", 123, "world"], ...])
 ```
 
-#### Length-Prefixed List Parser
+### Recursive Parsers
 
 ```typescript
-const lengthPrefixedList = Parser.gen(function* () {
-  const length = yield* numberParser
-  yield* skipSpaces
-  yield* char("[")
-  const items = yield* manyN(stringParser, length, char(","))
-  yield* char("]")
-  
-  if (items.length !== length) {
-    return yield* Parser.fail("Length mismatch")
-  }
-  return items
-})
+const expr: Parser<number> = Parser.lazy(() => 
+  Parser.gen(function* () {
+    yield* char("(")
+    const left = yield* number
+    const op = yield* or(char("+"), char("-"))
+    const right = yield* expr
+    yield* char(")")
+    
+    return op === "+" ? left + right : left - right
+  })
+)
 
-lengthPrefixedList.run('2 ["foo", "bar"]') // Right([["foo", "bar"], ...])
+expr.run("(1+(2-(3+4)))")
+// Right([-4, ...])
 ```
+
+## API Reference
+
+### Parser<T>
+
+The core Parser class that represents a parsing computation.
+
+#### Methods
+
+* `run(input: string): ParserResult<T>` - Run the parser on an input string
+* `parseOrError(input: string): T | ParserError` - Run parser and return result or error
+* `parseOrThrow(input: string): T` - Run parser and throw on error
+* `map<B>(f: (a: T) => B): Parser<B>` - Transform parser result
+* `flatMap<B>(f: (a: T) => Parser<B>): Parser<B>` - Chain parsers
+* `error(message: string): Parser<T>` - Set error message
+* `errorCallback(cb: (error: ParserError, state: ParserState) => string): Parser<T>` - Custom error handling
+* `withName(name: string): Parser<T>` - Name the parser for better errors
+
+#### Static Methods
+
+* `Parser.gen<T>(f: () => Generator<Parser<any>, T>): Parser<T>` - Create parser using generator syntax
+* `Parser.succeed<T>(value: T): Parser<T>` - Create always-succeeding parser
+* `Parser.fail(message: string): Parser<never>` - Create always-failing parser
+* `Parser.lazy<T>(f: () => Parser<T>): Parser<T>` - Create recursive parser
+
+### Combinators
+
+#### Basic Parsers
+
+* `char(c: string): Parser<string>` - Match single character
+* `string(s: string): Parser<string>` - Match exact string
+* `regex(re: RegExp): Parser<string>` - Match regex pattern
+* `alphabet: Parser<string>` - Match any letter
+* `digit: Parser<string>` - Match any digit
+
+#### Repetition
+
+* `many0<T>(parser: Parser<T>): Parser<T[]>` - Match zero or more
+* `many1<T>(parser: Parser<T>): Parser<T[]>` - Match one or more
+* `manyN<T>(parser: Parser<T>, n: number): Parser<T[]>` - Match exact count
+
+#### Sequencing
+
+* `sequence<T>(parsers: Parser<T>[]): Parser<T>` - Run parsers in sequence
+* `between<T>(open: Parser<any>, close: Parser<any>, parser: Parser<T>): Parser<T>` - Match between delimiters
+* `sepBy<T>(sep: Parser<any>, parser: Parser<T>): Parser<T[]>` - Match separated values
+
+#### Choice and Optional
+
+* `or<T>(...parsers: Parser<T>[]): Parser<T>` - Try multiple parsers
+* `optional<T>(parser: Parser<T>): Parser<T | undefined>` - Make parser optional
+
+#### Look-ahead and Skipping
+
+* `lookAhead<T>(parser: Parser<T>): Parser<T>` - Look ahead without consuming
+* `skipSpaces: Parser<undefined>` - Skip whitespace
+* `skipMany0<T>(parser: Parser<T>): Parser<undefined>` - Skip zero or more
+* `skipMany1<T>(parser: Parser<T>): Parser<undefined>` - Skip one or more
+* `skipManyN<T>(parser: Parser<T>, n: number): Parser<undefined>` - Skip exact count
 
 ## Contributing
 
