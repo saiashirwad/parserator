@@ -329,7 +329,7 @@ export class Parser<T> {
 	// }
 
 	static gen<T>(
-		f: () => Generator<Parser<T>, T>,
+		f: () => Generator<Parser<any>, T>,
 	): Parser<T> {
 		return new Parser((state) => {
 			const iterator = f()
@@ -344,7 +344,7 @@ export class Parser<T> {
 				currentState = newState
 				current = iterator.next(result.right)
 			}
-			return Parser.succeed(current.value, state)
+			return Parser.succeed(current.value, currentState)
 		})
 		// return () => {
 		// 	const iterator = f()

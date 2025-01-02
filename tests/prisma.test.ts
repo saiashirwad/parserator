@@ -99,12 +99,12 @@ const blockParser = Parser.gen(function* () {
   yield* char("{");
   yield* whitespace;
 
-  yield* parseLine();
+  yield* parseLine;
   yield* whitespace;
   yield* peekAhead(10);
-  yield* parseLine();
+  yield* parseLine;
   yield* peekAhead(10);
-  yield* parseLine();
+  yield* parseLine;
   yield* peekAhead(10);
 
   return {
