@@ -194,9 +194,10 @@ const contents = `
 const objString = char('"').then(many1(or(alphabet, digit, char('_')))).thenDiscard(char('"')).map(x => x.join(''))
 
 const parser = Parser.gen(function* () {
-  yield* string('hi')
-  // return yield* string('hi')
-  return { hi: 'ther' }
+  yield* char('-')
+  yield* char('+')
+  return { hi: yield* string('hi').zip(string("hi")) }
 })
 
-console.log(parser.parseOrError('hi'))
+
+console.log(parser.parseOrError('-+hihi'))
