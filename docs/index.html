@@ -106,7 +106,10 @@ This library is currently in early development and the API is subject to change.
 <p><code>many1&lt;T&gt;(parser: Parser&lt;T&gt;, separator?: Parser&lt;any&gt;): Parser&lt;T[]&gt;</code> - Creates a parser that matches one or more occurrences of the input parser.</p>
 </li>
 <li>
-<p><code>manyN&lt;T&gt;(parser: Parser&lt;T&gt;, n: number, separator?: Parser&lt;any&gt;): Parser&lt;T[]&gt;</code> - Creates a parser that matches exactly n occurrences of the input parser.</p>
+<p><code>manyN&lt;T&gt;(parser: Parser&lt;T&gt;, n: number, separator?: Parser&lt;any&gt;): Parser&lt;T[]&gt;</code> - Creates a parser that matches at least n occurrences of the input parser.</p>
+</li>
+<li>
+<p><code>manyNExact&lt;T&gt;(parser: Parser&lt;T&gt;, n: number, separator?: Parser&lt;any&gt;): Parser&lt;T[]&gt;</code> - Creates a parser that matches exactly n occurrences of the input parser.</p>
 </li>
 </ul>
 <a id="sequencing-and-choice-1" class="tsd-anchor"></a><h4 class="tsd-anchor-link">Sequencing and Choice<a href="#sequencing-and-choice-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h4><ul>
