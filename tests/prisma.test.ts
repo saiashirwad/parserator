@@ -1,15 +1,19 @@
+import { describe, expect, test } from "bun:test"
 import {
   Parser,
   alphabet,
+  between,
   char,
   constString,
   digit,
   many0,
   many1,
   or,
-  skipUntil
+  skipUntil,
+  skipSpaces,
+  lookAhead
 } from "../src/index";
-import { peekAhead } from "../src/utils";
+import { peekAhead, peekRemaining } from "../src/utils";
 
 const validChar = or(
   char("\n"),
@@ -64,28 +68,15 @@ const identifier = many1(or(alphabet, digit, char("_"))).map(
 );
 
 const fieldParser = Parser.gen(function* () {
+  yield* whitespace;
   const name = yield* identifier;
+  yield* whitespace;
   const type = yield* identifier;
   yield* skipUntil(char("\n"));
   return {
     name,
     type,
   };
-});
-
-const parseLine = Parser.gen(function* () {
-  yield* whitespace;
-  let line = "";
-  while (true) {
-    const ch = yield* validChar;
-    line += ch;
-    if (ch === "\n") {
-      console.log("oops");
-      break;
-    }
-  }
-  yield* whitespace;
-  return line;
 });
 
 const blockParser = Parser.gen(function* () {
@@ -95,20 +86,20 @@ const blockParser = Parser.gen(function* () {
   const name = yield* identifier;
   yield* whitespace;
 
-  yield* char("{");
-  yield* whitespace;
-
-  yield* parseLine;
-  yield* whitespace;
-  yield* peekAhead(10);
-  yield* parseLine;
-  yield* peekAhead(10);
-  yield* parseLine;
-  yield* peekAhead(10);
-
+  yield* char('{').thenDiscard(whitespace)
+  let fields: ModelField[] = []
+  while (true) {
+    const field = yield* fieldParser.thenDiscard(whitespace)
+    fields.push(field)
+    const next = yield* peekAhead(1)
+    if (next === '}') {
+      yield* char('}')
+      break
+    }
+  }
   return {
     name,
-    // fields,
+    fields,
   };
 });
 
@@ -125,21 +116,15 @@ const contents = `
     maxRetries   Int
     scheduledFor DateTime
     executions   QueueJobExecution[]
-
-    @@index([status])
-    @@index([scheduledFor])
-    @@index([attempts])
-    @@map("queueJob")
-  }
-`;
+  }`;
 
 
-// describe("prisma parser", () => {
-//   test("should parse a prisma schema", () => {
-//     const result = prismaParser.parseOrError(contents);
-//     console.log(JSON.stringify(result, null, 2));
-//   });
-// })
+describe("prisma parser", () => {
+  test("should parse a prisma schema", () => {
+    const result = blockParser.parseOrError(contents);
+    console.log(JSON.stringify(result, null, 2));
+  });
+})
 
 
 // const lineParser = Parser.gen(function* () {
@@ -187,16 +172,3 @@ const contents = `
 //     console.log(result)
 //   })
 // })
-
-
-
-const objString = char('"').then(many1(or(alphabet, digit, char('_')))).thenDiscard(char('"')).map(x => x.join(''))
-
-const parser = Parser.gen(function* () {
-  const x = yield* char('-')
-  const y = yield* char('+')
-  const hi = yield* constString('hi').zip(constString("there"))
-  return { x, y, hi }
-})
-
-console.log(parser.parseOrError('-+hihi'))

@@ -12,7 +12,6 @@ export const peekRemaining = new Parser((s) => {
 
 export const peekAhead = (n: number) =>
   new Parser((s) => {
-    console.log(s.remaining.slice(0, n));
     return Parser.succeed(s.remaining.slice(0, n), s);
   });
 
