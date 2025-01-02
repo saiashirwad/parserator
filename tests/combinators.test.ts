@@ -14,7 +14,8 @@ import {
 	sepBy,
 	sequence,
 	skipSpaces,
-	between
+	between,
+	many0
 } from "../src/combinators"
 import { Either } from "../src/either"
 import { Parser } from "../src/parser"
@@ -80,14 +81,11 @@ test("chain", () => {
 		return s.items
 	})
 
-
-	p.parseOrError('2 ["foo", "bar"]')
-
-	// expect(p.parseOrError('2 ["foo", "bar"]')).toEqual([
-	// 	"foo",
-	// 	"bar",
-	// ])
-	// expect(Either.isLeft(p.run('2 ["foo"]'))).toEqual(true)
+	expect(p.parseOrError('2 ["foo", "bar"]')).toEqual([
+		"foo",
+		"bar",
+	])
+	expect(Either.isLeft(p.run('2 ["foo"]'))).toEqual(true)
 })
 
 describe("regex", () => {
@@ -130,48 +128,47 @@ describe("basic combinators", () => {
 	})
 })
 
-// describe("many combinators", () => {
-// 	test("many1 requires at least one match", () => {
-// 		const digits = many1(digit)
-// 		expect(digits.parseOrThrow("123")).toEqual([
-// 			"1",
-// 			"2",
-// 			"3",
-// 		])
-// 		expect(digits.parseOrThrow("1")).toEqual(["1"])
-// 		expect(Either.isLeft(digits.run(""))).toBe(true)
-// 		expect(Either.isLeft(digits.run("abc"))).toBe(true)
-// 	})
+describe("many combinators", () => {
+	test("many1 requires at least one match", () => {
+		const digits = many1(digit)
+		expect(digits.parseOrThrow("123")).toEqual([
+			"1",
+			"2",
+			"3",
+		])
+		expect(digits.parseOrThrow("1")).toEqual(["1"])
+		expect(Either.isLeft(digits.run(""))).toBe(true)
+		expect(Either.isLeft(digits.run("abc"))).toBe(true)
+	})
 
-// 	test("manyNExact requires exactly n matches", () => {
-// 		const threeDigits = manyNExact(digit, 3)
-// 		const t1 = threeDigits.parseOrThrow("123")
-// 		expect(t1).toEqual(["1", "2", "3"])
-// 		expect(Either.isLeft(threeDigits.run("12"))).toBe(true)
-// 		const t2 = threeDigits.parseOrError("1234")
-// 		console.log(t2)
-// 		// expect(Either.isLeft(t2)).toBe(true)
-// 		// expect(Either.isLeft(threeDigits.run(""))).toBe(true)
-// 	})
+	test("manyNExact requires exactly n matches", () => {
+		const threeDigits = manyNExact(digit, 3)
+		const t1 = threeDigits.parseOrError("123")
+		expect(t1).toEqual(["1", "2", "3"])
+		expect(Either.isLeft(threeDigits.run("12"))).toBe(true)
+		const t2 = threeDigits.run("1234")
+		expect(Either.isLeft(t2)).toBe(true)
+		expect(Either.isLeft(threeDigits.run(""))).toBe(true)
+	})
 
-// 	test("manyN with separator", () => {
-// 		const threeDigitsComma = manyN(
-// 			digit,
-// 			3,
-// 			char(","),
-// 		).thenDiscard(
-// 			lookAhead(or(char("\n"), Parser.pure(undefined))),
-// 		)
-// 		expect(threeDigitsComma.parseOrThrow("1,2,3")).toEqual([
-// 			"1",
-// 			"2",
-// 			"3",
-// 		])
-// 		expect(Either.isLeft(threeDigitsComma.run("1,2"))).toBe(
-// 			true,
-// 		)
-// 	})
-// })
+	test("manyN with separator", () => {
+		const threeDigitsComma = manyN(
+			digit,
+			3,
+			char(","),
+		).thenDiscard(
+			lookAhead(or(char("\n"), Parser.pure(undefined))),
+		)
+		expect(threeDigitsComma.parseOrThrow("1,2,3")).toEqual([
+			"1",
+			"2",
+			"3",
+		])
+		expect(Either.isLeft(threeDigitsComma.run("1,2"))).toBe(
+			true,
+		)
+	})
+})
 
 describe("complex combinations", () => {
 	test("nested array of numbers", () => {
@@ -350,24 +347,24 @@ describe("error recovery", () => {
 
 
 
-// describe("between", () => {
-// 	test("between parser", () => {
-// 		const p = between(char("("), char(")"), many1(digit))
-// 		expect(p.parseOrThrow("(123)")).toEqual(["1", "2", "3"])
-// 	})
+describe("between", () => {
+	test("between parser", () => {
+		const p = between(char("("), char(")"), many1(digit))
+		expect(p.parseOrThrow("(123)")).toEqual(["1", "2", "3"])
+	})
 
-// 	test("between with nested parsers", () => {
-// 		const strParser = char('"').then(many1(or(alphabet, digit))).thenDiscard(char('"')).map((s) => s.join(""))
-// 		const p = between(
-// 			char("["),
-// 			char("]"),
-// 			sepBy(char(","), strParser)
-// 		)
-// 		const result = p.parseOrThrow('["hello", "world"]')
-// 		expect(result).toEqual([
-// 			"hello",
-// 			"world",
-// 		])
-// 	})
-// })
+	test("between with nested parsers", () => {
+		const strParser = char('"').then(many1(or(alphabet, digit))).thenDiscard(char('"')).map((s) => s.join(""))
+		const p = between(
+			char("["),
+			char("]"),
+			sepBy(many0(char(' ')).then(char(',')).then(many0(char(' '))), strParser)
+		)
+		const result = p.parseOrThrow('["hello", "world"]')
+		expect(result).toEqual([
+			"hello",
+			"world",
+		])
+	})
+})
 
