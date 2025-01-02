@@ -2,7 +2,7 @@ export type Either<R, L> = Left<L, R> | Right<R, L>
 
 export class Left<L, R = never> {
 	readonly _tag = "Left"
-	constructor(public readonly left: L) {}
+	constructor(public readonly left: L) { }
 	*[Symbol.iterator](): Generator<Either<R, L>, R, any> {
 		return yield this
 	}
@@ -10,7 +10,7 @@ export class Left<L, R = never> {
 
 export class Right<R, L> {
 	readonly _tag = "Right"
-	constructor(public readonly right: R) {}
+	constructor(public readonly right: R) { }
 	*[Symbol.iterator](): Generator<Either<R, L>, R, any> {
 		return yield this
 	}
@@ -49,7 +49,7 @@ export const Either = {
 	},
 
 	gen<R, L>(
-		f: () => Generator<Either<R, L>, R, any>,
+		f: () => Generator<Either<any, L>, R, any>,
 	): Either<R, L> {
 		const iterator = f()
 		let current = iterator.next()

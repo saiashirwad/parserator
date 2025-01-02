@@ -14,6 +14,8 @@ import {
 	sepBy,
 	sequence,
 	skipSpaces,
+	between,
+	many0
 } from "../src/combinators"
 import { Either } from "../src/either"
 import { Parser } from "../src/parser"
@@ -141,13 +143,12 @@ describe("many combinators", () => {
 
 	test("manyNExact requires exactly n matches", () => {
 		const threeDigits = manyNExact(digit, 3)
-		const t1 = threeDigits.parseOrThrow("123")
+		const t1 = threeDigits.parseOrError("123")
 		expect(t1).toEqual(["1", "2", "3"])
 		expect(Either.isLeft(threeDigits.run("12"))).toBe(true)
-		const t2 = threeDigits.parseOrError("1234")
-		console.log(t2)
-		// expect(Either.isLeft(t2)).toBe(true)
-		// expect(Either.isLeft(threeDigits.run(""))).toBe(true)
+		const t2 = threeDigits.run("1234")
+		expect(Either.isLeft(t2)).toBe(true)
+		expect(Either.isLeft(threeDigits.run(""))).toBe(true)
 	})
 
 	test("manyN with separator", () => {
@@ -332,10 +333,6 @@ describe("error recovery", () => {
 
 		const result = assignment.run("foo = bar")
 		expect(Either.isLeft(result)).toBe(true)
-		// if (Either.isLeft(result)) {
-		// 	console.log(result.left.message)
-		// 	// expect(result.left.message).toBe("Expected number")
-		// }
 	})
 
 	test("error position tracking", () => {
@@ -347,3 +344,27 @@ describe("error recovery", () => {
 		}
 	})
 })
+
+
+
+describe("between", () => {
+	test("between parser", () => {
+		const p = between(char("("), char(")"), many1(digit))
+		expect(p.parseOrThrow("(123)")).toEqual(["1", "2", "3"])
+	})
+
+	test("between with nested parsers", () => {
+		const strParser = char('"').then(many1(or(alphabet, digit))).thenDiscard(char('"')).map((s) => s.join(""))
+		const p = between(
+			char("["),
+			char("]"),
+			sepBy(many0(char(' ')).then(char(',')).then(many0(char(' '))), strParser)
+		)
+		const result = p.parseOrThrow('["hello", "world"]')
+		expect(result).toEqual([
+			"hello",
+			"world",
+		])
+	})
+})
+
