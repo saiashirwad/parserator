@@ -18,7 +18,7 @@ export class ParserError {
 		public message: string,
 		public expected: string[],
 		public pos: SourcePosition,
-	) {}
+	) { }
 }
 
 export type ParserResult<T> = Either<
@@ -32,14 +32,14 @@ export class Parser<r> {
 	constructor(
 		public parse: (state: ParserState) => ParserResult<r>,
 		public options?: ParserOptions,
-	) {}
+	) { }
 
 	withName(name: string) {
 		this.options = { ...this.options, name }
 		return this
 	}
 
-	static getState() {}
+	static getState() { }
 
 	static succeed<T>(
 		value: T,
@@ -315,32 +315,74 @@ export class Parser<r> {
 		}, this.options)
 	}
 
-	static gen<Yielded, Returned>(
-		f: ($: {
-			<A>(_: Parser<A>): Parser<A>
-		}) => Generator<Yielded, Returned, any>,
-	): Parser<Returned> {
-		const iterator = f((_: any) => new Parser(_))
-		function run(
-			state:
-				| IteratorYieldResult<Yielded>
-				| IteratorReturnResult<Returned>,
-		): Parser<Returned> {
-			if (state.done) {
-				if (state.value instanceof Parser) {
-					return state.value as Parser<Returned>
-				}
-				return Parser.pure(state.value as Returned)
-			}
-			const value = state.value
-			if (value instanceof Parser) {
-				return value.flatMap((result) =>
-					run(iterator.next(result)),
-				)
-			}
-			throw new Error("Expected a Parser")
-		}
+	// static gen<A>(
+	// 	f: () => Generator<Parser<A>, A>,
+	// ) {
+	// 	return () => {
+	// 		const iterator = f()
+	// 		const current = iterator.next()
+	// 		while (!current.done) {
+	// 			const parser = current.value
+	// 			// const result = parser.run(state)
+	// 		}
+	// 	}
+	// }
 
-		return run(iterator.next())
+	static gen<T>(
+		f: () => Generator<Parser<T>, ParserResult<T>>,
+	): Parser<T> {
+		return new Parser((state) => {
+			const iterator = f()
+			let current = iterator.next()
+			while (!current.done) {
+				const result = current.value.parse(state)
+				console.log(result)
+				if (Either.isLeft(result)) {
+					return result
+				}
+				console.log(result.right)
+				current = iterator.next(result.right)
+			}
+			return current.value
+		})
+		// return () => {
+		// 	const iterator = f()
+		// 	let current = iterator.next()
+
+		// 	while (!current.done) {
+		// 		const result = current.value
+		// 		if (Either.isLeft(result)) {
+		// 			return result.left
+		// 		}
+		// 		current = iterator.next(result.right)
+		// 	}
+
+		// 	// return Either.right(current.value)
+
+		// 	// function run(
+		// 	// 	state:
+		// 	// 		| IteratorYieldResult<ParserResult<T>>
+		// 	// 		| IteratorReturnResult<T>
+		// 	// ) {
+		// 	// 	if (state.done) {
+		// 	// 		if (state.value instanceof Parser) {
+		// 	// 			return state.value
+		// 	// 		}
+		// 	// 		return Parser.pure(state.value as T)
+		// 	// 	}
+		// 	// 	// const value = state.value
+		// 	// 	// if (value instanceof Parser) {
+		// 	// 	// 	return value.flatMap((result) =>
+		// 	// 	// 		run(iterator.next(result)),
+		// 	// 	// 	)
+		// 	// 	// }
+		// 	// 	throw new Error("Expected a Parser")
+		// 	// }
+
+		// 	// return run(iterator.next())
+		// }
 	}
 }
+
+
+
