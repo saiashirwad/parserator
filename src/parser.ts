@@ -315,19 +315,6 @@ export class Parser<T> {
 		}, this.options)
 	}
 
-	// static gen<A>(
-	// 	f: () => Generator<Parser<A>, A>,
-	// ) {
-	// 	return () => {
-	// 		const iterator = f()
-	// 		const current = iterator.next()
-	// 		while (!current.done) {
-	// 			const parser = current.value
-	// 			// const result = parser.run(state)
-	// 		}
-	// 	}
-	// }
-
 	static gen<T>(
 		f: () => Generator<Parser<any>, T>,
 	): Parser<T> {
@@ -340,9 +327,9 @@ export class Parser<T> {
 				if (Either.isLeft(result)) {
 					return result
 				}
-				const [value, newState] = result.right
+				const [remaining, newState] = result.right
 				currentState = newState
-				current = iterator.next(result.right)
+				current = iterator.next(remaining)
 			}
 			return Parser.succeed(current.value, currentState)
 		})

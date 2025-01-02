@@ -7,8 +7,7 @@ import {
   many0,
   many1,
   or,
-  skipUntil,
-  string,
+  skipUntil
 } from "../src/index";
 import { peekAhead } from "../src/utils";
 
@@ -194,10 +193,10 @@ const contents = `
 const objString = char('"').then(many1(or(alphabet, digit, char('_')))).thenDiscard(char('"')).map(x => x.join(''))
 
 const parser = Parser.gen(function* () {
-  yield* char('-')
-  yield* char('+')
-  return { hi: yield* string('hi').zip(string("hi")) }
+  const x = yield* char('-')
+  const y = yield* char('+')
+  const hi = yield* constString('hi').zip(constString("there"))
+  return { x, y, hi }
 })
-
 
 console.log(parser.parseOrError('-+hihi'))
