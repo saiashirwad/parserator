@@ -49,7 +49,7 @@ export const Either = {
 	},
 
 	gen<R, L>(
-		f: () => Generator<Either<R, L>, R, any>,
+		f: () => Generator<Either<any, L>, R, any>,
 	): Either<R, L> {
 		const iterator = f()
 		let current = iterator.next()
@@ -65,3 +65,18 @@ export const Either = {
 		return Either.right(current.value)
 	},
 }
+
+const fn = (
+	a: Either<number, Error>,
+	b: Either<string, Error>,
+) =>
+	Either.gen(function* () {
+		const a_ = yield* a
+		const b_ = yield* b
+		if (a_ > 5) {
+			return yield* Either.left(
+				new Error("a is greater than b"),
+			)
+		}
+		return `${a_} ${b_}`
+	})

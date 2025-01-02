@@ -347,3 +347,73 @@ describe("error recovery", () => {
 		}
 	})
 })
+
+describe("regex parser", () => {
+	test("matches simple pattern", () => {
+		const p = regex(/[a-z]+/)
+		expect(p.parseOrThrow("hello")).toEqual("hello")
+		expect(p.parseOrThrow("abc")).toEqual("abc")
+	})
+
+	test("matches digits", () => {
+		const p = regex(/\d+/)
+		expect(p.parseOrThrow("123")).toEqual("123")
+		expect(p.parseOrThrow("0")).toEqual("0")
+	})
+
+	test("fails on non-matching input", () => {
+		const p = regex(/[a-z]+/)
+		const result = p.run("123")
+		expect(Either.isLeft(result)).toBe(true)
+	})
+
+	test("matches at start of input", () => {
+		const p = regex(/^[a-z]+/)
+		expect(p.parseOrThrow("abc123")).toEqual("abc")
+		const result = p.run("123abc")
+		expect(Either.isLeft(result)).toBe(true)
+	})
+
+	test("matches with word boundaries", () => {
+		const p = regex(/\b\w+\b/)
+		expect(p.parseOrThrow("hello world")).toEqual("hello")
+	})
+
+	test("matches with optional patterns", () => {
+		const p = regex(/[a-z]+(-[a-z]+)?/)
+		expect(p.parseOrThrow("foo-bar")).toEqual("foo-bar")
+		expect(p.parseOrThrow("foo")).toEqual("foo")
+	})
+})
+
+describe("object parser", () => {
+	test("parses empty object", () => {
+		const p = char("{").then(skipSpaces).then(char("}"))
+		expect(p.parseOrThrow("{}")).toEqual("}")
+	})
+
+	test("parses object with multiple pairs", () => {
+		const pair = stringParser
+			.thenDiscard(skipSpaces)
+			.thenDiscard(char(":"))
+			.thenDiscard(skipSpaces)
+			.zip(or(stringParser, integerParser))
+			.map(([key, value]) => ({ [key]: value }))
+
+		const p = char("{")
+			.thenDiscard(skipSpaces)
+			.then(sepBy(char(","), pair))
+			.thenDiscard(skipSpaces)
+			.thenDiscard(char("}"))
+			.map((objects) => Object.assign({}, ...objects))
+
+		console.log(p.run('{"foo": 123, "bar": "hello"}'))
+
+		expect(
+			p.parseOrThrow('{"foo": 123, "bar": "hello"}'),
+		).toEqual({
+			foo: 123,
+			bar: "hello",
+		})
+	})
+})

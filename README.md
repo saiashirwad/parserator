@@ -1,6 +1,9 @@
 # Parserator
 
 > **Warning**
+> Some combinators are just fundamentally broken, I'll fix them in the next ~2 days (Jan 2)
+
+> **Warning**
 > This library is currently in early development and the API is subject to change. There are *several* bugs. Please don't use, even at your own risk. I am absolutely responsible for any bugs, so holler at me at [@texoport.in](https://bsky.app/profile/texoport.in).
 
 A TypeScript parser combinator library inspired by [Parsec](https://github.com/haskell/parsec) and [Effect-TS](https://github.com/Effect-ts/Effect). Write parsers using a clean, generator-based syntax or compose them using functional combinators.
