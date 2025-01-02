@@ -1,105 +1,91 @@
-import { describe, expect, test } from "bun:test"
+import { describe, test, expect } from "bun:test";
 import {
   Parser,
   alphabet,
-  between,
   char,
   constString,
   digit,
   many0,
   many1,
+  optional,
   or,
   skipUntil,
-  skipSpaces,
-  lookAhead
+  string
 } from "../src/index";
-import { peekAhead, peekRemaining } from "../src/utils";
-
-const validChar = or(
-  char("\n"),
-  char(" "),
-  alphabet,
-  digit,
-  char("_"),
-  char("."),
-  char("["),
-  char("]"),
-  char("@"),
-  char("?"),
-  char("!"),
-  char(":"),
-  char("="),
-  char("|"),
-  char("+"),
-  char("-"),
-  char("*"),
-  char("/"),
-  char("%"),
-  char("^"),
-  char("&"),
-  char("|"),
-  char("~"),
-  char("`"),
-  char("\\"),
-  char("|"),
-  char("~"),
-  char("`"),
-  char("\\"),
-  char("|"),
-  char("~"),
-  char("`"),
-  char("\\"),
-);
+import { peekAhead } from "../src/utils";
+import { Either } from "../dist";
 
 type ModelField = {
   name: string;
   type: string;
-};
-
-type Model = {
-  name: string;
-  fields: ModelField[];
+  following?: string
 };
 
 const whitespace = many0(or(char(" "), char("\n"), char("\t"))).withName('whitespace');
 const requiredWhitespace = many1(or(char(" "), char("\n"), char("\t")));
-const identifier = many1(or(alphabet, digit, char("_"))).map(
-  (chars: string[]) => chars.join(""),
+const word = many1(or(alphabet, digit, char("_"))).map(
+  (chars) => chars.join(""),
 );
+
+const typeParser = Parser.gen(function* () {
+  yield* whitespace
+  const typeName = yield* word
+  const following = yield* optional(or(
+    string('[]'),
+    char('?')
+  ))
+  return {
+    type: `${typeName}${following ?? ''}`,
+    following
+  }
+})
+
+const basicPrismaTypes = ['String', 'Int', 'Float', 'Boolean', 'DateTime', 'Json']
 
 const fieldParser = Parser.gen(function* () {
   yield* whitespace;
-  const name = yield* identifier;
+  const name = yield* word;
   yield* whitespace;
-  const type = yield* identifier;
+  const type = yield* typeParser;
   yield* skipUntil(char("\n"));
   return {
     name,
-    type,
+    ...type,
   };
 });
+
 
 const blockParser = Parser.gen(function* () {
   yield* whitespace;
   const blockName = yield* constString("model");
   yield* requiredWhitespace;
-  const name = yield* identifier;
+  const name = yield* word;
   yield* whitespace;
-
   yield* char('{').thenDiscard(whitespace)
+
   let fields: ModelField[] = []
   while (true) {
-    const field = yield* fieldParser.thenDiscard(whitespace)
-    fields.push(field)
-    const next = yield* peekAhead(1)
-    if (next === '}') {
+    yield* whitespace
+    const next = yield* optional(peekAhead(1))
+    if (!next) {
+      break
+    }
+    if (next === '@') {
+      yield* skipUntil(char('\n'))
+    } else if (next === '}') {
       yield* char('}')
       break
+    } else {
+      const field = yield* fieldParser.thenDiscard(whitespace)
+      if (basicPrismaTypes.includes(field.type)) {
+        fields.push(field)
+      }
     }
   }
   return {
     name,
     fields,
+    blockName
   };
 });
 
@@ -116,59 +102,32 @@ const contents = `
     maxRetries   Int
     scheduledFor DateTime
     executions   QueueJobExecution[]
-  }`;
+
+    @@index([queue, status])
+  }
+    
+  model QueueJobExecution {
+    id           String              @id
+    queue        String
+    payload      Json
+    status       QueueJobStatus
+    errorMessage String?             @db.LongText
+    createdAt    DateTime
+    attempts     Int
+    maxRetries   Int
+    scheduledFor DateTime
+    executions   QueueJobExecution[]
+
+    @@index([queue, status])
+  }
+  
+  `;
 
 
 describe("prisma parser", () => {
   test("should parse a prisma schema", () => {
-    const result = blockParser.parseOrError(contents);
-    console.log(JSON.stringify(result, null, 2));
+    const parser = many0(blockParser)
+    const result = parser.run(contents);
+    expect(Either.isRight(result)).toBe(true)
   });
 })
-
-
-// const lineParser = Parser.gen(function* () {
-//   yield* whitespace;
-//   const name = yield* identifier;
-//   yield* many1(char(' '));
-//   const type = yield* identifier;
-//   yield* skipSpaces;
-//   console.log({ name, type })
-// {
-//     name,
-//     type,
-//   };
-// });
-
-
-// describe("something", () => {
-//   test("parseLine", () => {
-//     const lineText = `queue        String
-//     id     String`;
-//     const parser = Parser.gen(function* () {
-//       const line1 = yield* lineParser;
-//       // const line2 = yield* lineParser;
-//       // return [line1, line2];
-//       return line1
-//     })
-//     const result = parser.parseOrError(lineText)
-//     console.log(JSON.stringify(result, null, 2))
-//   })
-// })
-
-
-// describe("object", () => {
-//   test('parse a simple flat object', () => {
-//     const objString = char('"').then(many1(or(alphabet, digit, char('_')))).thenDiscard(char('"')).map(x => x.join(''))
-//     const input = ` {
-//       "name": "John",
-//       "age": 30
-//     }`
-//     const parser = Parser.gen(function* () {
-//       yield* skipSpaces
-//       yield* char('{')
-//     })
-//     const result = parser.parseOrError(input)
-//     console.log(result)
-//   })
-// })
