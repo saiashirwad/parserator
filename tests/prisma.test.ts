@@ -150,7 +150,7 @@ const contents = `
 //   const type = yield* identifier;
 //   yield* skipSpaces;
 //   console.log({ name, type })
-//   return {
+// {
 //     name,
 //     type,
 //   };

@@ -346,42 +346,6 @@ export class Parser<T> {
 			}
 			return Parser.succeed(current.value, currentState)
 		})
-		// return () => {
-		// 	const iterator = f()
-		// 	let current = iterator.next()
-
-		// 	while (!current.done) {
-		// 		const result = current.value
-		// 		if (Either.isLeft(result)) {
-		// 			return result.left
-		// 		}
-		// 		current = iterator.next(result.right)
-		// 	}
-
-		// 	// return Either.right(current.value)
-
-		// 	// function run(
-		// 	// 	state:
-		// 	// 		| IteratorYieldResult<ParserResult<T>>
-		// 	// 		| IteratorReturnResult<T>
-		// 	// ) {
-		// 	// 	if (state.done) {
-		// 	// 		if (state.value instanceof Parser) {
-		// 	// 			return state.value
-		// 	// 		}
-		// 	// 		return Parser.pure(state.value as T)
-		// 	// 	}
-		// 	// 	// const value = state.value
-		// 	// 	// if (value instanceof Parser) {
-		// 	// 	// 	return value.flatMap((result) =>
-		// 	// 	// 		run(iterator.next(result)),
-		// 	// 	// 	)
-		// 	// 	// }
-		// 	// 	throw new Error("Expected a Parser")
-		// 	// }
-
-		// 	// return run(iterator.next())
-		// }
 	}
 }
 
