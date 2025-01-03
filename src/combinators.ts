@@ -503,6 +503,26 @@ export function skipUntil<T>(
 	})
 }
 
+export function takeUntil<T>(
+	parser: Parser<T>,
+): Parser<string> {
+	return new Parser((state) => {
+		let currentState = state
+		let collected = ""
+
+		while (!State.isAtEnd(currentState)) {
+			const result = parser.parse(currentState)
+			if (Either.isRight(result)) {
+				return Parser.succeed(collected, result.right[1])
+			}
+			collected += currentState.remaining[0]
+			currentState = State.consume(currentState, 1)
+		}
+
+		return Parser.succeed(collected, currentState)
+	})
+}
+
 /**
  * A parser that skips any number of space characters.
  */

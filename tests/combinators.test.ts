@@ -15,7 +15,8 @@ import {
 	sequence,
 	skipSpaces,
 	between,
-	many0
+	many0,
+	takeUntil,
 } from "../src/combinators"
 import { Either } from "../src/either"
 import { Parser } from "../src/parser"
@@ -352,17 +353,39 @@ describe("between", () => {
 	})
 
 	test("between with nested parsers", () => {
-		const strParser = char('"').then(many1(or(alphabet, digit))).thenDiscard(char('"')).map((s) => s.join(""))
+		const strParser = char('"')
+			.then(many1(or(alphabet, digit)))
+			.thenDiscard(char('"'))
+			.map((s) => s.join(""))
 		const p = between(
 			char("["),
 			char("]"),
-			sepBy(many0(char(' ')).then(char(',')).then(many0(char(' '))), strParser)
+			sepBy(
+				many0(char(" "))
+					.then(char(","))
+					.then(many0(char(" "))),
+				strParser,
+			),
 		)
 		const result = p.parseOrThrow('["hello", "world"]')
-		expect(result).toEqual([
-			"hello",
-			"world",
-		])
+		expect(result).toEqual(["hello", "world"])
 	})
 })
 
+describe("takeUntil", () => {
+	test("takeUntil 1", () => {
+		const p = takeUntil(char("a"))
+		expect(p.parseOrThrow("123142abc")).toBe("123142")
+	})
+
+	test("takeUntil 2", () => {
+		const strParser = char('"')
+			.then(many1(or(alphabet, digit)))
+			.thenDiscard(char('"'))
+			.map((s) => s.join(""))
+		const p = takeUntil(strParser)
+		expect(p.parseOrThrow('this is a "hello"')).toBe(
+			"this is a ",
+		)
+	})
+})
