@@ -1,15 +1,24 @@
 import {
 	Parser,
+	ParserError,
 	alphabet,
 	char,
 	digit,
+	many0,
 	many1,
 	manyN,
 	optional,
 	or,
 	skipSpaces,
 } from "../src/index"
-import { printPosition } from "../src/utils"
+import {
+	printErrorContext,
+	printPosition,
+} from "../src/utils"
+
+const whitespace = many0(
+	or(char(" "), char("\n"), char(".")),
+)
 
 const word = or(alphabet, char("_"))
 	.withError(
@@ -19,10 +28,17 @@ const word = or(alphabet, char("_"))
 	.map(([first, rest]) => first + rest.join(""))
 
 const expression = Parser.gen(function* () {
-	const name = yield* word.trim(skipSpaces)
+	const name = yield* word.trim(whitespace)
 	const operator = yield* char("=")
-		.withErrorCallback((error) => {
-			return `Expected '=' at ${printPosition(error.pos)} but found ${error}`
+		.withErrorCallback(({ error, state }) => {
+			return printErrorContext(
+				error,
+				state,
+				`Expected '=' at ${printPosition(error.pos)} but found '${state.source.slice(
+					error.pos.offset,
+					error.pos.offset + 1,
+				)}'`,
+			)
 		})
 		.trim(skipSpaces)
 	const sign = yield* optional(char("-")).map((x) =>
@@ -35,5 +51,10 @@ const expression = Parser.gen(function* () {
 	return { name, operator, value: sign * value }
 })
 
-const result = expression.parseOrError("aab >= 2234")
-console.log(result)
+const result = expression.parseOrError(
+	"\n.\n.\n.\n.\nhi -= 2234",
+)
+
+if (result instanceof ParserError) {
+	console.error(result.message)
+}

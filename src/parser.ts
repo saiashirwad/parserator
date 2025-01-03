@@ -82,16 +82,19 @@ export class Parser<T> {
 	}
 
 	withErrorCallback(
-		onError: (
-			error: ParserError,
-			state: ParserState,
-		) => string,
+		onError: (options: {
+			error: ParserError
+			state: ParserState
+		}) => string,
 	) {
 		return new Parser<T>((state) => {
 			const result = this.parse(state)
 			if (Either.isLeft(result)) {
 				return Parser.error(
-					onError(result.left, state),
+					onError({
+						error: result.left,
+						state,
+					}),
 					result.left.expected,
 					result.left.pos,
 				)

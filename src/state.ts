@@ -7,6 +7,7 @@ export type SourcePosition = {
 }
 
 export type ParserState = {
+	source: string
 	remaining: string
 	pos: SourcePosition
 	context: ParserContext
@@ -28,6 +29,7 @@ export const State = {
 		context: ParserContext = {},
 	): ParserState {
 		return {
+			source: input,
 			remaining: input,
 			pos: {
 				line: 1,
@@ -68,6 +70,7 @@ export const State = {
 		}
 
 		return {
+			source: state.source,
 			remaining: state.remaining.slice(n),
 			pos: { line, column, offset },
 			context: state.context,
