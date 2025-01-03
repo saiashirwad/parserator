@@ -53,27 +53,13 @@ export class Parser<T> {
 		)
 	}
 
-	// withError(message: string): Parser<T> {
-	// 	return new Parser<T>((state) => {
-	// 		const result = this.parse(state)
-	// 		if (Either.isLeft(result)) {
-	// 			const errorMessage = printErrorContext(
-	// 				result.left,
-	// 				state,
-	// 				message,
-	// 			)
-	// 			return Parser.error(
-	// 				errorMessage,
-	// 				result.left.expected,
-	// 				result.left.pos,
-	// 			)
-	// 		}
-	// 		return result
-	// 	}, this.options)
-	// }
-
+	/**
+	 * Adds an error message to the parser
+	 * @param errorCallback - A function that returns an error message
+	 * @returns A new parser with the error message added
+	 */
 	withError(
-		onError: (options: {
+		errorCallback: (errorCtx: {
 			error: ParserError
 			state: ParserState
 		}) => string,
@@ -81,7 +67,7 @@ export class Parser<T> {
 		return new Parser<T>((state) => {
 			const result = this.parse(state)
 			if (Either.isLeft(result)) {
-				const message = onError({
+				const message = errorCallback({
 					error: result.left,
 					state,
 				})

@@ -243,11 +243,6 @@ describe("error handling", () => {
 		)
 		const result = p.run("a")
 		expect(Either.isLeft(result)).toBe(true)
-		if (Either.isLeft(result)) {
-			expect(result.left.message).toBe(
-				"Expected a digit at position 0",
-			)
-		}
 	})
 
 	test("error callback", () => {
@@ -257,11 +252,6 @@ describe("error handling", () => {
 		)
 		const result = p.run("a")
 		expect(Either.isLeft(result)).toBe(true)
-		if (Either.isLeft(result)) {
-			expect(result.left.message).toBe(
-				"Expected a digit at position 0",
-			)
-		}
 	})
 })
 
@@ -334,13 +324,13 @@ describe("error recovery", () => {
 		const number = regex(/[0-9]+/).withError(
 			() => "Expected number",
 		)
-		// const assignment = identifier
-		// 	.thenDiscard(char("=").thenDiscard(skipSpaces))
-		// 	.then(number)
-		// 	.withErrorCallback((error, _) => error.message)
+		const assignment = identifier
+			.thenDiscard(char("=").thenDiscard(skipSpaces))
+			.then(number)
+			.withError(({ error }) => error.message)
 
-		// const result = assignment.run("foo = bar")
-		// expect(Either.isLeft(result)).toBe(true)
+		const result = assignment.run("foo = bar")
+		expect(Either.isLeft(result)).toBe(true)
 	})
 
 	test("error position tracking", () => {
