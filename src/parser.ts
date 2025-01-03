@@ -1,30 +1,16 @@
-import { Either } from "./either"
 import { debug } from "./debug"
+import { Either } from "./either"
+import { printErrorContext } from "./errors"
 import {
-	State,
+	type ParserContext,
+	ParserError,
+	type ParserOptions,
+	type ParserResult,
 	type ParserState,
 	type SourcePosition,
+	State,
 } from "./state"
 import type { Prettify } from "./types"
-
-export type ParserContext = {
-	debug?: boolean
-}
-
-export type ParserOptions = { name?: string }
-
-export class ParserError {
-	constructor(
-		public message: string,
-		public expected: string[],
-		public pos: SourcePosition,
-	) {}
-}
-
-export type ParserResult<T> = Either<
-	[T, ParserState],
-	ParserError
->
 
 export class Parser<T> {
 	private errorMessage: string | null = null
@@ -71,8 +57,13 @@ export class Parser<T> {
 		return new Parser<T>((state) => {
 			const result = this.parse(state)
 			if (Either.isLeft(result)) {
-				return Parser.error(
+				const errorMessage = printErrorContext(
+					result.left,
+					state,
 					message,
+				)
+				return Parser.error(
+					errorMessage,
 					result.left.expected,
 					result.left.pos,
 				)
@@ -90,11 +81,17 @@ export class Parser<T> {
 		return new Parser<T>((state) => {
 			const result = this.parse(state)
 			if (Either.isLeft(result)) {
+				const message = onError({
+					error: result.left,
+					state,
+				})
+				const errorMessage = printErrorContext(
+					result.left,
+					state,
+					message,
+				)
 				return Parser.error(
-					onError({
-						error: result.left,
-						state,
-					}),
+					errorMessage,
 					result.left.expected,
 					result.left.pos,
 				)

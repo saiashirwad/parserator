@@ -1,4 +1,23 @@
-import type { ParserContext } from "./parser"
+import type { Either } from "./either"
+
+export type ParserContext = {
+	debug?: boolean
+}
+
+export type ParserOptions = { name?: string }
+
+export class ParserError {
+	constructor(
+		public message: string,
+		public expected: string[],
+		public pos: SourcePosition,
+	) {}
+}
+
+export type ParserResult<T> = Either<
+	[T, ParserState],
+	ParserError
+>
 
 export type SourcePosition = {
 	line: number

@@ -14,7 +14,7 @@ import {
 import {
 	printErrorContext,
 	printPosition,
-} from "../src/utils"
+} from "../src/errors"
 
 const whitespace = many0(
 	or(char(" "), char("\n"), char(".")),
@@ -31,14 +31,11 @@ const expression = Parser.gen(function* () {
 	const name = yield* word.trim(whitespace)
 	const operator = yield* char("=")
 		.withErrorCallback(({ error, state }) => {
-			return printErrorContext(
-				error,
-				state,
-				`Expected '=' at ${printPosition(error.pos)} but found '${state.source.slice(
-					error.pos.offset,
-					error.pos.offset + 1,
-				)}'`,
+			const errorChar = state.source.slice(
+				error.pos.offset,
+				error.pos.offset + 1,
 			)
+			return `Expected '=' at ${printPosition(error.pos)} but found '${errorChar}'`
 		})
 		.trim(skipSpaces)
 	const sign = yield* optional(char("-")).map((x) =>
@@ -52,7 +49,7 @@ const expression = Parser.gen(function* () {
 })
 
 const result = expression.parseOrError(
-	"\n.\n.\n.\n.\nhi -= 2234",
+	"\n.\n.\n.\n.\n   _hi -= 2234",
 )
 
 if (result instanceof ParserError) {
