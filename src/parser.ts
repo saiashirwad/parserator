@@ -18,7 +18,7 @@ export class ParserError {
 		public message: string,
 		public expected: string[],
 		public pos: SourcePosition,
-	) { }
+	) {}
 }
 
 export type ParserResult<T> = Either<
@@ -32,14 +32,14 @@ export class Parser<T> {
 	constructor(
 		public parse: (state: ParserState) => ParserResult<T>,
 		public options?: ParserOptions,
-	) { }
+	) {}
 
 	withName(name: string) {
 		this.options = { ...this.options, name }
 		return this
 	}
 
-	static getState() { }
+	static getState() {}
 
 	static succeed<T>(
 		value: T,
@@ -334,7 +334,16 @@ export class Parser<T> {
 			return Parser.succeed(current.value, currentState)
 		})
 	}
+
+	trim(parser: Parser<any>) {
+		return parser.then(this).thenDiscard(parser)
+	}
+
+	trimLeft(parser: Parser<any>) {
+		return this.then(parser).thenDiscard(parser)
+	}
+
+	trimRight(parser: Parser<any>) {
+		return this.thenDiscard(parser).then(parser)
+	}
 }
-
-
-
