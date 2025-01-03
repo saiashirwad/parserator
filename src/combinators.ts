@@ -503,6 +503,12 @@ export function skipUntil<T>(
 	})
 }
 
+/**
+ * Creates a parser that takes input until the given parser succeeds.
+ *
+ * @param parser - The parser to look for
+ * @returns A parser that takes input until a match is found
+ */
 export function takeUntil<T>(
 	parser: Parser<T>,
 ): Parser<string> {
