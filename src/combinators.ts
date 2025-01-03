@@ -68,8 +68,8 @@ export function notFollowedBy<T>(parser: Parser<T>) {
  * parser.run("goodbye") // Left(error)
  * ```
  */
-export const string = (str: string): Parser<string> => {
-	return new Parser(
+export const string = (str: string): Parser<string> =>
+	new Parser(
 		(state) => {
 			if (state.remaining.startsWith(str)) {
 				return Parser.succeed(
@@ -85,7 +85,6 @@ export const string = (str: string): Parser<string> => {
 		},
 		{ name: str },
 	)
-}
 
 /**
  * Creates a parser that matches an exact string literal type.

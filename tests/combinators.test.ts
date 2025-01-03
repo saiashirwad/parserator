@@ -30,7 +30,7 @@ const stringParser = skipSpaces
 const integerParser = skipSpaces
 	.then(many1(digit))
 	.map((s) => parseInt(s.join("")))
-	.error("Expected an integer")
+	.withError("Expected an integer")
 
 test("sepBy string array", () => {
 	const p = char("[")
@@ -237,7 +237,7 @@ describe("complex combinations", () => {
 
 describe("error handling", () => {
 	test("custom error messages", () => {
-		const p = digit.error("Expected a digit")
+		const p = digit.withError("Expected a digit")
 		const result = p.run("a")
 		expect(Either.isLeft(result)).toBe(true)
 		if (Either.isLeft(result)) {
@@ -246,7 +246,7 @@ describe("error handling", () => {
 	})
 
 	test("error callback", () => {
-		const p = digit.errorCallback(
+		const p = digit.withErrorCallback(
 			(error, state) =>
 				`Expected a digit at position ${state.pos.offset}`,
 		)
@@ -323,14 +323,16 @@ describe("advanced combinators", () => {
 
 describe("error recovery", () => {
 	test("custom error with context", () => {
-		const identifier = regex(/[a-z]+/).error(
+		const identifier = regex(/[a-z]+/).withError(
 			"Expected lowercase identifier",
 		)
-		const number = regex(/[0-9]+/).error("Expected number")
+		const number = regex(/[0-9]+/).withError(
+			"Expected number",
+		)
 		const assignment = identifier
 			.thenDiscard(char("=").thenDiscard(skipSpaces))
 			.then(number)
-			.errorCallback((error, _) => error.message)
+			.withErrorCallback((error, _) => error.message)
 
 		const result = assignment.run("foo = bar")
 		expect(Either.isLeft(result)).toBe(true)
