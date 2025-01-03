@@ -1,6 +1,6 @@
 {
   "name": "parserator",
-  "version": "0.1.25",
+  "version": "0.1.26",
   "description": "A parser combinator library inspired by Parsec and Effect-TS",
   "type": "module",
   "main": "./dist/index.js",
