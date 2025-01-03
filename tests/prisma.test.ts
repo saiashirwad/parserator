@@ -10,6 +10,7 @@ import {
 	optional,
 	or,
 	skipSpaces,
+	string,
 } from "../src/index"
 import {
 	printErrorContext,
@@ -22,20 +23,20 @@ const whitespace = many0(
 
 const word = or(alphabet, char("_"))
 	.withError(
-		"A word must start with a letter or underscore",
+		() => "A word must start with a letter or underscore",
 	)
 	.zip(many1(or(alphabet, char("_"), digit)))
 	.map(([first, rest]) => first + rest.join(""))
 
 const expression = Parser.gen(function* () {
 	const name = yield* word.trim(whitespace)
-	const operator = yield* char("=")
-		.withErrorCallback(({ error, state }) => {
+	const operator = yield* string("==")
+		.withError(({ error, state }) => {
 			const errorChar = state.source.slice(
 				error.pos.offset,
 				error.pos.offset + 1,
 			)
-			return `Expected '=' at ${printPosition(error.pos)} but found '${errorChar}'`
+			return `Expected '==' at ${printPosition(error.pos)} but found '${errorChar}'`
 		})
 		.trim(skipSpaces)
 	const sign = yield* optional(char("-")).map((x) =>

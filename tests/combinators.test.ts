@@ -30,7 +30,7 @@ const stringParser = skipSpaces
 const integerParser = skipSpaces
 	.then(many1(digit))
 	.map((s) => parseInt(s.join("")))
-	.withError("Expected an integer")
+	.withError(() => "Expected an integer")
 
 test("sepBy string array", () => {
 	const p = char("[")
@@ -237,16 +237,21 @@ describe("complex combinations", () => {
 
 describe("error handling", () => {
 	test("custom error messages", () => {
-		const p = digit.withError("Expected a digit")
+		const p = digit.withError(
+			({ state }) =>
+				`Expected a digit at position ${state.pos.offset}`,
+		)
 		const result = p.run("a")
 		expect(Either.isLeft(result)).toBe(true)
 		if (Either.isLeft(result)) {
-			expect(result.left.message).toBe("Expected a digit")
+			expect(result.left.message).toBe(
+				"Expected a digit at position 0",
+			)
 		}
 	})
 
 	test("error callback", () => {
-		const p = digit.withErrorCallback(
+		const p = digit.withError(
 			({ state }) =>
 				`Expected a digit at position ${state.pos.offset}`,
 		)
@@ -324,10 +329,10 @@ describe("advanced combinators", () => {
 describe("error recovery", () => {
 	test("custom error with context", () => {
 		const identifier = regex(/[a-z]+/).withError(
-			"Expected lowercase identifier",
+			() => "Expected lowercase identifier",
 		)
 		const number = regex(/[0-9]+/).withError(
-			"Expected number",
+			() => "Expected number",
 		)
 		// const assignment = identifier
 		// 	.thenDiscard(char("=").thenDiscard(skipSpaces))
