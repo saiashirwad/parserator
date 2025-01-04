@@ -22,9 +22,9 @@ export function printErrorContext(
 ) {
 	return (
 		"Parser Error:\n" +
-		printLastNLines(error.state, 3) +
+		printLastNLines(state, 3) +
 		"\n" +
-		printArrow(error.state.pos) +
+		printArrow(state.pos) +
 		`${message ? `\n${message}` : ""}`
 	)
 }
