@@ -7,7 +7,6 @@ import {
 	type ParserOptions,
 	type ParserResult,
 	type ParserState,
-	type SourcePosition,
 	State,
 } from "./state"
 import type { Prettify } from "./types"
@@ -40,17 +39,17 @@ export class Parser<T> {
 		expected: string[] = [],
 	): Parser<never> {
 		return new Parser<never>((state) => {
-			return Parser.error(message, expected, state.pos)
+			return Parser.error(message, expected, state)
 		})
 	}
 
 	static error(
 		message: string,
 		expected: string[],
-		pos: SourcePosition,
+		state: ParserState,
 	): Either<never, ParserError> {
 		return Either.left(
-			new ParserError(message, expected, pos),
+			new ParserError(message, expected, state),
 		)
 	}
 
@@ -74,13 +73,12 @@ export class Parser<T> {
 				})
 				const errorMessage = printErrorContext(
 					result.left,
-					state,
 					message,
 				)
 				return Parser.error(
 					errorMessage,
 					result.left.expected,
-					result.left.pos,
+					state,
 				)
 			}
 			return result
@@ -91,7 +89,8 @@ export class Parser<T> {
 		input: string,
 		context: ParserContext = { source: input },
 	): ParserResult<T> {
-		const result = this.run(State.fromInput(input, context))
+		const state = State.fromInput(input, context)
+		const result = this.run(state)
 		if (Either.isRight(result)) {
 			return result
 		}
@@ -99,7 +98,7 @@ export class Parser<T> {
 			return Parser.error(
 				result.left.message,
 				result.left.expected,
-				result.left.pos,
+				state,
 			)
 		}
 		return result
@@ -143,7 +142,7 @@ export class Parser<T> {
 				return Parser.error(
 					result.left.message,
 					result.left.expected,
-					result.left.pos,
+					state,
 				)
 			}
 			return Either.match(result, {
@@ -161,7 +160,7 @@ export class Parser<T> {
 				return Parser.error(
 					result.left.message,
 					result.left.expected,
-					result.left.pos,
+					state,
 				)
 			}
 			return Either.match(result, {
@@ -247,7 +246,7 @@ export class Parser<T> {
 				return Parser.error(
 					result.left.message,
 					result.left.expected,
-					result.left.pos,
+					state,
 				)
 			}
 			return Either.match(result, {

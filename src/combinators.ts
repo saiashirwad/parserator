@@ -44,13 +44,13 @@ export function notFollowedBy<T>(parser: Parser<T>) {
 				return Parser.error(
 					`Found ${parser.options.name} when it should not appear here`,
 					[],
-					state.pos,
+					state,
 				)
 			}
 			return Parser.error(
 				"Expected not to follow",
 				[],
-				state.pos,
+				state,
 			)
 		}
 		return Parser.succeed(true, state)
@@ -81,7 +81,7 @@ export const string = (str: string): Parser<string> =>
 			const errorMessage =
 				`Expected ${str}, ` + `but found ${state.remaining}`
 
-			return Parser.error(errorMessage, [str], state.pos)
+			return Parser.error(errorMessage, [str], state)
 		},
 		{ name: str },
 	)
@@ -124,7 +124,7 @@ export const char = <T extends string>(
 				return Parser.error(
 					"Incorrect usage of char parser.",
 					[ch],
-					state.pos,
+					state,
 				)
 			}
 			if (state.remaining[0] === ch) {
@@ -133,7 +133,7 @@ export const char = <T extends string>(
 
 			const errorMessage = `Expected ${ch} but found ${state.remaining.at(0)}.`
 
-			return Parser.error(errorMessage, [ch], state.pos)
+			return Parser.error(errorMessage, [ch], state)
 		},
 		{ name: ch },
 	)
@@ -154,7 +154,7 @@ export const alphabet = new Parser(
 			return Parser.error(
 				"Unexpected end of input",
 				[],
-				state.pos,
+				state,
 			)
 		}
 		const first = state.remaining[0]
@@ -164,7 +164,7 @@ export const alphabet = new Parser(
 		return Parser.error(
 			`Expected alphabetic character, but got '${first}'`,
 			[],
-			state.pos,
+			state,
 		)
 	},
 	{ name: "alphabet" },
@@ -185,7 +185,7 @@ export const digit = new Parser(
 			return Parser.error(
 				"Unexpected end of input",
 				[],
-				state.pos,
+				state,
 			)
 		}
 		const first = state.remaining[0]
@@ -195,7 +195,7 @@ export const digit = new Parser(
 		return Parser.error(
 			`Expected digit, but got '${first}'`,
 			[],
-			state.pos,
+			state,
 		)
 	},
 	{ name: "digit" },
@@ -248,7 +248,7 @@ export function sepBy<S, T>(
 				return Parser.error(
 					itemResult.left.message,
 					itemResult.left.expected,
-					itemResult.left.pos,
+					state,
 				)
 			}
 			results.push(itemResult.right[0])
@@ -349,7 +349,7 @@ function many_<S, T>(count: number) {
 			return Parser.error(
 				`Expected at least ${count} occurrences, but only found ${results.length}`,
 				[],
-				state.pos,
+				state,
 			)
 		})
 	}
@@ -442,7 +442,7 @@ function skipMany_<T>(count: number) {
 			return Parser.error(
 				`Expected at least ${count} occurrences, but only found ${successes}`,
 				[],
-				state.pos,
+				state,
 			)
 		})
 	}
@@ -565,7 +565,7 @@ export function or<Parsers extends Parser<any>[]>(
 		return Parser.error(
 			`None of the ${parsers.length} choices could be satisfied`,
 			expectedNames,
-			state.pos,
+			state,
 		)
 	})
 }
@@ -648,7 +648,7 @@ export const regex = (re: RegExp): Parser<string> => {
 			return Parser.error(
 				`Expected ${re} but found ${state.remaining.slice(0, 10)}...`,
 				[re.toString()],
-				state.pos,
+				state,
 			)
 		},
 		{ name: re.toString() },

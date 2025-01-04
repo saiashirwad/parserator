@@ -30,10 +30,10 @@ const expression = Parser.gen(function* () {
 	const operator = yield* string("==")
 		.withError(({ error, state }) => {
 			const errorChar = state.context.source.slice(
-				error.pos.offset,
-				error.pos.offset + 1,
+				error.state.pos.offset,
+				error.state.pos.offset + 1,
 			)
-			return `Expected '==' at ${printPosition(error.pos)} but found '${errorChar}'`
+			return `Expected '==' at ${printPosition(error.state.pos)} but found '${errorChar}'`
 		})
 		.trim(skipSpaces)
 	const sign = yield* optional(char("-")).map((x) =>

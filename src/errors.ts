@@ -18,13 +18,12 @@ export function printArrow(position: SourcePosition) {
 
 export function printErrorContext(
 	error: ParserError,
-	state: ParserState,
 	message?: string,
 ) {
 	return (
-		printLastNLines(state, 3) +
+		printLastNLines(error.state, 3) +
 		"\n" +
-		printArrow(error.pos) +
+		printArrow(error.state.pos) +
 		`${message ? `\n${message}` : ""}`
 	)
 }
@@ -53,8 +52,11 @@ export function getErrorLine(
 	state: ParserState,
 ) {
 	const errorLine = state.context.source.slice(
-		error.pos.offset,
-		state.context.source.indexOf("\n", error.pos.offset),
+		error.state.pos.offset,
+		state.context.source.indexOf(
+			"\n",
+			error.state.pos.offset,
+		),
 	)
 	return errorLine
 }
