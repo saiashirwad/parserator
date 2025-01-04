@@ -11,6 +11,8 @@ import {
 } from "./state"
 import type { Prettify } from "./types"
 
+let count = 0
+
 export class Parser<T> {
 	constructor(
 		/**
@@ -49,6 +51,7 @@ export class Parser<T> {
 		state: ParserState,
 	): Either<never, ParserError> {
 		const error = new ParserError(message, expected, state)
+		// oof, broken
 		const formattedMessage = error.message.includes(
 			"Parser Error:",
 		)
