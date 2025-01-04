@@ -50,14 +50,16 @@ export class Parser<T> {
 		expected: string[],
 		state: ParserState,
 	): Either<never, ParserError> {
-		// oof, potentially broken
-		const formattedMessage = message.includes(
-			"Parser Error:",
-		)
-			? message
-			: printErrorContext(state, message)
+		// TODO: fix this
+		// this tends to print out the same error context + message thrice
 		return Either.left(
-			new ParserError(formattedMessage, expected, state),
+			new ParserError(
+				message.includes("Parser Error:")
+					? message
+					: printErrorContext(state, message),
+				expected,
+				state,
+			),
 		)
 	}
 
