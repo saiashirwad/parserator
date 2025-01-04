@@ -17,7 +17,7 @@ export function printArrow(position: SourcePosition) {
 }
 
 export function printErrorContext(
-	error: ParserError,
+	state: ParserState,
 	message?: string,
 ) {
 	return (
