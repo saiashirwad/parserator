@@ -248,7 +248,7 @@ export function sepBy<S, T>(
 				return Parser.error(
 					itemResult.left.message,
 					itemResult.left.expected,
-					state,
+					itemResult.left.state,
 				)
 			}
 			results.push(itemResult.right[0])
@@ -324,7 +324,16 @@ function many_<S, T>(count: number) {
 				// Try to parse the next item
 				const itemResult = parser.run(currentState)
 				if (Either.isLeft(itemResult)) {
-					break
+					// If we have enough items, return success
+					if (results.length >= count) {
+						return Parser.succeed(results, currentState)
+					}
+					// Otherwise return the error with its state
+					return Parser.error(
+						`Expected at least ${count} occurrences, but only found ${results.length}`,
+						[],
+						itemResult.left.state,
+					)
 				}
 
 				// Add the item and update state
@@ -349,7 +358,7 @@ function many_<S, T>(count: number) {
 			return Parser.error(
 				`Expected at least ${count} occurrences, but only found ${results.length}`,
 				[],
-				state,
+				currentState,
 			)
 		})
 	}

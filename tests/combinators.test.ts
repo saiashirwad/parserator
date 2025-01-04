@@ -340,6 +340,7 @@ describe("error recovery", () => {
 		const result = p.parse("123x")
 		expect(Either.isLeft(result)).toBe(true)
 		if (Either.isLeft(result)) {
+			console.log(result.left.state.pos)
 			expect(result.left.state.pos.offset).toBe(3)
 		}
 	})

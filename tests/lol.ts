@@ -1,5 +1,9 @@
-import { Parser, char, digit, many1 } from "../src"
+import { ParserError, char, string } from "../src"
 
-const lol = char("a")
+const lol = string("abc")
+const result = lol.parseOrError(".abc")
 
-console.log(lol.parse("b"))
+if (result instanceof ParserError) {
+	console.log(result.pos)
+	console.error(result.message)
+}

@@ -48,8 +48,13 @@ export class Parser<T> {
 		expected: string[],
 		state: ParserState,
 	): Either<never, ParserError> {
+		const error = new ParserError(message, expected, state)
+		const formattedMessage = printErrorContext(
+			error,
+			message,
+		)
 		return Either.left(
-			new ParserError(message, expected, state),
+			new ParserError(formattedMessage, expected, state),
 		)
 	}
 
@@ -69,16 +74,12 @@ export class Parser<T> {
 			if (Either.isLeft(result)) {
 				const message = errorCallback({
 					error: result.left,
-					state,
+					state: result.left.state,
 				})
-				const errorMessage = printErrorContext(
-					result.left,
-					message,
-				)
 				return Parser.error(
-					errorMessage,
+					message,
 					result.left.expected,
-					state,
+					result.left.state,
 				)
 			}
 			return result
@@ -98,7 +99,7 @@ export class Parser<T> {
 			return Parser.error(
 				result.left.message,
 				result.left.expected,
-				state,
+				result.left.state,
 			)
 		}
 		return result
@@ -130,7 +131,18 @@ export class Parser<T> {
 	): T {
 		const result = this.parseOrError(input, context)
 		if (result instanceof ParserError) {
-			throw new Error(result.message)
+			const errorDetails = `Parser Error:
+Location: line ${result.state.pos.line}, column ${result.state.pos.column}
+Message: ${result.message}
+Expected: ${result.expected.join(", ")}
+Input context: ${
+				result.state.context?.source?.slice(
+					Math.max(0, result.state.pos.offset - 20),
+					result.state.pos.offset + 20,
+				) || "N/A"
+			}
+Position: ${"^".padStart(Math.min(20, result.state.pos.column), " ")}`
+			throw new Error(errorDetails)
 		}
 		return result
 	}
@@ -142,7 +154,7 @@ export class Parser<T> {
 				return Parser.error(
 					result.left.message,
 					result.left.expected,
-					state,
+					result.left.state,
 				)
 			}
 			return Either.match(result, {
@@ -160,7 +172,7 @@ export class Parser<T> {
 				return Parser.error(
 					result.left.message,
 					result.left.expected,
-					state,
+					result.left.state,
 				)
 			}
 			return Either.match(result, {
@@ -246,7 +258,7 @@ export class Parser<T> {
 				return Parser.error(
 					result.left.message,
 					result.left.expected,
-					state,
+					result.left.state,
 				)
 			}
 			return Either.match(result, {

@@ -13,6 +13,10 @@ export class ParserError {
 		public expected: string[],
 		public state: ParserState,
 	) {}
+
+	get pos(): SourcePosition {
+		return this.state.pos
+	}
 }
 
 export type ParserResult<T> = Either<
