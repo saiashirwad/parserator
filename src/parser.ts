@@ -88,7 +88,7 @@ export class Parser<T> {
 
 	run(
 		input: string,
-		context: ParserContext = {},
+		context: ParserContext = { source: input },
 	): ParserResult<T> {
 		const result = this.parse(
 			State.fromInput(input, context),
@@ -117,7 +117,10 @@ export class Parser<T> {
 		}, this.options)
 	}
 
-	parseOrError(input: string, context: ParserContext = {}) {
+	parseOrError(
+		input: string,
+		context: ParserContext = { source: input },
+	) {
 		const result = this.parse(
 			State.fromInput(input, context),
 		)
@@ -129,7 +132,7 @@ export class Parser<T> {
 
 	parseOrThrow(
 		input: string,
-		context: ParserContext = {},
+		context: ParserContext = { source: input },
 	): T {
 		const result = this.parseOrError(input, context)
 		if (result instanceof ParserError) {

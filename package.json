@@ -1,7 +1,7 @@
 {
   "name": "parserator",
   "version": "0.1.26",
-  "description": "A parser combinator library inspired by Parsec and Effect-TS",
+  "description": "An elegant parser combinators library for TypeScript",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -24,7 +24,6 @@
   "scripts": {
     "build": "tsup && bun build.ts",
     "test": "bun test",
-    "docs": "bun typedoc",
     "prepublishOnly": "bun run build && bun test",
     "publish:patch": "bun run build && npm version patch && npm publish --access public",
     "publish:minor": "bun run build && npm version minor && npm publish --access public",
@@ -45,8 +44,6 @@
     "@biomejs/biome": "^1.9.4",
     "@types/bun": "^1.1.10",
     "tsup": "^8.3.5",
-    "typedoc": "^0.27.6",
-    "typedoc-plugin-markdown": "^3.17.1",
     "typescript": "^5.0.0",
     "vitest": "^1.2.1"
   },

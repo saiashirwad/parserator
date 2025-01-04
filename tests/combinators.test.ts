@@ -2,9 +2,11 @@ import { describe, expect, test } from "bun:test"
 import { chain } from "../src/chain"
 import {
 	alphabet,
+	between,
 	char,
 	digit,
 	lookAhead,
+	many0,
 	many1,
 	manyN,
 	manyNExact,
@@ -14,8 +16,6 @@ import {
 	sepBy,
 	sequence,
 	skipSpaces,
-	between,
-	many0,
 	takeUntil,
 } from "../src/combinators"
 import { Either } from "../src/either"

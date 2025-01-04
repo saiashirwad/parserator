@@ -29,7 +29,7 @@ const expression = Parser.gen(function* () {
 	const name = yield* word.trim(whitespace)
 	const operator = yield* string("==")
 		.withError(({ error, state }) => {
-			const errorChar = state.source.slice(
+			const errorChar = state.context.source.slice(
 				error.pos.offset,
 				error.pos.offset + 1,
 			)

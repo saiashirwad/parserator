@@ -33,10 +33,10 @@ export function printLastNLines(
 	state: ParserState,
 	n: number,
 ) {
-	const lines = state.source.split("\n").slice(-n)
+	const lines = state.context.source.split("\n").slice(-n)
 	const withNumbers = lines.map((line, i) => {
 		const lineNumber =
-			state.source.split("\n").length - n + i + 1
+			state.context.source.split("\n").length - n + i + 1
 		return `${lineNumber} | ${line}`
 	})
 	return withNumbers.join("\n")
@@ -52,9 +52,9 @@ export function getErrorLine(
 	error: ParserError,
 	state: ParserState,
 ) {
-	const errorLine = state.source.slice(
+	const errorLine = state.context.source.slice(
 		error.pos.offset,
-		state.source.indexOf("\n", error.pos.offset),
+		state.context.source.indexOf("\n", error.pos.offset),
 	)
 	return errorLine
 }
