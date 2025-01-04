@@ -1,36 +1,24 @@
-import { Either } from "./either"
 import { debug } from "./debug"
+import { Either } from "./either"
+import { printErrorContext } from "./errors"
 import {
-	State,
+	type ParserContext,
+	ParserError,
+	type ParserOptions,
+	type ParserResult,
 	type ParserState,
-	type SourcePosition,
+	State,
 } from "./state"
 import type { Prettify } from "./types"
 
-export type ParserContext = {
-	debug?: boolean
-}
-
-export type ParserOptions = { name?: string }
-
-export class ParserError {
-	constructor(
-		public message: string,
-		public expected: string[],
-		public pos: SourcePosition,
-	) {}
-}
-
-export type ParserResult<T> = Either<
-	[T, ParserState],
-	ParserError
->
+let count = 0
 
 export class Parser<T> {
-	private errorMessage: string | null = null
-
 	constructor(
-		public parse: (state: ParserState) => ParserResult<T>,
+		/**
+		 * @internal
+		 */
+		public run: (state: ParserState) => ParserResult<T>,
 		public options?: ParserOptions,
 	) {}
 
@@ -53,71 +41,71 @@ export class Parser<T> {
 		expected: string[] = [],
 	): Parser<never> {
 		return new Parser<never>((state) => {
-			return Parser.error(message, expected, state.pos)
+			return Parser.error(message, expected, state)
 		})
 	}
 
 	static error(
 		message: string,
 		expected: string[],
-		pos: SourcePosition,
-	) {
+		state: ParserState,
+	): Either<never, ParserError> {
+		// TODO: fix this
+		// this tends to print out the same error context + message thrice
 		return Either.left(
-			new ParserError(message, expected, pos),
+			new ParserError(
+				message.includes("Parser Error:")
+					? message
+					: printErrorContext(state, message),
+				expected,
+				state,
+			),
 		)
 	}
 
-	error(message: string): Parser<T> {
+	/**
+	 * Adds an error message to the parser
+	 * @param errorCallback - A function that returns an error message
+	 * @returns A new parser with the error message added
+	 */
+	withError(
+		errorCallback: (errorCtx: {
+			error: ParserError
+			state: ParserState
+		}) => string,
+	) {
 		return new Parser<T>((state) => {
-			const result = this.parse(state)
+			const result = this.run(state)
 			if (Either.isLeft(result)) {
+				const message = errorCallback({
+					error: result.left,
+					state: result.left.state,
+				})
 				return Parser.error(
 					message,
 					result.left.expected,
-					result.left.pos,
+					result.left.state,
 				)
 			}
 			return result
 		}, this.options)
 	}
 
-	errorCallback(
-		onError: (
-			error: ParserError,
-			state: ParserState,
-		) => string,
-	) {
-		return new Parser<T>((state) => {
-			const result = this.parse(state)
-			if (Either.isLeft(result)) {
-				return Parser.error(
-					onError(result.left, state),
-					result.left.expected,
-					result.left.pos,
-				)
-			}
-			return result
-		}, this.options)
-	}
-
-	run(
+	parse(
 		input: string,
-		context: ParserContext = {},
+		context: ParserContext = { source: input },
 	): ParserResult<T> {
-		const result = this.parse(
-			State.fromInput(input, context),
-		)
+		const state = State.fromInput(input, context)
+		const result = this.run(state)
 		if (Either.isRight(result)) {
 			return result
 		}
 		if (Either.isLeft(result)) {
-			if (this.errorMessage) {
-				return Parser.error(
-					this.errorMessage,
-					result.left.expected,
-					result.left.pos,
-				)
-			}
+			return Parser.error(
+				result.left.message,
+				result.left.expected,
+				result.left.state,
+			)
 		}
 		return result
 	}
@@ -125,16 +113,17 @@ export class Parser<T> {
 	withTrace(label: string): Parser<T> {
 		return new Parser((state) => {
 			if (!state.context?.debug) {
-				return this.parse(state)
+				return this.run(state)
 			}
-			return debug(this, label).parse(state)
+			return debug(this, label).run(state)
 		}, this.options)
 	}
 
-	parseOrError(input: string, context: ParserContext = {}) {
-		const result = this.parse(
-			State.fromInput(input, context),
-		)
+	parseOrError(
+		input: string,
+		context: ParserContext = { source: input },
+	) {
+		const result = this.run(State.fromInput(input, context))
 		if (Either.isRight(result)) {
 			return result.right[0]
 		}
@@ -143,7 +132,7 @@ export class Parser<T> {
 
 	parseOrThrow(
 		input: string,
-		context: ParserContext = {},
+		context: ParserContext = { source: input },
 	): T {
 		const result = this.parseOrError(input, context)
 		if (result instanceof ParserError) {
@@ -154,12 +143,12 @@ export class Parser<T> {
 
 	map<B>(f: (a: T) => B): Parser<B> {
 		return new Parser<B>((state) => {
-			const result = this.parse(state)
-			if (Either.isLeft(result) && this.errorMessage) {
+			const result = this.run(state)
+			if (Either.isLeft(result)) {
 				return Parser.error(
-					this.errorMessage,
+					result.left.message,
 					result.left.expected,
-					result.left.pos,
+					result.left.state,
 				)
 			}
 			return Either.match(result, {
@@ -172,18 +161,18 @@ export class Parser<T> {
 
 	flatMap<B>(f: (a: T) => Parser<B>): Parser<B> {
 		return new Parser<B>((state) => {
-			const result = this.parse(state)
-			if (Either.isLeft(result) && this.errorMessage) {
+			const result = this.run(state)
+			if (Either.isLeft(result)) {
 				return Parser.error(
-					this.errorMessage,
+					result.left.message,
 					result.left.expected,
-					result.left.pos,
+					result.left.state,
 				)
 			}
 			return Either.match(result, {
 				onRight: ([value, newState]) => {
 					const nextParser = f(value)
-					return nextParser.parse(newState)
+					return nextParser.run(newState)
 				},
 				onLeft: Either.left,
 			})
@@ -221,15 +210,15 @@ export class Parser<T> {
 	static lazy<T>(fn: () => Parser<T>): Parser<T> {
 		return new Parser((state) => {
 			const parser = fn()
-			return parser.parse(state)
+			return parser.run(state)
 		})
 	}
 
 	zip<B>(parserB: Parser<B>): Parser<readonly [T, B]> {
 		return new Parser((state) => {
-			return Either.match(this.parse(state), {
+			return Either.match(this.run(state), {
 				onRight: ([a, restA]) =>
-					Either.match(parserB.parse(restA), {
+					Either.match(parserB.run(restA), {
 						onRight: ([b, restB]) =>
 							Either.right([[a, b] as const, restB]),
 						onLeft: Either.left,
@@ -258,19 +247,19 @@ export class Parser<T> {
 		>
 	> {
 		return new Parser((state) => {
-			const result = this.parse(state)
-			if (Either.isLeft(result) && this.errorMessage) {
+			const result = this.run(state)
+			if (Either.isLeft(result)) {
 				return Parser.error(
-					this.errorMessage,
+					result.left.message,
 					result.left.expected,
-					result.left.pos,
+					result.left.state,
 				)
 			}
 			return Either.match(result, {
 				onRight: ([value, newState]) => {
 					const nextParser =
 						other instanceof Parser ? other : other(value)
-					return Either.match(nextParser.parse(newState), {
+					return Either.match(nextParser.run(newState), {
 						onRight: ([b, finalState]) =>
 							Either.right([
 								{
@@ -309,7 +298,7 @@ export class Parser<T> {
 		) => void,
 	): Parser<T> {
 		return new Parser((state) => {
-			const result = this.parse(state)
+			const result = this.run(state)
 			callback(state, result)
 			return result
 		}, this.options)
@@ -323,7 +312,7 @@ export class Parser<T> {
 			let current = iterator.next()
 			let currentState: ParserState = state
 			while (!current.done) {
-				const result = current.value.parse(currentState)
+				const result = current.value.run(currentState)
 				if (Either.isLeft(result)) {
 					return result
 				}

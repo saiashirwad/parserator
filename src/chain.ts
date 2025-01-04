@@ -81,13 +81,13 @@ export const chain: Chain = (
 	...fns: Array<(value: any) => Parser<any>>
 ): Parser<any> => {
 	return new Parser((state) => {
-		let result = parser.parse(state)
+		let result = parser.run(state)
 		for (const fn of fns) {
 			if (Either.isLeft(result)) {
 				return result
 			}
 			const [value, newState] = result.right
-			result = fn(value).parse(newState)
+			result = fn(value).run(newState)
 		}
 		return result
 	})

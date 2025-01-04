@@ -1,4 +1,28 @@
-import type { ParserContext } from "./parser"
+import type { Either } from "./either"
+
+export type ParserContext = {
+	debug?: boolean
+	source: string
+}
+
+export type ParserOptions = { name?: string }
+
+export class ParserError {
+	constructor(
+		public message: string,
+		public expected: string[],
+		public state: ParserState,
+	) {}
+
+	get pos(): SourcePosition {
+		return this.state.pos
+	}
+}
+
+export type ParserResult<T> = Either<
+	[T, ParserState],
+	ParserError
+>
 
 export type SourcePosition = {
 	line: number
@@ -25,7 +49,7 @@ export const State = {
 	 */
 	fromInput(
 		input: string,
-		context: ParserContext = {},
+		context: ParserContext,
 	): ParserState {
 		return {
 			remaining: input,

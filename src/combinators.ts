@@ -16,7 +16,7 @@ import { State } from "./state"
  */
 export function lookAhead<T>(parser: Parser<T>) {
 	return new Parser((state) => {
-		const result = parser.parse(state)
+		const result = parser.run(state)
 		if (Either.isRight(result)) {
 			return Parser.succeed(result.right[0], state)
 		}
@@ -38,19 +38,19 @@ export function lookAhead<T>(parser: Parser<T>) {
  */
 export function notFollowedBy<T>(parser: Parser<T>) {
 	return new Parser((state) => {
-		const result = parser.parse(state)
+		const result = parser.run(state)
 		if (Either.isRight(result)) {
 			if (parser.options?.name) {
 				return Parser.error(
 					`Found ${parser.options.name} when it should not appear here`,
 					[],
-					state.pos,
+					state,
 				)
 			}
 			return Parser.error(
 				"Expected not to follow",
 				[],
-				state.pos,
+				state,
 			)
 		}
 		return Parser.succeed(true, state)
@@ -68,8 +68,8 @@ export function notFollowedBy<T>(parser: Parser<T>) {
  * parser.run("goodbye") // Left(error)
  * ```
  */
-export const string = (str: string): Parser<string> => {
-	return new Parser(
+export const string = (str: string): Parser<string> =>
+	new Parser(
 		(state) => {
 			if (state.remaining.startsWith(str)) {
 				return Parser.succeed(
@@ -79,13 +79,13 @@ export const string = (str: string): Parser<string> => {
 			}
 
 			const errorMessage =
-				`Expected ${str}, ` + `but found ${state.remaining}`
+				`Expected '${str}', ` +
+				`but found '${state.remaining.slice(0, str.length)}'`
 
-			return Parser.error(errorMessage, [str], state.pos)
+			return Parser.error(errorMessage, [str], state)
 		},
 		{ name: str },
 	)
-}
 
 /**
  * Creates a parser that matches an exact string literal type.
@@ -125,7 +125,7 @@ export const char = <T extends string>(
 				return Parser.error(
 					"Incorrect usage of char parser.",
 					[ch],
-					state.pos,
+					state,
 				)
 			}
 			if (state.remaining[0] === ch) {
@@ -134,7 +134,7 @@ export const char = <T extends string>(
 
 			const errorMessage = `Expected ${ch} but found ${state.remaining.at(0)}.`
 
-			return Parser.error(errorMessage, [ch], state.pos)
+			return Parser.error(errorMessage, [ch], state)
 		},
 		{ name: ch },
 	)
@@ -155,7 +155,7 @@ export const alphabet = new Parser(
 			return Parser.error(
 				"Unexpected end of input",
 				[],
-				state.pos,
+				state,
 			)
 		}
 		const first = state.remaining[0]
@@ -165,7 +165,7 @@ export const alphabet = new Parser(
 		return Parser.error(
 			`Expected alphabetic character, but got '${first}'`,
 			[],
-			state.pos,
+			state,
 		)
 	},
 	{ name: "alphabet" },
@@ -186,7 +186,7 @@ export const digit = new Parser(
 			return Parser.error(
 				"Unexpected end of input",
 				[],
-				state.pos,
+				state,
 			)
 		}
 		const first = state.remaining[0]
@@ -196,7 +196,7 @@ export const digit = new Parser(
 		return Parser.error(
 			`Expected digit, but got '${first}'`,
 			[],
-			state.pos,
+			state,
 		)
 	},
 	{ name: "digit" },
@@ -224,7 +224,7 @@ export function sepBy<S, T>(
 		let currentState = state
 
 		// Try to parse first item
-		const firstResult = parser.parse(currentState)
+		const firstResult = parser.run(currentState)
 		if (Either.isLeft(firstResult)) {
 			// Empty list is valid for sepBy
 			return Parser.succeed(results, state)
@@ -237,19 +237,19 @@ export function sepBy<S, T>(
 		// Parse remaining items
 		while (true) {
 			// Try to parse separator
-			const sepResult = sepParser.parse(currentState)
+			const sepResult = sepParser.run(currentState)
 			if (Either.isLeft(sepResult)) {
 				break
 			}
 			currentState = sepResult.right[1]
 
 			// Try to parse next item
-			const itemResult = parser.parse(currentState)
+			const itemResult = parser.run(currentState)
 			if (Either.isLeft(itemResult)) {
 				return Parser.error(
 					itemResult.left.message,
 					itemResult.left.expected,
-					itemResult.left.pos,
+					itemResult.left.state,
 				)
 			}
 			results.push(itemResult.right[0])
@@ -281,19 +281,19 @@ export function between<T>(
 ): Parser<T> {
 	return new Parser((state) => {
 		// Parse opening delimiter
-		const startResult = start.parse(state)
+		const startResult = start.run(state)
 		if (Either.isLeft(startResult)) {
 			return startResult
 		}
 
 		// Parse content
-		const contentResult = parser.parse(startResult.right[1])
+		const contentResult = parser.run(startResult.right[1])
 		if (Either.isLeft(contentResult)) {
 			return contentResult
 		}
 
 		// Parse closing delimiter
-		const endResult = end.parse(contentResult.right[1])
+		const endResult = end.run(contentResult.right[1])
 		if (Either.isLeft(endResult)) {
 			return endResult
 		}
@@ -323,9 +323,18 @@ function many_<S, T>(count: number) {
 
 			while (true) {
 				// Try to parse the next item
-				const itemResult = parser.parse(currentState)
+				const itemResult = parser.run(currentState)
 				if (Either.isLeft(itemResult)) {
-					break
+					// If we have enough items, return success
+					if (results.length >= count) {
+						return Parser.succeed(results, currentState)
+					}
+					// Otherwise return the error with its state
+					return Parser.error(
+						`Expected at least ${count} occurrences, but only found ${results.length}`,
+						[],
+						itemResult.left.state,
+					)
 				}
 
 				// Add the item and update state
@@ -335,7 +344,7 @@ function many_<S, T>(count: number) {
 
 				// If we have a separator, try to parse it
 				if (separator) {
-					const sepResult = separator.parse(currentState)
+					const sepResult = separator.run(currentState)
 					if (Either.isLeft(sepResult)) {
 						break
 					}
@@ -350,7 +359,7 @@ function many_<S, T>(count: number) {
 			return Parser.error(
 				`Expected at least ${count} occurrences, but only found ${results.length}`,
 				[],
-				state.pos,
+				currentState,
 			)
 		})
 	}
@@ -428,7 +437,7 @@ function skipMany_<T>(count: number) {
 			let successes = 0
 
 			while (true) {
-				const result = parser.parse(currentState)
+				const result = parser.run(currentState)
 				if (Either.isLeft(result)) {
 					break
 				}
@@ -443,7 +452,7 @@ function skipMany_<T>(count: number) {
 			return Parser.error(
 				`Expected at least ${count} occurrences, but only found ${successes}`,
 				[],
-				state.pos,
+				state,
 			)
 		})
 	}
@@ -492,7 +501,7 @@ export function skipUntil<T>(
 		let currentState = state
 
 		while (!State.isAtEnd(currentState)) {
-			const result = parser.parse(currentState)
+			const result = parser.run(currentState)
 			if (Either.isRight(result)) {
 				return Parser.succeed(undefined, result.right[1])
 			}
@@ -517,7 +526,7 @@ export function takeUntil<T>(
 		let collected = ""
 
 		while (!State.isAtEnd(currentState)) {
-			const result = parser.parse(currentState)
+			const result = parser.run(currentState)
 			if (Either.isRight(result)) {
 				return Parser.succeed(collected, result.right[1])
 			}
@@ -555,7 +564,7 @@ export function or<Parsers extends Parser<any>[]>(
 	return new Parser((state) => {
 		const expectedNames: string[] = []
 		for (const parser of parsers) {
-			const result = parser.parse(state)
+			const result = parser.run(state)
 			if (Either.isRight(result)) {
 				return result
 			}
@@ -566,7 +575,7 @@ export function or<Parsers extends Parser<any>[]>(
 		return Parser.error(
 			`None of the ${parsers.length} choices could be satisfied`,
 			expectedNames,
-			state.pos,
+			state,
 		)
 	})
 }
@@ -582,7 +591,7 @@ export function optional<T>(
 	parser: Parser<T>,
 ): Parser<T | undefined> {
 	return new Parser((state) => {
-		const result = parser.parse(state)
+		const result = parser.run(state)
 		if (Either.isLeft(result)) {
 			return Parser.succeed(undefined, state)
 		}
@@ -609,7 +618,7 @@ export function sequence<Parsers extends Parser<any>[]>(
 		let currentState = state
 
 		for (const parser of parsers) {
-			const result = parser.parse(currentState)
+			const result = parser.run(currentState)
 			if (Either.isLeft(result)) {
 				return result
 			}
@@ -649,7 +658,7 @@ export const regex = (re: RegExp): Parser<string> => {
 			return Parser.error(
 				`Expected ${re} but found ${state.remaining.slice(0, 10)}...`,
 				[re.toString()],
-				state.pos,
+				state,
 			)
 		},
 		{ name: re.toString() },

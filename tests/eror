@@ -1,8 +1,0 @@
-Argument of type '() => Generator<Parser<"+"> | Parser<"-"> | Parser<readonly [string, string]>, { hi: readonly [string, string]; }, any>' is not assignable to parameter of type '() => Generator<Parser<"+">, "+", unknown>'.
-  Call signature return types 'Generator<Parser<"+"> | Parser<"-"> | Parser<readonly [string, string]>, { hi: readonly [string, string]; }, any>' and 'Generator<Parser<"+">, "+", unknown>' are incompatible.
-    The types returned by 'next(...)' are incompatible between these types.
-      Type 'IteratorResult<Parser<"+"> | Parser<"-"> | Parser<readonly [string, string]>, { hi: readonly [string, string]; }>' is not assignable to type 'IteratorResult<Parser<"+">, "+">'.
-        Type 'IteratorYieldResult<Parser<"+"> | Parser<"-"> | Parser<readonly [string, string]>>' is not assignable to type 'IteratorResult<Parser<"+">, "+">'.
-          Type 'IteratorYieldResult<Parser<"+"> | Parser<"-"> | Parser<readonly [string, string]>>' is not assignable to type 'IteratorYieldResult<Parser<"+">>'.
-            Type 'Parser<"+"> | Parser<"-"> | Parser<readonly [string, string]>' is not assignable to type 'Parser<"+">'.
-              Type 'Parser<"-">' is not assignable to type 'Parser<"+">'.

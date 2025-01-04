@@ -1,7 +1,10 @@
 import { Either } from "./either"
-import { Parser, type ParserResult } from "./parser"
-import { type ParserState, State } from "./state"
-
+import { Parser } from "./parser"
+import {
+	type ParserState,
+	State,
+	type ParserResult,
+} from "./state"
 /**
  * Creates a debug output for a parser's current state and result
  */
@@ -89,7 +92,7 @@ export function benchmark<T>(
 ): Parser<T> {
 	return new Parser((state) => {
 		const start = performance.now()
-		const result = parser.parse(state)
+		const result = parser.run(state)
 		const end = performance.now()
 		console.log(
 			`\n[BENCHMARK] ${label}: ${(end - start).toFixed(2)}ms`,
