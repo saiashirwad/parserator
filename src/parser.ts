@@ -49,10 +49,11 @@ export class Parser<T> {
 		state: ParserState,
 	): Either<never, ParserError> {
 		const error = new ParserError(message, expected, state)
-		const formattedMessage = printErrorContext(
-			error,
-			message,
+		const formattedMessage = error.message.includes(
+			"Parser Error:",
 		)
+			? error.message
+			: printErrorContext(error, message)
 		return Either.left(
 			new ParserError(formattedMessage, expected, state),
 		)
@@ -131,18 +132,7 @@ export class Parser<T> {
 	): T {
 		const result = this.parseOrError(input, context)
 		if (result instanceof ParserError) {
-			const errorDetails = `Parser Error:
-Location: line ${result.state.pos.line}, column ${result.state.pos.column}
-Message: ${result.message}
-Expected: ${result.expected.join(", ")}
-Input context: ${
-				result.state.context?.source?.slice(
-					Math.max(0, result.state.pos.offset - 20),
-					result.state.pos.offset + 20,
-				) || "N/A"
-			}
-Position: ${"^".padStart(Math.min(20, result.state.pos.column), " ")}`
-			throw new Error(errorDetails)
+			throw new Error(result.message)
 		}
 		return result
 	}

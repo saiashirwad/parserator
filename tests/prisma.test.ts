@@ -27,15 +27,7 @@ const word = or(alphabet, char("_"))
 
 const expression = Parser.gen(function* () {
 	const name = yield* word.trim(whitespace)
-	const operator = yield* string("==")
-		.withError(({ error, state }) => {
-			const errorChar = state.context.source.slice(
-				error.state.pos.offset,
-				error.state.pos.offset + 1,
-			)
-			return `Expected '==' at ${printPosition(error.state.pos)} but found '${errorChar}'`
-		})
-		.trim(skipSpaces)
+	const operator = yield* string("==").trim(skipSpaces)
 	const sign = yield* optional(char("-")).map((x) =>
 		x ? -1 : 1,
 	)
@@ -46,9 +38,12 @@ const expression = Parser.gen(function* () {
 	return { name, operator, value: sign * value }
 })
 
-const result = expression.parseOrError(
-	"\n.\n.\n.\n.\n   _hi -= 2234",
-)
+const result = expression.parseOrError(`
+.
+.
+.
+.
+_hi -= 2234`)
 
 if (result instanceof ParserError) {
 	console.error(result.message)
