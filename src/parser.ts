@@ -339,11 +339,11 @@ export class Parser<T> {
 		return parser.then(this).thenDiscard(parser)
 	}
 
-	trimLeft(parser: Parser<any>) {
-		return this.then(parser).thenDiscard(parser)
+	trimLeft(parser: Parser<any>): Parser<T> {
+		return parser.then(this)
 	}
 
-	trimRight(parser: Parser<any>) {
-		return this.thenDiscard(parser).then(parser)
+	trimRight(parser: Parser<any>): Parser<T> {
+		return this.thenDiscard(parser)
 	}
 }
