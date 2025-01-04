@@ -1,3 +1,4 @@
 {
-  "biome.enabled": true
+  "biome.enabled": true,
+  "typescript.tsserver.experimental.enableProjectDiagnostics": true
 }

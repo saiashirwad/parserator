@@ -92,7 +92,7 @@ export function benchmark<T>(
 ): Parser<T> {
 	return new Parser((state) => {
 		const start = performance.now()
-		const result = parser.parse(state)
+		const result = parser.run(state)
 		const end = performance.now()
 		console.log(
 			`\n[BENCHMARK] ${label}: ${(end - start).toFixed(2)}ms`,

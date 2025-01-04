@@ -24,6 +24,7 @@
   "scripts": {
     "build": "tsup && bun build.ts",
     "test": "bun test",
+    "typecheck": "tsc --noEmit",
     "prepublishOnly": "bun run build && bun test",
     "publish:patch": "bun run build && npm version patch && npm publish --access public",
     "publish:minor": "bun run build && npm version minor && npm publish --access public",

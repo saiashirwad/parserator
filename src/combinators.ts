@@ -16,7 +16,7 @@ import { State } from "./state"
  */
 export function lookAhead<T>(parser: Parser<T>) {
 	return new Parser((state) => {
-		const result = parser.parse(state)
+		const result = parser.run(state)
 		if (Either.isRight(result)) {
 			return Parser.succeed(result.right[0], state)
 		}
@@ -38,7 +38,7 @@ export function lookAhead<T>(parser: Parser<T>) {
  */
 export function notFollowedBy<T>(parser: Parser<T>) {
 	return new Parser((state) => {
-		const result = parser.parse(state)
+		const result = parser.run(state)
 		if (Either.isRight(result)) {
 			if (parser.options?.name) {
 				return Parser.error(
@@ -223,7 +223,7 @@ export function sepBy<S, T>(
 		let currentState = state
 
 		// Try to parse first item
-		const firstResult = parser.parse(currentState)
+		const firstResult = parser.run(currentState)
 		if (Either.isLeft(firstResult)) {
 			// Empty list is valid for sepBy
 			return Parser.succeed(results, state)
@@ -236,14 +236,14 @@ export function sepBy<S, T>(
 		// Parse remaining items
 		while (true) {
 			// Try to parse separator
-			const sepResult = sepParser.parse(currentState)
+			const sepResult = sepParser.run(currentState)
 			if (Either.isLeft(sepResult)) {
 				break
 			}
 			currentState = sepResult.right[1]
 
 			// Try to parse next item
-			const itemResult = parser.parse(currentState)
+			const itemResult = parser.run(currentState)
 			if (Either.isLeft(itemResult)) {
 				return Parser.error(
 					itemResult.left.message,
@@ -280,19 +280,19 @@ export function between<T>(
 ): Parser<T> {
 	return new Parser((state) => {
 		// Parse opening delimiter
-		const startResult = start.parse(state)
+		const startResult = start.run(state)
 		if (Either.isLeft(startResult)) {
 			return startResult
 		}
 
 		// Parse content
-		const contentResult = parser.parse(startResult.right[1])
+		const contentResult = parser.run(startResult.right[1])
 		if (Either.isLeft(contentResult)) {
 			return contentResult
 		}
 
 		// Parse closing delimiter
-		const endResult = end.parse(contentResult.right[1])
+		const endResult = end.run(contentResult.right[1])
 		if (Either.isLeft(endResult)) {
 			return endResult
 		}
@@ -322,7 +322,7 @@ function many_<S, T>(count: number) {
 
 			while (true) {
 				// Try to parse the next item
-				const itemResult = parser.parse(currentState)
+				const itemResult = parser.run(currentState)
 				if (Either.isLeft(itemResult)) {
 					break
 				}
@@ -334,7 +334,7 @@ function many_<S, T>(count: number) {
 
 				// If we have a separator, try to parse it
 				if (separator) {
-					const sepResult = separator.parse(currentState)
+					const sepResult = separator.run(currentState)
 					if (Either.isLeft(sepResult)) {
 						break
 					}
@@ -427,7 +427,7 @@ function skipMany_<T>(count: number) {
 			let successes = 0
 
 			while (true) {
-				const result = parser.parse(currentState)
+				const result = parser.run(currentState)
 				if (Either.isLeft(result)) {
 					break
 				}
@@ -491,7 +491,7 @@ export function skipUntil<T>(
 		let currentState = state
 
 		while (!State.isAtEnd(currentState)) {
-			const result = parser.parse(currentState)
+			const result = parser.run(currentState)
 			if (Either.isRight(result)) {
 				return Parser.succeed(undefined, result.right[1])
 			}
@@ -516,7 +516,7 @@ export function takeUntil<T>(
 		let collected = ""
 
 		while (!State.isAtEnd(currentState)) {
-			const result = parser.parse(currentState)
+			const result = parser.run(currentState)
 			if (Either.isRight(result)) {
 				return Parser.succeed(collected, result.right[1])
 			}
@@ -554,7 +554,7 @@ export function or<Parsers extends Parser<any>[]>(
 	return new Parser((state) => {
 		const expectedNames: string[] = []
 		for (const parser of parsers) {
-			const result = parser.parse(state)
+			const result = parser.run(state)
 			if (Either.isRight(result)) {
 				return result
 			}
@@ -581,7 +581,7 @@ export function optional<T>(
 	parser: Parser<T>,
 ): Parser<T | undefined> {
 	return new Parser((state) => {
-		const result = parser.parse(state)
+		const result = parser.run(state)
 		if (Either.isLeft(result)) {
 			return Parser.succeed(undefined, state)
 		}
@@ -608,7 +608,7 @@ export function sequence<Parsers extends Parser<any>[]>(
 		let currentState = state
 
 		for (const parser of parsers) {
-			const result = parser.parse(currentState)
+			const result = parser.run(currentState)
 			if (Either.isLeft(result)) {
 				return result
 			}

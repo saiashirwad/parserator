@@ -13,10 +13,11 @@ import {
 import type { Prettify } from "./types"
 
 export class Parser<T> {
-	private errorMessage: string | null = null
-
 	constructor(
-		public parse: (state: ParserState) => ParserResult<T>,
+		/**
+		 * @internal
+		 */
+		public run: (state: ParserState) => ParserResult<T>,
 		public options?: ParserOptions,
 	) {}
 
@@ -47,7 +48,7 @@ export class Parser<T> {
 		message: string,
 		expected: string[],
 		pos: SourcePosition,
-	) {
+	): Either<never, ParserError> {
 		return Either.left(
 			new ParserError(message, expected, pos),
 		)
@@ -65,7 +66,7 @@ export class Parser<T> {
 		}) => string,
 	) {
 		return new Parser<T>((state) => {
-			const result = this.parse(state)
+			const result = this.run(state)
 			if (Either.isLeft(result)) {
 				const message = errorCallback({
 					error: result.left,
@@ -86,24 +87,20 @@ export class Parser<T> {
 		}, this.options)
 	}
 
-	run(
+	parse(
 		input: string,
 		context: ParserContext = { source: input },
 	): ParserResult<T> {
-		const result = this.parse(
-			State.fromInput(input, context),
-		)
+		const result = this.run(State.fromInput(input, context))
 		if (Either.isRight(result)) {
 			return result
 		}
 		if (Either.isLeft(result)) {
-			if (this.errorMessage) {
-				return Parser.error(
-					this.errorMessage,
-					result.left.expected,
-					result.left.pos,
-				)
-			}
+			return Parser.error(
+				result.left.message,
+				result.left.expected,
+				result.left.pos,
+			)
 		}
 		return result
 	}
@@ -111,9 +108,9 @@ export class Parser<T> {
 	withTrace(label: string): Parser<T> {
 		return new Parser((state) => {
 			if (!state.context?.debug) {
-				return this.parse(state)
+				return this.run(state)
 			}
-			return debug(this, label).parse(state)
+			return debug(this, label).run(state)
 		}, this.options)
 	}
 
@@ -121,9 +118,7 @@ export class Parser<T> {
 		input: string,
 		context: ParserContext = { source: input },
 	) {
-		const result = this.parse(
-			State.fromInput(input, context),
-		)
+		const result = this.run(State.fromInput(input, context))
 		if (Either.isRight(result)) {
 			return result.right[0]
 		}
@@ -143,10 +138,10 @@ export class Parser<T> {
 
 	map<B>(f: (a: T) => B): Parser<B> {
 		return new Parser<B>((state) => {
-			const result = this.parse(state)
-			if (Either.isLeft(result) && this.errorMessage) {
+			const result = this.run(state)
+			if (Either.isLeft(result)) {
 				return Parser.error(
-					this.errorMessage,
+					result.left.message,
 					result.left.expected,
 					result.left.pos,
 				)
@@ -161,10 +156,10 @@ export class Parser<T> {
 
 	flatMap<B>(f: (a: T) => Parser<B>): Parser<B> {
 		return new Parser<B>((state) => {
-			const result = this.parse(state)
-			if (Either.isLeft(result) && this.errorMessage) {
+			const result = this.run(state)
+			if (Either.isLeft(result)) {
 				return Parser.error(
-					this.errorMessage,
+					result.left.message,
 					result.left.expected,
 					result.left.pos,
 				)
@@ -172,7 +167,7 @@ export class Parser<T> {
 			return Either.match(result, {
 				onRight: ([value, newState]) => {
 					const nextParser = f(value)
-					return nextParser.parse(newState)
+					return nextParser.run(newState)
 				},
 				onLeft: Either.left,
 			})
@@ -210,15 +205,15 @@ export class Parser<T> {
 	static lazy<T>(fn: () => Parser<T>): Parser<T> {
 		return new Parser((state) => {
 			const parser = fn()
-			return parser.parse(state)
+			return parser.run(state)
 		})
 	}
 
 	zip<B>(parserB: Parser<B>): Parser<readonly [T, B]> {
 		return new Parser((state) => {
-			return Either.match(this.parse(state), {
+			return Either.match(this.run(state), {
 				onRight: ([a, restA]) =>
-					Either.match(parserB.parse(restA), {
+					Either.match(parserB.run(restA), {
 						onRight: ([b, restB]) =>
 							Either.right([[a, b] as const, restB]),
 						onLeft: Either.left,
@@ -247,10 +242,10 @@ export class Parser<T> {
 		>
 	> {
 		return new Parser((state) => {
-			const result = this.parse(state)
-			if (Either.isLeft(result) && this.errorMessage) {
+			const result = this.run(state)
+			if (Either.isLeft(result)) {
 				return Parser.error(
-					this.errorMessage,
+					result.left.message,
 					result.left.expected,
 					result.left.pos,
 				)
@@ -259,7 +254,7 @@ export class Parser<T> {
 				onRight: ([value, newState]) => {
 					const nextParser =
 						other instanceof Parser ? other : other(value)
-					return Either.match(nextParser.parse(newState), {
+					return Either.match(nextParser.run(newState), {
 						onRight: ([b, finalState]) =>
 							Either.right([
 								{
@@ -298,7 +293,7 @@ export class Parser<T> {
 		) => void,
 	): Parser<T> {
 		return new Parser((state) => {
-			const result = this.parse(state)
+			const result = this.run(state)
 			callback(state, result)
 			return result
 		}, this.options)
@@ -312,7 +307,7 @@ export class Parser<T> {
 			let current = iterator.next()
 			let currentState: ParserState = state
 			while (!current.done) {
-				const result = current.value.parse(currentState)
+				const result = current.value.run(currentState)
 				if (Either.isLeft(result)) {
 					return result
 				}
