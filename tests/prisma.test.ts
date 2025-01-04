@@ -1,3 +1,4 @@
+import { printPosition } from "../src/errors"
 import {
 	Parser,
 	ParserError,
@@ -12,10 +13,6 @@ import {
 	skipSpaces,
 	string,
 } from "../src/index"
-import {
-	printErrorContext,
-	printPosition,
-} from "../src/errors"
 
 const whitespace = many0(
 	or(char(" "), char("\n"), char(".")),
