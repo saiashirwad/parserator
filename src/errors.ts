@@ -20,6 +20,7 @@ export function printErrorContext(
 	error: ParserError,
 	message?: string,
 ) {
+	console.log("hi")
 	return (
 		printLastNLines(error.state, 3) +
 		"\n" +

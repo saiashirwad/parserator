@@ -79,7 +79,8 @@ export const string = (str: string): Parser<string> =>
 			}
 
 			const errorMessage =
-				`Expected ${str}, ` + `but found ${state.remaining}`
+				`Expected '${str}', ` +
+				`but found '${state.remaining.slice(0, str.length)}'`
 
 			return Parser.error(errorMessage, [str], state)
 		},

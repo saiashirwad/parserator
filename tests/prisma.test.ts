@@ -13,14 +13,9 @@ import {
 	string,
 } from "../src/index"
 
-const whitespace = many0(
-	or(char(" "), char("\n"), char(".")),
-)
+const whitespace = many0(or(char(" "), char("\n")))
 
 const word = or(alphabet, char("_"))
-	.withError(
-		() => "A word must start with a letter or underscore",
-	)
 	.zip(many1(or(alphabet, char("_"), digit)))
 	.map(([first, rest]) => first + rest.join(""))
 
@@ -38,13 +33,11 @@ const expression = Parser.gen(function* () {
 })
 
 const result = expression.parseOrError(`
-.
-.
-.
-.
+
+
+
 _hi -= 2234`)
 
 if (result instanceof ParserError) {
-	console.log(result)
 	console.error(result.message)
 }
