@@ -1,4 +1,3 @@
-import { printPosition } from "../src/errors"
 import {
 	Parser,
 	ParserError,
@@ -46,5 +45,6 @@ const result = expression.parseOrError(`
 _hi -= 2234`)
 
 if (result instanceof ParserError) {
+	console.log(result)
 	console.error(result.message)
 }
