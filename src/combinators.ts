@@ -96,7 +96,9 @@ export const string = <Ctx = {}>(str: string): Parser<string, Ctx> =>
  * parser.run("goodbye") // Left(error)
  * ```
  */
-export function narrowedString<const T extends string>(str: T): Parser<T> {
+export function narrowedString<const T extends string, Ctx>(
+	str: T,
+): Parser<T, Ctx> {
 	return string(str) as any
 }
 
@@ -111,7 +113,7 @@ export function narrowedString<const T extends string>(str: T): Parser<T> {
  * parser.run("xyz") // Left(error)
  * ```
  */
-export const char = <T extends string>(ch: T): Parser<T> => {
+export const char = <T extends string, Ctx = {}>(ch: T): Parser<T, Ctx> => {
 	return new Parser(
 		(state) => {
 			if (ch.length !== 1) {
@@ -198,10 +200,10 @@ export const digit = new Parser(
  * parser.run("") // Right([[], {...}])
  * ```
  */
-export function sepBy<S, T>(
-	sepParser: Parser<S>,
-	parser: Parser<T>,
-): Parser<T[]> {
+export function sepBy<S, T, Ctx>(
+	sepParser: Parser<S, Ctx>,
+	parser: Parser<T, Ctx>,
+): Parser<T[], Ctx> {
 	return new Parser((state) => {
 		const results: T[] = []
 		let currentState = state
@@ -444,7 +446,8 @@ export const skipMany0 = <T, Ctx = {}>(parser: Parser<T, Ctx>) =>
  * @param parser - The parser to skip
  * @returns A parser that skips all matches (requires at least one)
  */
-export const skipMany1 = <T>(parser: Parser<T>) => skipMany_<T>(1)(parser)
+export const skipMany1 = <T, Ctx>(parser: Parser<T, Ctx>) =>
+	skipMany_<T, Ctx>(1)(parser)
 
 /**
  * Creates a parser that skips exactly n occurrences of the input parser.
@@ -453,8 +456,8 @@ export const skipMany1 = <T>(parser: Parser<T>) => skipMany_<T>(1)(parser)
  * @param n - Number of required repetitions to skip
  * @returns A parser that skips exactly n matches
  */
-export const skipManyN = <T>(parser: Parser<T>, n: number) =>
-	skipMany_<T>(n)(parser)
+export const skipManyN = <T, Ctx>(parser: Parser<T, Ctx>, n: number) =>
+	skipMany_<T, Ctx>(n)(parser)
 
 /**
  * Creates a parser that skips input until the given parser succeeds.
@@ -462,14 +465,16 @@ export const skipManyN = <T>(parser: Parser<T>, n: number) =>
  * @param parser - The parser to look for
  * @returns A parser that skips input until a match is found
  */
-export function skipUntil<T>(parser: Parser<T>): Parser<undefined> {
+export function skipUntil<T, Ctx = {}>(
+	parser: Parser<T, Ctx>,
+): Parser<undefined, Ctx> {
 	return new Parser((state) => {
 		let currentState = state
 
 		while (!State.isAtEnd(currentState)) {
-			const result = parser.run(currentState)
+			const { result, state: newState } = parser.run(currentState)
 			if (Either.isRight(result)) {
-				return Parser.succeed(undefined, result.right.state)
+				return Parser.succeed(undefined, newState)
 			}
 			currentState = State.consume(currentState, 1)
 		}
@@ -484,15 +489,17 @@ export function skipUntil<T>(parser: Parser<T>): Parser<undefined> {
  * @param parser - The parser to look for
  * @returns A parser that takes input until a match is found
  */
-export function takeUntil<T>(parser: Parser<T>): Parser<string> {
+export function takeUntil<T, Ctx = {}>(
+	parser: Parser<T, Ctx>,
+): Parser<string, Ctx> {
 	return new Parser((state) => {
 		let currentState = state
 		let collected = ""
 
 		while (!State.isAtEnd(currentState)) {
-			const result = parser.run(currentState)
+			const { result, state: newState } = parser.run(currentState)
 			if (Either.isRight(result)) {
-				return Parser.succeed(collected, result.right.state)
+				return Parser.succeed(collected, newState)
 			}
 			collected += currentState.remaining[0]
 			currentState = State.consume(currentState, 1)
@@ -583,7 +590,9 @@ export function or<Parsers extends Parser<any>[]>(
  * @param parser - The parser to make optional
  * @returns A parser that either succeeds with a value or undefined
  */
-export function optional<T>(parser: Parser<T>): Parser<T | undefined> {
+export function optional<T, Ctx>(
+	parser: Parser<T, Ctx>,
+): Parser<T | undefined> {
 	return new Parser((state) => {
 		const result = parser.run(state)
 		if (Either.isLeft(result)) {
@@ -593,7 +602,7 @@ export function optional<T>(parser: Parser<T>): Parser<T | undefined> {
 	})
 }
 
-type LastParser<T> = T extends [...any[], Parser<infer L>] ? L : never
+type LastParser<T, Ctx> = T extends [...any[], Parser<infer L>] ? L : never
 
 /**
  * Creates a parser that runs multiple parsers in sequence.
