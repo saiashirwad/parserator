@@ -515,12 +515,14 @@ export function takeUntil<T, Ctx = {}>(
  * @param char - The character to look for
  * @returns A parser that takes input until the character is found
  */
-export function parseUntilChar(char: string): Parser<string> {
+export function parseUntilChar<Ctx = {}>(char: string): Parser<string, Ctx> {
 	return new Parser((state) => {
 		if (char.length !== 1) {
 			return Parser.fail(
-				"Incorrect usage of parseUntilChar parser.",
-				[char],
+				{
+					message: "Incorrect usage of parseUntilChar parser.",
+					expected: [char],
+				},
 				state,
 			)
 		}
@@ -535,11 +537,8 @@ export function parseUntilChar(char: string): Parser<string> {
 			currentState = State.consume(currentState, 1)
 		}
 
-		return Parser.fail(
-			`Expected character ${char} but found ${collected}`,
-			[char],
-			currentState,
-		)
+		const message = `Expected character ${char} but found ${collected}`
+		return Parser.fail({ message, expected: [char] }, currentState)
 	})
 }
 
