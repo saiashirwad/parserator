@@ -9,7 +9,10 @@ export function printArrow(position: SourcePosition) {
 	return " ".repeat(lineNumberDigits + 3 + position.column - 1) + "^"
 }
 
-export function printErrorContext(state: ParserState, message?: string) {
+export function printErrorContext<Ctx = {}>(
+	state: ParserState<Ctx>,
+	message?: string,
+) {
 	return (
 		"Parser Error:\n" +
 		printLastNLines(state, 3) +
@@ -19,7 +22,7 @@ export function printErrorContext(state: ParserState, message?: string) {
 	)
 }
 
-export function printLastNLines(state: ParserState, n: number) {
+export function printLastNLines<Ctx = {}>(state: ParserState<Ctx>, n: number) {
 	const lines = state.context.source.split("\n").slice(-n)
 	const withNumbers = lines.map((line, i) => {
 		const lineNumber = state.context.source.split("\n").length - n + i + 1
