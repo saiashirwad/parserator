@@ -306,14 +306,14 @@ export class Parser<T> {
 	 * @returns The same parser with the tap point added
 	 */
 	tap(
-		callback: (
-			state: ParserState,
-			result: ParserResult<T>,
-		) => void,
+		callback: (args: {
+			state: ParserState
+			result: ParserResult<T>
+		}) => void,
 	): Parser<T> {
 		return new Parser((state) => {
 			const result = this.run(state)
-			callback(state, result)
+			callback({ state, result })
 			return result
 		}, this.options)
 	}

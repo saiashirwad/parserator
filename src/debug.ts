@@ -49,7 +49,7 @@ export function debug<T>(
 	parser: Parser<T>,
 	label: string,
 ): Parser<T> {
-	return parser.tap((state, result) =>
+	return parser.tap(({ state, result }) =>
 		debugState(label, state, result),
 	)
 }
@@ -76,7 +76,7 @@ export function breakpoint<T>(
 	parser: Parser<T>,
 	label: string,
 ): Parser<T> {
-	return parser.tap((state, result) => {
+	return parser.tap(({ state, result }) => {
 		debugState(label, state, result)
 		// eslint-disable-next-line no-debugger
 		debugger
