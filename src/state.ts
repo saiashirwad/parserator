@@ -28,10 +28,10 @@ export type SourcePosition = {
 	offset: number
 }
 
-export type ParserState<C = {}> = {
+export type ParserState<Ctx = {}> = {
 	remaining: string
 	pos: SourcePosition
-	context: ParserContext<C>
+	context: ParserContext<Ctx>
 }
 
 // Add static methods to help create and manipulate parser state
