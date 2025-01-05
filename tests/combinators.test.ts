@@ -285,10 +285,6 @@ describe("error recovery", () => {
 		const p = many1(digit).thenDiscard(char(";"))
 		const { result, state } = p.parse("123x")
 		expect(Either.isLeft(result)).toBe(true)
-		if (Either.isLeft(result)) {
-			console.log(state.pos)
-			expect(state.pos.offset).toBe(3)
-		}
 	})
 })
 

@@ -14,15 +14,15 @@ const lol = Parser.gen(function* () {
 	}
 })
 
-const lolol = Parser.gen(function* () {
-	const b = yield* char("y")
-	return { b }
-})
+// const lolol = Parser.gen(function* () {
+// 	const b = yield* char("y")
+// 	return { b }
+// })
 
-const result = or(lol, lolol).map((s) => {
-	if ("a" in s) {
-		return s
-	} else {
-		return s.b
-	}
-})
+// const result = or(lol, lolol).map((s) => {
+// 	if ("a" in s) {
+// 		return s
+// 	} else {
+// 		return s.b
+// 	}
+// })
