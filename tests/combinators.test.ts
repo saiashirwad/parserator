@@ -45,20 +45,21 @@ test("optional", () => {
 	expect(p.parseOrThrow("123")).toEqual(123)
 })
 
-// test("sequence", () => {
-// 	const p = sequence([
-// 		stringParser,
-// 		skipSpaces,
-// 		char(","),
-// 		skipSpaces,
-// 		integerParser,
-// 		skipSpaces,
-// 		char(","),
-// 		skipSpaces,
-// 		integerParser,
-// 	])
-// 	expect(p.parseOrThrow('"hello", 123, 23')).toEqual(23)
-// })
+test("sequence", () => {
+	const p = sequence([
+		stringParser,
+		skipSpaces,
+		char(","),
+		skipSpaces,
+		integerParser,
+		skipSpaces,
+		char(","),
+		skipSpaces,
+		integerParser,
+	])
+	console.log(p.parseOrError('"hello", 123, 23'))
+	// expect(p.parseOrThrow('"hello", 123, 23')).toEqual(23)
+})
 
 test("chain", () => {
 	const lengthPrefixedList = chain(integerParser, (length) =>
