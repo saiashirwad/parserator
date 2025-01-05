@@ -538,8 +538,23 @@ export function takeUntil<T>(
 	})
 }
 
-export function parseUntilChar(char: string) {
+/**
+ * Creates a parser that takes input until the given character is found.
+ *
+ * @param char - The character to look for
+ * @returns A parser that takes input until the character is found
+ */
+export function parseUntilChar(
+	char: string,
+): Parser<string> {
 	return new Parser((state) => {
+		if (char.length !== 1) {
+			return Parser.error(
+				"Incorrect usage of parseUntilChar parser.",
+				[char],
+				state,
+			)
+		}
 		let currentState = state
 		let collected = ""
 
