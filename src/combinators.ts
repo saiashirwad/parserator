@@ -595,7 +595,7 @@ export function optional<T, Ctx = {}>(parser: Parser<T, Ctx>) {
 			return Parser.succeed(undefined, newState)
 		}
 		// return result
-		return Parser.succeed(result, newState)
+		return Parser.succeed(result.right, newState)
 	})
 }
 
