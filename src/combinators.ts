@@ -94,12 +94,12 @@ export const string = (str: string): Parser<string> =>
  * @param str - The string literal to match
  * @returns A parser that matches and consumes the exact string with preserved type
  * ```ts
- * const parser = constString("hello") // Parser<"hello">
+ * const parser = narrowedString("hello") // Parser<"hello">
  * parser.run("hello world") // Right(["hello", {...}])
  * parser.run("goodbye") // Left(error)
  * ```
  */
-export function constString<const T extends string>(
+export function narrowedString<const T extends string>(
 	str: T,
 ): Parser<T> {
 	return string(str) as any

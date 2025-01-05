@@ -67,6 +67,16 @@ export class Parser<T> {
 		)
 	}
 
+	static resultError(
+		error: ParserError,
+	): Either<never, ParserError> {
+		return Parser.error(
+			error.message,
+			error.expected,
+			error.state,
+		)
+	}
+
 	/**
 	 * Adds an error message to the parser
 	 * @param errorCallback - A function that returns an error message
@@ -192,9 +202,7 @@ export class Parser<T> {
 		)
 	}
 
-	static Do = () => {
-		return Parser.pure({})
-	}
+	static Do = Parser.pure({})
 
 	/**
 	 * Creates a new parser that lazily evaluates the given function.
@@ -260,34 +268,28 @@ export class Parser<T> {
 		return new Parser((state) => {
 			const result = this.run(state)
 			if (Either.isLeft(result)) {
-				return Parser.error(
-					result.left.message,
-					result.left.expected,
-					result.left.state,
-				)
+				return Parser.resultError(result.left)
 			}
-			return Either.match(result, {
-				onRight: ({
-					value: boundValues,
-					state: newState,
-				}) => {
-					const nextParser =
-						other instanceof Parser
-							? other
-							: other(boundValues)
-					return Either.match(nextParser.run(newState), {
-						onRight: ({ value: b, state: finalState }) =>
-							Either.right({
-								value: {
-									...boundValues,
-									[k]: b,
-								} as BindResult<T, K, B>,
-								state: finalState,
-							}),
-						onLeft: Either.left,
-					})
-				},
-				onLeft: Either.left,
+
+			const { value: boundValues, state: newState } =
+				result.right
+
+			const nextParser =
+				other instanceof Parser ? other : other(boundValues)
+
+			const nextResult = nextParser.run(newState)
+			if (Either.isLeft(nextResult)) {
+				return Parser.resultError(nextResult.left)
+			}
+
+			const { value, state: finalState } = nextResult.right
+
+			return Either.right({
+				value: {
+					...boundValues,
+					[k]: value,
+				} as BindResult<T, K, B>,
+				state: finalState,
 			})
 		}, this.options)
 	}
