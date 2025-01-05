@@ -68,7 +68,7 @@ export function notFollowedBy<T, Ctx = {}>(
  * parser.run("goodbye") // Left(error)
  * ```
  */
-export const string = (str: string): Parser<string> =>
+export const string = <Ctx = {}>(str: string): Parser<string, Ctx> =>
 	new Parser(
 		(state) => {
 			if (state.remaining.startsWith(str)) {
@@ -248,39 +248,42 @@ export function sepBy<S, T>(
  * parser.run('5') // Left(error)
  * ```
  */
-export function between<T>(
-	start: Parser<any>,
-	end: Parser<any>,
-	parser: Parser<T>,
-): Parser<T> {
+export function between<T, Ctx = {}>(
+	start: Parser<any, Ctx>,
+	end: Parser<any, Ctx>,
+	parser: Parser<T, Ctx>,
+): Parser<any, Ctx> {
 	return new Parser((state) => {
 		// Parse opening delimiter
 		const startResult = start.run(state)
-		if (Either.isLeft(startResult)) {
+		if (Either.isLeft(startResult.result)) {
 			return startResult
 		}
 
 		// Parse content
-		const contentResult = parser.run(startResult.right.state)
-		if (Either.isLeft(contentResult)) {
+		const contentResult = parser.run(startResult.state)
+		if (Either.isLeft(contentResult.result)) {
 			return contentResult
 		}
 
 		// Parse closing delimiter
-		const endResult = end.run(contentResult.right.state)
-		if (Either.isLeft(endResult)) {
+		const endResult = end.run(contentResult.state)
+		if (Either.isLeft(endResult.result)) {
 			return endResult
 		}
 
 		// Return the content and final state
-		return Parser.succeed(contentResult.right.value, endResult.right.state)
+		return Parser.succeed(contentResult.result.right, endResult.state)
 	})
 }
 
-export function anyChar() {
-	return new Parser((state) => {
+export function anyChar<Ctx = {}>() {
+	return new Parser<string, Ctx>((state) => {
 		if (State.isAtEnd(state)) {
-			return Parser.fail("Unexpected end of input", [], state)
+			return Parser.fail(
+				{ message: "Unexpected end of input", expected: [] },
+				state,
+			)
 		}
 		return Parser.succeed(state.remaining[0], State.consume(state, 1))
 	})
