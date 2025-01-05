@@ -17,6 +17,16 @@ type BindResult<T, K extends string, B> = Prettify<
 	}
 >
 
+export function createContext<Ctx>(
+	context: Omit<ParserContext<Ctx>, "source">,
+): ParserContext<Ctx> {
+	// @ts-expect-error this is fine
+	return {
+		...context,
+		source: "",
+	}
+}
+
 export class Parser<T, Ctx = {}> {
 	constructor(
 		/**
@@ -168,6 +178,16 @@ export class Parser<T, Ctx = {}> {
 		new Parser((state) => Parser.succeed(a, state))
 
 	static Do = Parser.pure({})
+
+	/**
+	 * Gets the current parser context.
+	 * @returns A parser that succeeds with the current context
+	 */
+	static getContext<Ctx>(
+		context: ParserContext<Ctx>,
+	): Parser<ParserContext<Ctx>, Ctx> {
+		return new Parser((state) => Parser.succeed(context, state))
+	}
 
 	/**
 	 * Creates a new parser that lazily evaluates the given function.
