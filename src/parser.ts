@@ -217,7 +217,7 @@ export class Parser<T> {
 		})
 	}
 
-	zip<B>(parserB: Parser<B>): Parser<readonly [T, B]> {
+	zip<B>(parserB: Parser<B>): Parser<[T, B]> {
 		return new Parser((state) => {
 			return Either.match(this.run(state), {
 				// onRight: ([a, restA]) =>
@@ -225,7 +225,7 @@ export class Parser<T> {
 					Either.match(parserB.run(restA), {
 						onRight: ({ value: b, state: restB }) =>
 							Either.right({
-								value: [a, b] as const,
+								value: [a, b],
 								state: restB,
 							}),
 						onLeft: Either.left,

@@ -749,3 +749,10 @@ export const regex = (re: RegExp): Parser<string> => {
 		{ name: re.toString() },
 	)
 }
+
+export function zip<A, B>(
+	parserA: Parser<A>,
+	parserB: Parser<B>,
+): Parser<[A, B]> {
+	return parserA.zip(parserB)
+}
