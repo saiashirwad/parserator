@@ -32,10 +32,13 @@ export function printPositionWithOffset(position: SourcePosition) {
 	return `line ${position.line}, column ${position.column}, offset ${position.offset}`
 }
 
-export function getErrorLine(error: ParserError, state: ParserState) {
+export function getErrorLine<Ctx = {}>(
+	error: ParserError,
+	state: ParserState<Ctx>,
+) {
 	const errorLine = state.context.source.slice(
-		error.state.pos.offset,
-		state.context.source.indexOf("\n", error.state.pos.offset),
+		state.pos.offset,
+		state.context.source.indexOf("\n", state.pos.offset),
 	)
 	return errorLine
 }
