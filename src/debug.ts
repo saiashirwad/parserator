@@ -3,7 +3,7 @@ import { Parser } from "./parser"
 import {
 	type ParserState,
 	State,
-	type ParserResult,
+	type ParserOutput,
 } from "./state"
 /**
  * Creates a debug output for a parser's current state and result
@@ -11,7 +11,7 @@ import {
 export function debugState(
 	label: string,
 	state: ParserState,
-	result: ParserResult<any>,
+	result: ParserOutput<any>,
 	options: {
 		inputPreviewLength?: number
 		separator?: string

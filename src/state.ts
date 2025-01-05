@@ -11,23 +11,13 @@ export class ParserError {
 	constructor(
 		public message: string,
 		public expected: string[],
-		public state: ParserState,
 	) {}
-
-	get pos(): SourcePosition {
-		return this.state.pos
-	}
 }
 
-type ParserSuccess<T> = {
-	value: T
+export type ParserOutput<T> = {
 	state: ParserState
+	result: Either<T, ParserError>
 }
-
-export type ParserResult<T> = Either<
-	ParserSuccess<T>,
-	ParserError
->
 
 export type SourcePosition = {
 	line: number
