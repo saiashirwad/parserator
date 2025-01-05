@@ -4,10 +4,10 @@ import { type ParserState, State, type ParserOutput } from "./state"
 /**
  * Creates a debug output for a parser's current state and result
  */
-export function debugState(
+export function debugState<Ctx = {}>(
 	label: string,
-	state: ParserState,
-	result: ParserOutput<any>,
+	state: ParserState<Ctx>,
+	result: ParserOutput<any, Ctx>,
 	options: {
 		inputPreviewLength?: number
 		separator?: string
@@ -36,10 +36,10 @@ export function debugState(
 /**
  * Adds debug output to a parser
  */
-export function debug<T, C = {}>(
-	parser: Parser<T, C>,
+export function debug<T, Ctx = {}>(
+	parser: Parser<T, Ctx>,
 	label: string,
-): Parser<T, C> {
+): Parser<T, Ctx> {
 	return parser.tap(({ state, result }) => debugState(label, state, result))
 }
 
@@ -58,7 +58,10 @@ export function trace(label: string): Parser<void> {
 /**
  * Adds breakpoints to a parser for step-by-step debugging
  */
-export function breakpoint<T>(parser: Parser<T>, label: string): Parser<T> {
+export function breakpoint<T, Ctx = {}>(
+	parser: Parser<T, Ctx>,
+	label: string,
+): Parser<T, Ctx> {
 	return parser.tap(({ state, result }) => {
 		debugState(label, state, result)
 		// eslint-disable-next-line no-debugger
@@ -69,7 +72,10 @@ export function breakpoint<T>(parser: Parser<T>, label: string): Parser<T> {
 /**
  * Times how long a parser takes to run
  */
-export function benchmark<T>(parser: Parser<T>, label: string): Parser<T> {
+export function benchmark<T, Ctx = {}>(
+	parser: Parser<T, Ctx>,
+	label: string,
+): Parser<T, Ctx> {
 	return new Parser((state) => {
 		const start = performance.now()
 		const result = parser.run(state)

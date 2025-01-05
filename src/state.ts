@@ -17,8 +17,8 @@ export class ParserError {
 	) {}
 }
 
-export type ParserOutput<T, C = {}> = {
-	state: ParserState<C>
+export type ParserOutput<T, Ctx = {}> = {
+	state: ParserState<Ctx>
 	result: Either<T, ParserError>
 }
 
