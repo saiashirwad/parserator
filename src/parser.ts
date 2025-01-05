@@ -11,6 +11,12 @@ import {
 } from "./state"
 import type { Prettify } from "./types"
 
+type BindResult<T, K extends string, B> = Prettify<
+	T & {
+		[k in K]: B
+	}
+>
+
 export class Parser<T> {
 	constructor(
 		/**
@@ -250,13 +256,7 @@ export class Parser<T> {
 	bind<K extends string, B>(
 		k: K,
 		other: Parser<B> | ((a: T) => Parser<B>),
-	): Parser<
-		Prettify<
-			T & {
-				[k in K]: B
-			}
-		>
-	> {
+	): Parser<BindResult<T, K, B>> {
 		return new Parser((state) => {
 			const result = this.run(state)
 			if (Either.isLeft(result)) {
@@ -267,20 +267,21 @@ export class Parser<T> {
 				)
 			}
 			return Either.match(result, {
-				onRight: ({ value, state: newState }) => {
+				onRight: ({
+					value: boundValues,
+					state: newState,
+				}) => {
 					const nextParser =
-						other instanceof Parser ? other : other(value)
+						other instanceof Parser
+							? other
+							: other(boundValues)
 					return Either.match(nextParser.run(newState), {
 						onRight: ({ value: b, state: finalState }) =>
 							Either.right({
 								value: {
-									...(value as object),
+									...boundValues,
 									[k]: b,
-								} as Prettify<
-									T & {
-										[k in K]: B
-									}
-								>,
+								} as BindResult<T, K, B>,
 								state: finalState,
 							}),
 						onLeft: Either.left,
