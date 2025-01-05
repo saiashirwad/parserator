@@ -17,16 +17,6 @@ type BindResult<T, K extends string, B> = Prettify<
 	}
 >
 
-export function createContext<Ctx>(
-	context: Omit<ParserContext<Ctx>, "source">,
-): ParserContext<Ctx> {
-	// @ts-expect-error this is fine
-	return {
-		...context,
-		source: "",
-	}
-}
-
 export class Parser<T, Ctx = {}> {
 	constructor(
 		/**
@@ -180,16 +170,6 @@ export class Parser<T, Ctx = {}> {
 	static Do = Parser.pure({})
 
 	/**
-	 * Gets the current parser context.
-	 * @returns A parser that succeeds with the current context
-	 */
-	static getContext<Ctx>(
-		context: ParserContext<Ctx>,
-	): Parser<ParserContext<Ctx>, Ctx> {
-		return new Parser((state) => Parser.succeed(context, state))
-	}
-
-	/**
 	 * Creates a new parser that lazily evaluates the given function.
 	 * This is useful for creating recursive parsers.
 	 *
@@ -287,8 +267,8 @@ export class Parser<T, Ctx = {}> {
 		}, this.options)
 	}
 
-	static gen<T, Ctx = {}>(
-		f: () => Generator<Parser<any, Ctx>, T>,
+	static gen<T, Ctx = unknown>(
+		f: () => Generator<Parser<any, Ctx>, T, any>,
 	): Parser<T, Ctx> {
 		return new Parser<T, Ctx>((state) => {
 			const iterator = f()
