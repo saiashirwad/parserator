@@ -208,20 +208,17 @@ export class Parser<T> {
 		return new Parser((state) => {
 			const { result: resultA, state: stateA } = this.run(state)
 			if (Either.isLeft(resultA)) {
-				return { state: stateA, result: Either.left(resultA.left) }
+				return Parser.fail(resultA.left, stateA)
 			}
 			const nextParser = other instanceof Parser ? other : other(resultA.right)
 			const { result: resultB, state: stateB } = nextParser.run(stateA)
 			if (Either.isLeft(resultB)) {
-				return { state: stateB, result: Either.left(resultB.left) }
+				return Parser.fail(resultB.left, stateB)
 			}
-			return {
-				state: stateB,
-				result: Either.right({
-					...resultA.right,
-					[k]: resultB.right,
-				} as BindResult<T, K, B>),
-			}
+			return Parser.succeed(
+				{ ...resultA.right, [k]: resultB.right } as BindResult<T, K, B>,
+				stateB,
+			)
 		}, this.options)
 	}
 
