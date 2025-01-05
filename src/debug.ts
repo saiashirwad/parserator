@@ -46,7 +46,7 @@ export function debug<T, Ctx = {}>(
 /**
  * Creates a parser that logs its input state and continues
  */
-export function trace(label: string): Parser<void> {
+export function trace<Ctx = {}>(label: string): Parser<void, Ctx> {
 	return new Parser((state) => {
 		console.log(`\n[TRACE] ${label}`)
 		console.log("Position:", State.printPosition(state))
