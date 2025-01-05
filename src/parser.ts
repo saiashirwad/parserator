@@ -96,7 +96,10 @@ export class Parser<T, Ctx = {}> {
 		}, this.options)
 	}
 
-	parse(input: string, context: ParserContext<Ctx>): ParserOutput<T, Ctx> {
+	parse(
+		input: string,
+		context = { source: input } as ParserContext<Ctx>,
+	): ParserOutput<T, Ctx> {
 		const { result, state } = this.run(State.fromInput(input, context))
 		if (Either.isLeft(result)) {
 			return Parser.fail(result.left, state)
@@ -113,7 +116,10 @@ export class Parser<T, Ctx = {}> {
 		}, this.options)
 	}
 
-	parseOrError(input: string, context: ParserContext<Ctx>) {
+	parseOrError(
+		input: string,
+		context = { source: input } as ParserContext<Ctx>,
+	) {
 		const { result } = this.run(State.fromInput(input, context))
 		if (Either.isRight(result)) {
 			return result.right
@@ -121,8 +127,16 @@ export class Parser<T, Ctx = {}> {
 		return result.left
 	}
 
-	parseOrThrow(input: string, context: ParserContext<Ctx>): T {
-		const { result } = this.parse(input, context)
+	parseOrThrow(
+		input: string,
+		context = { source: input } as ParserContext<Ctx>,
+	): T {
+		const { result } = this.parse(
+			input,
+			context ?? {
+				source: input,
+			},
+		)
 		if (Either.isLeft(result)) {
 			throw new Error(result.left.message)
 		}
