@@ -3,7 +3,7 @@ import { Either } from "./either"
 import { printErrorContext } from "./errors"
 import {
 	type ParserContext,
-	type ParserError,
+	ParserError,
 	type ParserOptions,
 	type ParserOutput,
 	type ParserState,
@@ -40,34 +40,21 @@ export class Parser<T> {
 		}
 	}
 
-	static fail(message: string, expected: string[] = []): Parser<never> {
-		return new Parser<never>((state) => {
-			return {
-				state,
-				result: Either.left({
-					message,
-					expected,
-				}),
-			}
-		})
-	}
-
-	static error(
-		message: string,
-		expected: string[],
+	static fail(
+		error: {
+			message: string
+			expected?: string[]
+		},
 		state: ParserState,
-	): Either<never, ParserError> {
-		const errorMessage = message.includes("Parser Error:")
-			? message
-			: printErrorContext(state, message)
-		return Either.left({
-			message: errorMessage,
-			expected,
-		})
-	}
+	): ParserOutput<never> {
+		const errorMessage = error.message.includes("Parser Error:")
+			? error.message
+			: printErrorContext(state, error.message)
 
-	static resultError(error: ParserError): Either<never, ParserError> {
-		return Either.left(error)
+		return {
+			state,
+			result: Either.left(new ParserError(errorMessage, error.expected ?? [])),
+		}
 	}
 
 	/**
@@ -84,16 +71,16 @@ export class Parser<T> {
 		return new Parser<T>((state) => {
 			const output = this.run(state)
 			if (Either.isLeft(output.result)) {
-				return {
-					state: output.state,
-					result: Either.left({
+				return Parser.fail(
+					{
 						message: makeMessage({
 							error: output.result.left,
 							state: output.state,
 						}),
 						expected: output.result.left.expected,
-					}),
-				}
+					},
+					output.state,
+				)
 			}
 			return output
 		}, this.options)
@@ -105,10 +92,7 @@ export class Parser<T> {
 	): ParserOutput<T> {
 		const { result, state } = this.run(State.fromInput(input, context))
 		if (Either.isLeft(result)) {
-			return {
-				state,
-				result: Either.left(result.left),
-			}
+			return Parser.fail(result.left, state)
 		}
 		return {
 			state,

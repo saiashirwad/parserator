@@ -1,6 +1,6 @@
 import { Either } from "./either"
 import { Parser } from "./parser"
-import { State } from "./state"
+import { ParserError, State } from "./state"
 
 /**
  * Creates a parser that looks ahead in the input stream without consuming any input.
@@ -16,9 +16,9 @@ import { State } from "./state"
  */
 export function lookAhead<T>(parser: Parser<T>) {
 	return new Parser((state) => {
-		const result = parser.run(state)
+		const { result } = parser.run(state)
 		if (Either.isRight(result)) {
-			return Parser.succeed(result.right.value, state)
+			return Parser.succeed(result.right, state)
 		}
 		return Parser.succeed(undefined, state)
 	})
@@ -38,18 +38,29 @@ export function lookAhead<T>(parser: Parser<T>) {
  */
 export function notFollowedBy<T>(parser: Parser<T>) {
 	return new Parser((state) => {
-		const result = parser.run(state)
+		const { result, state: newState } = parser.run(state)
 		if (Either.isRight(result)) {
 			if (parser.options?.name) {
-				return Parser.error(
-					`Found ${parser.options.name} when it should not appear here`,
-					[],
-					state,
-				)
+				return {
+					result: Either.left(
+						new ParserError(
+							`Found ${parser.options.name} when it should not appear here`,
+							[],
+						),
+					),
+					state: newState,
+				}
 			}
-			return Parser.error("Expected not to follow", [], state)
+			return {
+				result: Either.left(new ParserError("Expected not to follow", [])),
+				state: newState,
+			}
 		}
-		return Parser.succeed(true, state)
+		// return {
+		// 	result: Either.right(true),
+		// 	state: newState,
+		// }
+		return Parser.succeed(true, newState)
 	})
 }
 
@@ -75,7 +86,7 @@ export const string = (str: string): Parser<string> =>
 				`Expected '${str}', ` +
 				`but found '${state.remaining.slice(0, str.length)}'`
 
-			return Parser.error(errorMessage, [str], state)
+			return Parser.fail(errorMessage, [str], state)
 		},
 		{ name: str },
 	)
@@ -111,7 +122,7 @@ export const char = <T extends string>(ch: T): Parser<T> => {
 	return new Parser(
 		(state) => {
 			if (ch.length !== 1) {
-				return Parser.error("Incorrect usage of char parser.", [ch], state)
+				return Parser.fail("Incorrect usage of char parser.", [ch], state)
 			}
 			if (state.remaining[0] === ch) {
 				return Parser.succeed(ch, State.consume(state, 1))
@@ -119,7 +130,7 @@ export const char = <T extends string>(ch: T): Parser<T> => {
 
 			const errorMessage = `Expected ${ch} but found ${state.remaining.at(0)}.`
 
-			return Parser.error(errorMessage, [ch], state)
+			return Parser.fail(errorMessage, [ch], state)
 		},
 		{ name: ch },
 	)
@@ -137,13 +148,13 @@ export const char = <T extends string>(ch: T): Parser<T> => {
 export const alphabet = new Parser(
 	(state) => {
 		if (State.isAtEnd(state)) {
-			return Parser.error("Unexpected end of input", [], state)
+			return Parser.fail("Unexpected end of input", [], state)
 		}
 		const first = state.remaining[0]
 		if (first && /^[a-zA-Z]$/.test(first)) {
 			return Parser.succeed(first, State.consume(state, 1))
 		}
-		return Parser.error(
+		return Parser.fail(
 			`Expected alphabetic character, but got '${first}'`,
 			[],
 			state,
@@ -164,13 +175,13 @@ export const alphabet = new Parser(
 export const digit = new Parser(
 	(state) => {
 		if (State.isAtEnd(state)) {
-			return Parser.error("Unexpected end of input", [], state)
+			return Parser.fail("Unexpected end of input", [], state)
 		}
 		const first = state.remaining[0]
 		if (first && /^[0-9]$/.test(first)) {
 			return Parser.succeed(first, State.consume(state, 1))
 		}
-		return Parser.error(`Expected digit, but got '${first}'`, [], state)
+		return Parser.fail(`Expected digit, but got '${first}'`, [], state)
 	},
 	{ name: "digit" },
 )
@@ -219,7 +230,7 @@ export function sepBy<S, T>(
 			// Try to parse next item
 			const itemResult = parser.run(currentState)
 			if (Either.isLeft(itemResult)) {
-				return Parser.error(
+				return Parser.fail(
 					itemResult.left.message,
 					itemResult.left.expected,
 					itemResult.left.state,
@@ -279,7 +290,7 @@ export function between<T>(
 export function anyChar() {
 	return new Parser((state) => {
 		if (State.isAtEnd(state)) {
-			return Parser.error("Unexpected end of input", [], state)
+			return Parser.fail("Unexpected end of input", [], state)
 		}
 		return Parser.succeed(state.remaining[0], State.consume(state, 1))
 	})
@@ -337,7 +348,7 @@ function many_<S, T>(count: number) {
 						return Parser.succeed(results, currentState)
 					}
 					// Otherwise return the error with its state
-					return Parser.error(
+					return Parser.fail(
 						`Expected at least ${count} occurrences, but only found ${results.length}`,
 						[],
 						itemResult.left.state,
@@ -363,7 +374,7 @@ function many_<S, T>(count: number) {
 				return Parser.succeed(results, currentState)
 			}
 
-			return Parser.error(
+			return Parser.fail(
 				`Expected at least ${count} occurrences, but only found ${results.length}`,
 				[],
 				currentState,
@@ -452,7 +463,7 @@ function skipMany_<T>(count: number) {
 				return Parser.succeed(undefined, currentState)
 			}
 
-			return Parser.error(
+			return Parser.fail(
 				`Expected at least ${count} occurrences, but only found ${successes}`,
 				[],
 				state,
@@ -542,7 +553,7 @@ export function takeUntil<T>(parser: Parser<T>): Parser<string> {
 export function parseUntilChar(char: string): Parser<string> {
 	return new Parser((state) => {
 		if (char.length !== 1) {
-			return Parser.error(
+			return Parser.fail(
 				"Incorrect usage of parseUntilChar parser.",
 				[char],
 				state,
@@ -559,7 +570,7 @@ export function parseUntilChar(char: string): Parser<string> {
 			currentState = State.consume(currentState, 1)
 		}
 
-		return Parser.error(
+		return Parser.fail(
 			`Expected character ${char} but found ${collected}`,
 			[char],
 			currentState,
@@ -599,7 +610,7 @@ export function or<Parsers extends Parser<any>[]>(
 				expectedNames.push(parser.options.name)
 			}
 		}
-		return Parser.error(
+		return Parser.fail(
 			`None of the ${parsers.length} choices could be satisfied`,
 			expectedNames,
 			state,
@@ -672,7 +683,7 @@ export const regex = (re: RegExp): Parser<string> => {
 				const value = match[0]
 				return Parser.succeed(value, state)
 			}
-			return Parser.error(
+			return Parser.fail(
 				`Expected ${re} but found ${state.remaining.slice(0, 10)}...`,
 				[re.toString()],
 				state,

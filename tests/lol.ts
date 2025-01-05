@@ -1,4 +1,5 @@
-import { Parser, narrowedString, string } from "../src"
+import { Parser, char, narrowedString, or, string } from "../src"
+import { peekAhead } from "../src/utils"
 
 // const lol = Parser.gen(function* () {
 // 	yield* string("abc")
@@ -19,9 +20,7 @@ import { Parser, narrowedString, string } from "../src"
 const rip = Parser.Do.bind("hi", string("hi"))
 	.bind("bar", narrowedString("bar"))
 	.bind("baz", narrowedString("baz"))
-	.bind("rip", (ctx) =>
-		narrowedString(`${ctx.bar}${ctx.baz}`),
-	)
+	.bind("rip", (ctx) => narrowedString(`${ctx.bar}${ctx.baz}`))
 	.map((ctx) => {
 		return ctx.rip
 	})
@@ -34,24 +33,28 @@ const rip2 = Parser.gen(function* () {
 	return rip
 })
 
-// const rip2 = Parser.gen(function* () {
-// 	const hi = yield* many1(alphabet).map((s) => s.join(""))
-// 	yield* skipSpaces
-// 	const bar = yield* narrowedString("bar")
-// 	yield* skipSpaces
-// 	const baz = yield* narrowedString("baz")
-// 	yield* skipSpaces
-// 	if (hi === "rip") {
-// 		yield* string("rip")
-// 	}
-// 	const rip = yield* narrowedString(`${bar}${baz}`)
-// 	return rip
-// })
+const lol = Parser.gen(function* () {
+	const a = yield* char("h")
+	let count = 0
+	while (true) {
+		const next = yield* peekAhead(1)
+		if (next === "\n") {
+			return { a, count }
+		}
+		count++
+		yield* char(next)
+	}
+})
 
-// const result = rip2.parse("hi bar baz barbaz")
+const lolol = Parser.gen(function* () {
+	const b = yield* char("y")
+	return { b }
+})
 
-// if (Either.isLeft(result)) {
-// 	console.error(result.left.message)
-// } else {
-// 	console.log(result.right)
-// }
+const result = or(lol, lolol).map((s) => {
+	if ("a" in s) {
+		return s
+	} else {
+		return s.b
+	}
+})
