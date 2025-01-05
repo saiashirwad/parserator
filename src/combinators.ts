@@ -14,7 +14,9 @@ import { State } from "./state"
  * // Input position remains at 'abc', 'a' is not consumed
  * ```
  */
-export function lookAhead<T>(parser: Parser<T>) {
+export function lookAhead<T, Ctx = {}>(
+	parser: Parser<T, Ctx>,
+): Parser<T | undefined, Ctx> {
 	return new Parser((state) => {
 		const { result } = parser.run(state)
 		if (Either.isRight(result)) {
@@ -36,7 +38,9 @@ export function lookAhead<T>(parser: Parser<T>) {
  * notA.run('abc') // Left(error) - Fails because 'a' is found
  * ```
  */
-export function notFollowedBy<T>(parser: Parser<T>) {
+export function notFollowedBy<T, Ctx = {}>(
+	parser: Parser<T, Ctx>,
+): Parser<boolean, Ctx> {
 	return new Parser((state) => {
 		const { result, state: newState } = parser.run(state)
 		if (Either.isRight(result)) {
