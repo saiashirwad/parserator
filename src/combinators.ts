@@ -538,6 +538,27 @@ export function takeUntil<T>(
 	})
 }
 
+export function parseUntilChar(char: string) {
+	return new Parser((state) => {
+		let currentState = state
+		let collected = ""
+
+		while (!State.isAtEnd(currentState)) {
+			if (currentState.remaining[0] === char) {
+				return Parser.succeed(collected, currentState)
+			}
+			collected += currentState.remaining[0]
+			currentState = State.consume(currentState, 1)
+		}
+
+		return Parser.error(
+			`Expected character ${char} but found ${collected}`,
+			[char],
+			currentState,
+		)
+	})
+}
+
 /**
  * A parser that skips any number of space characters.
  */
