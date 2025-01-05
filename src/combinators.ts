@@ -289,45 +289,17 @@ export function anyChar<Ctx = {}>() {
 	})
 }
 
-// export function betweenChars<T>(
-// 	open: string,
-// 	close: string,
-// 	parser: Parser<T>,
-// ) {
-// 	return new Parser((state) => {
-// 		const startResult = char(open).run(state)
-// 		if (Either.isLeft(startResult)) {
-// 			return startResult
-// 		}
-// 		const newState = startResult.right[1]
-// 	})
-// 	// return Parser.gen(function* () {
-// 	// 	yield* char(open)
-// 	// 	let acc = ""
-// 	// 	const str = string(yield* peekUntil(close)).map(
-// 	// 		(str) => {
-
-// 	// 		}
-// 	// 	)
-// 	// 	// const result = yield* string(str).map(parser)
-// 	// 	// while (true) {
-// 	// 	// 	const next = yield* anyChar()
-// 	// 	// 	if (next === close) {
-// 	// 	// 		// return acc
-// 	// 	// 	}
-// 	// 	// 	acc += next
-// 	// 	// }
-// 	// })
-// }
-
 /**
  * Internal helper function for creating repetition parsers.
  *
  * @param count - Minimum number of repetitions required
  * @returns A function that creates a parser matching multiple occurrences
  */
-function many_<S, T>(count: number) {
-	return (parser: Parser<T>, separator?: Parser<S>): Parser<T[]> => {
+function many_<S, T, Ctx = {}>(count: number) {
+	return (
+		parser: Parser<T, Ctx>,
+		separator?: Parser<S, Ctx>,
+	): Parser<T[], Ctx> => {
 		return new Parser((state) => {
 			const results: T[] = []
 			let currentState = state
@@ -335,16 +307,18 @@ function many_<S, T>(count: number) {
 			while (true) {
 				// Try to parse the next item
 				const itemResult = parser.run(currentState)
-				if (Either.isLeft(itemResult)) {
+				if (Either.isLeft(itemResult.result)) {
 					// If we have enough items, return success
 					if (results.length >= count) {
 						return Parser.succeed(results, currentState)
 					}
 					// Otherwise return the error with its state
 					return Parser.fail(
-						`Expected at least ${count} occurrences, but only found ${results.length}`,
-						[],
-						itemResult.left.state,
+						{
+							message: `Expected at least ${count} occurrences, but only found ${results.length}`,
+							expected: [],
+						},
+						itemResult.state,
 					)
 				}
 
