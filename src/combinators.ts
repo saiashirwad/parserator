@@ -323,17 +323,17 @@ function many_<S, T, Ctx = {}>(count: number) {
 				}
 
 				// Add the item and update state
-				const { value, state: newState } = itemResult.right
-				results.push(value)
+				const { result: value, state: newState } = itemResult
+				results.push(value.right)
 				currentState = newState
 
 				// If we have a separator, try to parse it
 				if (separator) {
-					const sepResult = separator.run(currentState)
+					const { result: sepResult, state } = separator.run(currentState)
 					if (Either.isLeft(sepResult)) {
 						break
 					}
-					currentState = sepResult.right.state
+					currentState = state
 				}
 			}
 
@@ -342,8 +342,10 @@ function many_<S, T, Ctx = {}>(count: number) {
 			}
 
 			return Parser.fail(
-				`Expected at least ${count} occurrences, but only found ${results.length}`,
-				[],
+				{
+					message: `Expected at least ${count} occurrences, but only found ${results.length}`,
+					expected: [],
+				},
 				currentState,
 			)
 		})
