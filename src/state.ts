@@ -1,9 +1,12 @@
 import type { Either } from "./either"
+import type { Prettify } from "./types"
 
-export type ParserContext = {
-	debug?: boolean
-	source: string
-}
+export type ParserContext<C> = Prettify<
+	C & {
+		debug?: boolean
+		source: string
+	}
+>
 
 export type ParserOptions = { name?: string }
 
@@ -14,8 +17,8 @@ export class ParserError {
 	) {}
 }
 
-export type ParserOutput<T> = {
-	state: ParserState
+export type ParserOutput<T, C = {}> = {
+	state: ParserState<C>
 	result: Either<T, ParserError>
 }
 
@@ -25,10 +28,10 @@ export type SourcePosition = {
 	offset: number
 }
 
-export type ParserState = {
+export type ParserState<C = {}> = {
 	remaining: string
 	pos: SourcePosition
-	context: ParserContext
+	context: ParserContext<C>
 }
 
 // Add static methods to help create and manipulate parser state
@@ -42,7 +45,7 @@ export const State = {
 	 * @param input - The input string to parse
 	 * @returns A new parser state initialized at the start of the input
 	 */
-	fromInput(input: string, context: ParserContext): ParserState {
+	fromInput<C = {}>(input: string, context: ParserContext<C>): ParserState<C> {
 		return {
 			remaining: input,
 			pos: {
@@ -62,7 +65,7 @@ export const State = {
 	 * @returns A new state with n characters consumed and position updated
 	 * @throws Error if attempting to consume more characters than remaining
 	 */
-	consume(state: ParserState, n: number): ParserState {
+	consume<C = {}>(state: ParserState<C>, n: number): ParserState<C> {
 		if (n === 0) return state
 		if (n > state.remaining.length) {
 			throw new Error("Cannot consume more characters than remaining")
@@ -96,7 +99,7 @@ export const State = {
 	 * @returns A new state with the string consumed and position updated
 	 * @throws Error if the input doesn't start with the specified string
 	 */
-	consumeString(state: ParserState, str: string): ParserState {
+	consumeString<C = {}>(state: ParserState<C>, str: string): ParserState<C> {
 		if (!state.remaining.startsWith(str)) {
 			throw new Error(
 				`Cannot consume "${str}" - input "${state.remaining}" doesn't start with it`,
@@ -112,10 +115,10 @@ export const State = {
 	 * @param predicate - Function that tests each character
 	 * @returns A new state with matching characters consumed
 	 */
-	consumeWhile(
-		state: ParserState,
+	consumeWhile<C = {}>(
+		state: ParserState<C>,
 		predicate: (char: string) => boolean,
-	): ParserState {
+	): ParserState<C> {
 		let i = 0
 		while (i < state.remaining.length && predicate(state.remaining[i])) {
 			i++
@@ -130,7 +133,7 @@ export const State = {
 	 * @param n - Number of characters to peek (default: 1)
 	 * @returns The next n characters as a string
 	 */
-	peek(state: ParserState, n: number = 1): string {
+	peek<C = {}>(state: ParserState<C>, n: number = 1): string {
 		return state.remaining.slice(0, n)
 	},
 
@@ -140,11 +143,11 @@ export const State = {
 	 * @param state - The current parser state
 	 * @returns True if at end of input, false otherwise
 	 */
-	isAtEnd(state: ParserState): boolean {
+	isAtEnd<C = {}>(state: ParserState<C>): boolean {
 		return state.remaining.length === 0
 	},
 
-	printPosition(state: ParserState): string {
+	printPosition<C = {}>(state: ParserState<C>): string {
 		return `line ${state.pos.line}, column ${state.pos.column}, offset ${state.pos.offset}`
 	},
 }

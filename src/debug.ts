@@ -36,7 +36,10 @@ export function debugState(
 /**
  * Adds debug output to a parser
  */
-export function debug<T>(parser: Parser<T>, label: string): Parser<T> {
+export function debug<T, C = {}>(
+	parser: Parser<T, C>,
+	label: string,
+): Parser<T, C> {
 	return parser.tap(({ state, result }) => debugState(label, state, result))
 }
 
