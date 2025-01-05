@@ -435,7 +435,8 @@ function skipMany_<T, Ctx>(count: number) {
  * @param parser - The parser to skip
  * @returns A parser that skips all matches
  */
-export const skipMany0 = <T>(parser: Parser<T>) => skipMany_<T>(0)(parser)
+export const skipMany0 = <T, Ctx = {}>(parser: Parser<T, Ctx>) =>
+	skipMany_<T, Ctx>(0)(parser)
 
 /**
  * Creates a parser that skips one or more occurrences of the input parser.
