@@ -347,8 +347,10 @@ function many_<S, T, Ctx = {}>(count: number) {
  * @param parser - The parser to repeat
  * @returns A parser that produces an array of all matches
  */
-export const many0 = <S, T>(parser: Parser<T>, separator?: Parser<S>) =>
-	many_<S, T>(0)(parser, separator)
+export const many0 = <S, T, Ctx = {}>(
+	parser: Parser<T, Ctx>,
+	separator?: Parser<S, Ctx>,
+) => many_<S, T, Ctx>(0)(parser, separator)
 
 /**
  * Creates a parser that matches one or more occurrences of the input parser.
@@ -356,8 +358,10 @@ export const many0 = <S, T>(parser: Parser<T>, separator?: Parser<S>) =>
  * @param parser - The parser to repeat
  * @returns A parser that produces an array of all matches (at least one)
  */
-export const many1 = <S, T>(parser: Parser<T>, separator?: Parser<S>) =>
-	many_<S, T>(1)(parser, separator)
+export const many1 = <S, T, Ctx>(
+	parser: Parser<T, Ctx>,
+	separator?: Parser<S, Ctx>,
+) => many_<S, T, Ctx>(1)(parser, separator)
 
 /**
  * Creates a parser that matches at least n occurrences of the input parser.
@@ -366,11 +370,11 @@ export const many1 = <S, T>(parser: Parser<T>, separator?: Parser<S>) =>
  * @param n - Number of required repetitions
  * @returns A parser that produces an array of at least n matches
  */
-export const manyN = <S, T>(
-	parser: Parser<T>,
+export const manyN = <S, T, Ctx>(
+	parser: Parser<T, Ctx>,
 	n: number,
-	separator?: Parser<S>,
-) => many_<S, T>(n)(parser, separator)
+	separator?: Parser<S, Ctx>,
+) => many_<S, T, Ctx>(n)(parser, separator)
 
 /**
  * Creates a parser that matches exactly n occurrences of the input parser.
@@ -381,17 +385,19 @@ export const manyN = <S, T>(
  * @returns A parser that produces an array of exactly n matches
  */
 
-export const manyNExact = <S, T>(
-	parser: Parser<T>,
+export const manyNExact = <S, T, Ctx>(
+	parser: Parser<T, Ctx>,
 	n: number,
-	separator?: Parser<S>,
+	separator?: Parser<S, Ctx>,
 ) =>
 	Parser.gen(function* () {
 		const results = yield* manyN(parser, n, separator)
 		if (results.length !== n) {
-			return yield* Parser.fail(
-				`Expected exactly ${n} occurrences, but found ${results.length}`,
-			)
+			const message = `Expected exactly ${n} occurrences, but found ${results.length}`
+			return yield* Parser.error<Ctx>(message)
+			// return yield* Parser.fail(
+			// 	`Expected exactly ${n} occurrences, but found ${results.length}`,
+			// )
 		}
 		return results
 	})

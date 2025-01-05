@@ -58,6 +58,15 @@ export class Parser<T, Ctx = {}> {
 		}
 	}
 
+	static error<Ctx = {}>(
+		message: string,
+		expected: string[] = [],
+	): Parser<never, Ctx> {
+		return new Parser((state) => {
+			return Parser.fail({ message, expected }, state)
+		})
+	}
+
 	/**
 	 * Adds an error message to the parser
 	 * @param makeMessage - A function that returns an error message
