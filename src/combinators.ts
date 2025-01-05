@@ -68,14 +68,14 @@ export const string = (str: string): Parser<string> =>
 	new Parser(
 		(state) => {
 			if (state.remaining.startsWith(str)) {
-				return Parser.succeed(str, State.consumeString(state, str))
+				return Parser.succeed(str, State.consume(state, str.length))
 			}
 
-			const errorMessage =
+			const message =
 				`Expected '${str}', ` +
 				`but found '${state.remaining.slice(0, str.length)}'`
 
-			return Parser.fail(errorMessage, [str], state)
+			return Parser.fail({ message, expected: [str] }, state)
 		},
 		{ name: str },
 	)
