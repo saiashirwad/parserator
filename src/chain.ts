@@ -80,10 +80,11 @@ export const chain: Chain = (
 	return new Parser((state) => {
 		let result = parser.run(state)
 		for (const fn of fns) {
-			if (Either.isLeft(result)) {
-				return result
+			const { result: parserResult, state: newState } = result
+			if (Either.isLeft(parserResult)) {
+				return Parser.fail(parserResult.left, newState)
 			}
-			const { value, state: newState } = result.right
+			const value = parserResult.right
 			result = fn(value).run(newState)
 		}
 		return result
