@@ -1,6 +1,6 @@
 import { Either } from "./either"
 import { Parser } from "./parser"
-import { ParserError, State } from "./state"
+import { State } from "./state"
 
 /**
  * Creates a parser that looks ahead in the input stream without consuming any input.
@@ -139,17 +139,17 @@ export const char = <T extends string>(ch: T): Parser<T> => {
 export const alphabet = new Parser(
 	(state) => {
 		if (State.isAtEnd(state)) {
-			return Parser.fail("Unexpected end of input", [], state)
+			return Parser.fail(
+				{ message: "Unexpected end of input", expected: [] },
+				state,
+			)
 		}
 		const first = state.remaining[0]
 		if (first && /^[a-zA-Z]$/.test(first)) {
 			return Parser.succeed(first, State.consume(state, 1))
 		}
-		return Parser.fail(
-			`Expected alphabetic character, but got '${first}'`,
-			[],
-			state,
-		)
+		const message = `Expected alphabetic character, but got '${first}'`
+		return Parser.fail({ message, expected: [] }, state)
 	},
 	{ name: "alphabet" },
 )
@@ -166,13 +166,17 @@ export const alphabet = new Parser(
 export const digit = new Parser(
 	(state) => {
 		if (State.isAtEnd(state)) {
-			return Parser.fail("Unexpected end of input", [], state)
+			return Parser.fail(
+				{ message: "Unexpected end of input", expected: [] },
+				state,
+			)
 		}
 		const first = state.remaining[0]
 		if (first && /^[0-9]$/.test(first)) {
 			return Parser.succeed(first, State.consume(state, 1))
 		}
-		return Parser.fail(`Expected digit, but got '${first}'`, [], state)
+		const message = `Expected digit, but got '${first}'`
+		return Parser.fail({ message, expected: [] }, state)
 	},
 	{ name: "digit" },
 )
@@ -199,36 +203,32 @@ export function sepBy<S, T>(
 		let currentState = state
 
 		// Try to parse first item
-		const firstResult = parser.run(currentState)
+		const { result: firstResult, state: firstState } = parser.run(currentState)
 		if (Either.isLeft(firstResult)) {
 			// Empty list is valid for sepBy
-			return Parser.succeed(results, state)
+			return Parser.succeed(results, firstState)
 		}
 
-		// Add first item and continue
-		results.push(firstResult.right.value)
-		currentState = firstResult.right.state
+		results.push(firstResult.right)
+		currentState = firstState
 
 		// Parse remaining items
 		while (true) {
 			// Try to parse separator
-			const sepResult = sepParser.run(currentState)
+			const { result: sepResult, state: sepState } = sepParser.run(currentState)
 			if (Either.isLeft(sepResult)) {
 				break
 			}
-			currentState = sepResult.right.state
+			currentState = sepState
 
 			// Try to parse next item
-			const itemResult = parser.run(currentState)
+			const { result: itemResult, state: itemResultState } =
+				parser.run(currentState)
 			if (Either.isLeft(itemResult)) {
-				return Parser.fail(
-					itemResult.left.message,
-					itemResult.left.expected,
-					itemResult.left.state,
-				)
+				return Parser.fail(itemResult.left, itemResultState)
 			}
-			results.push(itemResult.right.value)
-			currentState = itemResult.right.state
+			results.push(itemResult.right)
+			currentState = itemResultState
 		}
 
 		return Parser.succeed(results, currentState)
