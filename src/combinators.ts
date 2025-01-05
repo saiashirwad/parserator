@@ -312,14 +312,8 @@ function many_<S, T, Ctx = {}>(count: number) {
 					if (results.length >= count) {
 						return Parser.succeed(results, currentState)
 					}
-					// Otherwise return the error with its state
-					return Parser.fail(
-						{
-							message: `Expected at least ${count} occurrences, but only found ${results.length}`,
-							expected: [],
-						},
-						itemResult.state,
-					)
+					const message = `Expected at least ${count} occurrences, but only found ${results.length}`
+					return Parser.fail({ message, expected: [] }, itemResult.state)
 				}
 
 				// Add the item and update state
@@ -341,13 +335,8 @@ function many_<S, T, Ctx = {}>(count: number) {
 				return Parser.succeed(results, currentState)
 			}
 
-			return Parser.fail(
-				{
-					message: `Expected at least ${count} occurrences, but only found ${results.length}`,
-					expected: [],
-				},
-				currentState,
-			)
+			const message = `Expected at least ${count} occurrences, but only found ${results.length}`
+			return Parser.fail({ message, expected: [] }, currentState)
 		})
 	}
 }
