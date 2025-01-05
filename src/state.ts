@@ -51,11 +51,7 @@ export const State = {
 	): ParserState<Ctx> {
 		return {
 			remaining: input,
-			pos: {
-				line: 1,
-				column: 1,
-				offset: 0,
-			},
+			pos: { line: 1, column: 1, offset: 0 },
 			context,
 		}
 	},
