@@ -202,26 +202,21 @@ export function sepBy<S, T>(
 		const results: T[] = []
 		let currentState = state
 
-		// Try to parse first item
 		const { result: firstResult, state: firstState } = parser.run(currentState)
 		if (Either.isLeft(firstResult)) {
-			// Empty list is valid for sepBy
-			return Parser.succeed(results, firstState)
+			return Parser.fail(firstResult.left, firstState)
 		}
 
 		results.push(firstResult.right)
 		currentState = firstState
 
-		// Parse remaining items
 		while (true) {
-			// Try to parse separator
 			const { result: sepResult, state: sepState } = sepParser.run(currentState)
 			if (Either.isLeft(sepResult)) {
 				break
 			}
 			currentState = sepState
 
-			// Try to parse next item
 			const { result: itemResult, state: itemResultState } =
 				parser.run(currentState)
 			if (Either.isLeft(itemResult)) {
