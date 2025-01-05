@@ -1,6 +1,6 @@
 import { Either } from "./either"
 import { Parser } from "./parser"
-import { State } from "./state"
+import { type ParserState, State } from "./state"
 
 /**
  * Creates a parser that looks ahead in the input stream without consuming any input.
@@ -560,15 +560,16 @@ export const skipSpaces = new Parser(
  * @param parsers - Array of parsers to try
  * @returns A parser that succeeds if any of the input parsers succeed
  */
-export function or<Parsers extends Parser<any>[], Ctx = {}>(
+export function or<Parsers extends Parser<any, any>[], Ctx = {}>(
 	...parsers: Parsers
 ): Parser<Parsers[number] extends Parser<infer T, Ctx> ? T : never, Ctx> {
 	return new Parser((state) => {
 		const expectedNames: string[] = []
 		for (const parser of parsers) {
-			const { result } = parser.run(state)
+			const { result, state: newState } = parser.run(state)
 			if (Either.isRight(result)) {
-				return result
+				// return result
+				return Parser.succeed(result.right, newState)
 			}
 			if (parser.options?.name) {
 				expectedNames.push(parser.options.name)
@@ -587,19 +588,20 @@ export function or<Parsers extends Parser<any>[], Ctx = {}>(
  * @param parser - The parser to make optional
  * @returns A parser that either succeeds with a value or undefined
  */
-export function optional<T, Ctx>(
-	parser: Parser<T, Ctx>,
-): Parser<T | undefined> {
-	return new Parser((state) => {
-		const result = parser.run(state)
+export function optional<T, Ctx = {}>(parser: Parser<T, Ctx>) {
+	return new Parser((state: ParserState<Ctx>) => {
+		const { result, state: newState } = parser.run(state)
 		if (Either.isLeft(result)) {
-			return Parser.succeed(undefined, state)
+			return Parser.succeed(undefined, newState)
 		}
-		return result
+		// return result
+		return Parser.succeed(result, newState)
 	})
 }
 
-type LastParser<T, Ctx> = T extends [...any[], Parser<infer L>] ? L : never
+type LastParser<T, Ctx = {}> = T extends [...any[], Parser<infer L, Ctx>]
+	? L
+	: never
 
 /**
  * Creates a parser that runs multiple parsers in sequence.
@@ -608,20 +610,21 @@ type LastParser<T, Ctx> = T extends [...any[], Parser<infer L>] ? L : never
  * @param parsers - Array of parsers to run in sequence
  * @returns A parser that succeeds if all parsers succeed in sequence
  */
-export function sequence<Parsers extends Parser<any>[]>(
+export function sequence<Parsers extends Parser<any>[], Ctx = {}>(
 	parsers: [...Parsers],
-): Parser<LastParser<Parsers>> {
-	return new Parser((state) => {
+): Parser<LastParser<Parsers, Ctx>, Ctx> {
+	return new Parser((state: ParserState<Ctx>) => {
 		const results: Parsers[] = []
 		let currentState = state
 
 		for (const parser of parsers) {
-			const result = parser.run(currentState)
+			const { result, state: newState } = parser.run(currentState)
 			if (Either.isLeft(result)) {
-				return result
+				return Parser.fail(result.left, newState)
 			}
-			const { value, state: newState } = result.right
-			results.push(value)
+			results.push(result.right)
+			// TODO: fix this
+			// @ts-expect-error this should be fine
 			currentState = newState
 		}
 
@@ -636,7 +639,7 @@ export function sequence<Parsers extends Parser<any>[]>(
  * @param re - The regular expression to match against
  * @returns A parser that matches the regex pattern
  */
-export const regex = (re: RegExp): Parser<string> => {
+export const regex = <Ctx = {}>(re: RegExp): Parser<string, Ctx> => {
 	// Create a new RegExp without global flag to ensure consistent behavior
 	const nonGlobalRe = new RegExp(re.source, re.flags.replace("g", ""))
 
@@ -647,9 +650,12 @@ export const regex = (re: RegExp): Parser<string> => {
 				const value = match[0]
 				return Parser.succeed(value, state)
 			}
+			const message = `Expected ${re} but found ${state.remaining.slice(0, 10)}...`
 			return Parser.fail(
-				`Expected ${re} but found ${state.remaining.slice(0, 10)}...`,
-				[re.toString()],
+				{
+					message,
+					expected: [re.toString()],
+				},
 				state,
 			)
 		},
