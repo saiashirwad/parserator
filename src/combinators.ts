@@ -560,13 +560,13 @@ export const skipSpaces = new Parser(
  * @param parsers - Array of parsers to try
  * @returns A parser that succeeds if any of the input parsers succeed
  */
-export function or<Parsers extends Parser<any>[]>(
+export function or<Parsers extends Parser<any>[], Ctx = {}>(
 	...parsers: Parsers
-): Parser<Parsers[number] extends Parser<infer T> ? T : never> {
+): Parser<Parsers[number] extends Parser<infer T, Ctx> ? T : never, Ctx> {
 	return new Parser((state) => {
 		const expectedNames: string[] = []
 		for (const parser of parsers) {
-			const result = parser.run(state)
+			const { result } = parser.run(state)
 			if (Either.isRight(result)) {
 				return result
 			}
@@ -574,11 +574,9 @@ export function or<Parsers extends Parser<any>[]>(
 				expectedNames.push(parser.options.name)
 			}
 		}
-		return Parser.fail(
-			`None of the ${parsers.length} choices could be satisfied`,
-			expectedNames,
-			state,
-		)
+
+		const message = `None of the ${parsers.length} choices could be satisfied`
+		return Parser.fail({ message, expected: expectedNames }, state)
 	})
 }
 
