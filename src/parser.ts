@@ -33,20 +33,14 @@ export class Parser<T> {
 
 	static getState() {}
 
-	static succeed<T>(
-		value: T,
-		state: ParserState,
-	): ParserOutput<T> {
+	static succeed<T>(value: T, state: ParserState): ParserOutput<T> {
 		return {
 			state,
 			result: Either.right(value),
 		}
 	}
 
-	static fail(
-		message: string,
-		expected: string[] = [],
-	): Parser<never> {
+	static fail(message: string, expected: string[] = []): Parser<never> {
 		return new Parser<never>((state) => {
 			return {
 				state,
@@ -72,9 +66,7 @@ export class Parser<T> {
 		})
 	}
 
-	static resultError(
-		error: ParserError,
-	): Either<never, ParserError> {
+	static resultError(error: ParserError): Either<never, ParserError> {
 		return Either.left(error)
 	}
 
@@ -111,9 +103,7 @@ export class Parser<T> {
 		input: string,
 		context: ParserContext = { source: input },
 	): ParserOutput<T> {
-		const { result, state } = this.run(
-			State.fromInput(input, context),
-		)
+		const { result, state } = this.run(State.fromInput(input, context))
 		if (Either.isLeft(result)) {
 			return {
 				state,
@@ -135,23 +125,15 @@ export class Parser<T> {
 		}, this.options)
 	}
 
-	parseOrError(
-		input: string,
-		context: ParserContext = { source: input },
-	) {
-		const { result } = this.run(
-			State.fromInput(input, context),
-		)
+	parseOrError(input: string, context: ParserContext = { source: input }) {
+		const { result } = this.run(State.fromInput(input, context))
 		if (Either.isRight(result)) {
 			return result.right
 		}
 		return result.left
 	}
 
-	parseOrThrow(
-		input: string,
-		context: ParserContext = { source: input },
-	): T {
+	parseOrThrow(input: string, context: ParserContext = { source: input }): T {
 		const { result } = this.parse(input, context)
 		if (Either.isLeft(result)) {
 			throw new Error(result.left.message)
@@ -186,12 +168,11 @@ export class Parser<T> {
 		})
 	}
 
-	static pure = <A>(a: A): Parser<A> => {
-		return new Parser((state) => ({
+	static pure = <A>(a: A): Parser<A> =>
+		new Parser((state) => ({
 			state,
 			result: Either.right(a),
 		}))
-	}
 
 	static Do = Parser.pure({})
 
@@ -224,19 +205,24 @@ export class Parser<T> {
 
 	zip<B>(parserB: Parser<B>): Parser<[T, B]> {
 		return new Parser((state) => {
-			return Either.match(this.run(state), {
-				// onRight: ([a, restA]) =>
-				onRight: ({ value: a, state: restA }) =>
-					Either.match(parserB.run(restA), {
-						onRight: ({ value: b, state: restB }) =>
-							Either.right({
-								value: [a, b],
-								state: restB,
-							}),
-						onLeft: Either.left,
-					}),
-				onLeft: Either.left,
-			})
+			const { result: a, state: stateA } = this.run(state)
+			if (Either.isLeft(a)) {
+				return {
+					state: stateA,
+					result: Either.left(a.left),
+				}
+			}
+			const { result: b, state: stateB } = parserB.run(stateA)
+			if (Either.isLeft(b)) {
+				return {
+					state: stateB,
+					result: Either.left(b.left),
+				}
+			}
+			return {
+				state: stateB,
+				result: Either.right([a.right, b.right]),
+			}
 		})
 	}
 
@@ -257,31 +243,22 @@ export class Parser<T> {
 		other: Parser<B> | ((a: T) => Parser<B>),
 	): Parser<BindResult<T, K, B>> {
 		return new Parser((state) => {
-			const result = this.run(state)
-			if (Either.isLeft(result)) {
-				return Parser.resultError(result.left)
+			const { result: resultA, state: stateA } = this.run(state)
+			if (Either.isLeft(resultA)) {
+				return { state: stateA, result: Either.left(resultA.left) }
 			}
-
-			const { value: boundValues, state: newState } =
-				result.right
-
-			const nextParser =
-				other instanceof Parser ? other : other(boundValues)
-
-			const nextResult = nextParser.run(newState)
-			if (Either.isLeft(nextResult)) {
-				return Parser.resultError(nextResult.left)
+			const nextParser = other instanceof Parser ? other : other(resultA.right)
+			const { result: resultB, state: stateB } = nextParser.run(stateA)
+			if (Either.isLeft(resultB)) {
+				return { state: stateB, result: Either.left(resultB.left) }
 			}
-
-			const { value, state: finalState } = nextResult.right
-
-			return Either.right({
-				value: {
-					...boundValues,
-					[k]: value,
-				} as BindResult<T, K, B>,
-				state: finalState,
-			})
+			return {
+				state: stateB,
+				result: Either.right({
+					...resultA.right,
+					[k]: resultB.right,
+				} as BindResult<T, K, B>),
+			}
 		}, this.options)
 	}
 
@@ -309,22 +286,23 @@ export class Parser<T> {
 		}, this.options)
 	}
 
-	static gen<T>(
-		f: () => Generator<Parser<any>, T>,
-	): Parser<T> {
+	static gen<T>(f: () => Generator<Parser<any>, T>): Parser<T> {
 		return new Parser((state) => {
 			const iterator = f()
 			let current = iterator.next()
 			let currentState: ParserState = state
 			while (!current.done) {
-				const result = current.value.run(currentState)
+				const { result, state: newState } = current.value.run(currentState)
 				if (Either.isLeft(result)) {
-					return result
+					return { result, state: newState }
 				}
-				currentState = result.right.state
-				current = iterator.next(result.right.value)
+				currentState = newState
+				current = iterator.next(result.right)
 			}
-			return Parser.succeed(current.value, currentState)
+			return {
+				result: Either.right(current.value),
+				state: currentState,
+			}
 		})
 	}
 

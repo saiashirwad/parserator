@@ -42,10 +42,7 @@ export const State = {
 	 * @param input - The input string to parse
 	 * @returns A new parser state initialized at the start of the input
 	 */
-	fromInput(
-		input: string,
-		context: ParserContext,
-	): ParserState {
+	fromInput(input: string, context: ParserContext): ParserState {
 		return {
 			remaining: input,
 			pos: {
@@ -68,9 +65,7 @@ export const State = {
 	consume(state: ParserState, n: number): ParserState {
 		if (n === 0) return state
 		if (n > state.remaining.length) {
-			throw new Error(
-				"Cannot consume more characters than remaining",
-			)
+			throw new Error("Cannot consume more characters than remaining")
 		}
 
 		const consumed = state.remaining.slice(0, n)
@@ -101,10 +96,7 @@ export const State = {
 	 * @returns A new state with the string consumed and position updated
 	 * @throws Error if the input doesn't start with the specified string
 	 */
-	consumeString(
-		state: ParserState,
-		str: string,
-	): ParserState {
+	consumeString(state: ParserState, str: string): ParserState {
 		if (!state.remaining.startsWith(str)) {
 			throw new Error(
 				`Cannot consume "${str}" - input "${state.remaining}" doesn't start with it`,
@@ -125,10 +117,7 @@ export const State = {
 		predicate: (char: string) => boolean,
 	): ParserState {
 		let i = 0
-		while (
-			i < state.remaining.length &&
-			predicate(state.remaining[i])
-		) {
+		while (i < state.remaining.length && predicate(state.remaining[i])) {
 			i++
 		}
 		return State.consume(state, i)

@@ -2,10 +2,7 @@ import { Either } from "./either"
 import { Parser } from "./parser"
 
 export type Chain = {
-	<T, U>(
-		parser: Parser<T>,
-		fn1: (value: T) => Parser<U>,
-	): Parser<U>
+	<T, U>(parser: Parser<T>, fn1: (value: T) => Parser<U>): Parser<U>
 	<T1, T2, T3>(
 		parser: Parser<T1>,
 		fn1: (value: T1) => Parser<T2>,
