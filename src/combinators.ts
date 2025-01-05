@@ -628,7 +628,7 @@ export function sequence<Parsers extends Parser<any>[], Ctx = {}>(
 			currentState = newState
 		}
 
-		return Either.right([results.at(-1), currentState]) as any
+		return Parser.succeed(results.at(-1), currentState) as any
 	})
 }
 
