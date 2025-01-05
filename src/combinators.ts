@@ -41,25 +41,14 @@ export function notFollowedBy<T>(parser: Parser<T>) {
 		const { result, state: newState } = parser.run(state)
 		if (Either.isRight(result)) {
 			if (parser.options?.name) {
-				return {
-					result: Either.left(
-						new ParserError(
-							`Found ${parser.options.name} when it should not appear here`,
-							[],
-						),
-					),
-					state: newState,
-				}
+				const message = `Found ${parser.options.name} when it should not appear here`
+				return Parser.fail({ message, expected: [] }, newState)
 			}
-			return {
-				result: Either.left(new ParserError("Expected not to follow", [])),
-				state: newState,
-			}
+			return Parser.fail(
+				{ message: "Expected not to follow", expected: [] },
+				newState,
+			)
 		}
-		// return {
-		// 	result: Either.right(true),
-		// 	state: newState,
-		// }
 		return Parser.succeed(true, newState)
 	})
 }
