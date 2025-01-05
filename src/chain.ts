@@ -86,7 +86,7 @@ export const chain: Chain = (
 			if (Either.isLeft(result)) {
 				return result
 			}
-			const [value, newState] = result.right
+			const { value, state: newState } = result.right
 			result = fn(value).run(newState)
 		}
 		return result

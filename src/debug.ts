@@ -36,7 +36,7 @@ export function debugState(
 	console.log(
 		"Result:",
 		Either.isRight(result)
-			? `Success: ${JSON.stringify(result.right[0])}`
+			? `Success: ${JSON.stringify(result.right.value)}`
 			: `Error: ${result.left.message}`,
 	)
 	console.log(separator)

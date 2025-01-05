@@ -11,8 +11,6 @@ import {
 } from "./state"
 import type { Prettify } from "./types"
 
-let count = 0
-
 export class Parser<T> {
 	constructor(
 		/**
@@ -33,7 +31,7 @@ export class Parser<T> {
 		value: T,
 		state: ParserState,
 	): ParserResult<T> {
-		return Either.right([value, state])
+		return Either.right({ value, state })
 	}
 
 	static fail(
@@ -125,7 +123,7 @@ export class Parser<T> {
 	) {
 		const result = this.run(State.fromInput(input, context))
 		if (Either.isRight(result)) {
-			return result.right[0]
+			return result.right.value
 		}
 		return result.left
 	}
@@ -152,8 +150,11 @@ export class Parser<T> {
 				)
 			}
 			return Either.match(result, {
-				onRight: ([value, newState]) =>
-					Either.right([f(value), newState] as const),
+				onRight: ({ value, state: newState }) =>
+					Either.right({
+						value: f(value),
+						state: newState,
+					}),
 				onLeft: Either.left,
 			})
 		}, this.options)
@@ -170,7 +171,7 @@ export class Parser<T> {
 				)
 			}
 			return Either.match(result, {
-				onRight: ([value, newState]) => {
+				onRight: ({ value, state: newState }) => {
 					const nextParser = f(value)
 					return nextParser.run(newState)
 				},
@@ -180,7 +181,9 @@ export class Parser<T> {
 	}
 
 	static pure = <A>(a: A): Parser<A> => {
-		return new Parser((input) => Either.right([a, input]))
+		return new Parser((input) =>
+			Either.right({ value: a, state: input }),
+		)
 	}
 
 	static Do = () => {
@@ -217,10 +220,14 @@ export class Parser<T> {
 	zip<B>(parserB: Parser<B>): Parser<readonly [T, B]> {
 		return new Parser((state) => {
 			return Either.match(this.run(state), {
-				onRight: ([a, restA]) =>
+				// onRight: ([a, restA]) =>
+				onRight: ({ value: a, state: restA }) =>
 					Either.match(parserB.run(restA), {
-						onRight: ([b, restB]) =>
-							Either.right([[a, b] as const, restB]),
+						onRight: ({ value: b, state: restB }) =>
+							Either.right({
+								value: [a, b] as const,
+								state: restB,
+							}),
 						onLeft: Either.left,
 					}),
 				onLeft: Either.left,
@@ -256,13 +263,13 @@ export class Parser<T> {
 				)
 			}
 			return Either.match(result, {
-				onRight: ([value, newState]) => {
+				onRight: ({ value, state: newState }) => {
 					const nextParser =
 						other instanceof Parser ? other : other(value)
 					return Either.match(nextParser.run(newState), {
-						onRight: ([b, finalState]) =>
-							Either.right([
-								{
+						onRight: ({ value: b, state: finalState }) =>
+							Either.right({
+								value: {
 									...(value as object),
 									[k]: b,
 								} as Prettify<
@@ -270,8 +277,8 @@ export class Parser<T> {
 										[k in K]: B
 									}
 								>,
-								finalState,
-							] as const),
+								state: finalState,
+							}),
 						onLeft: Either.left,
 					})
 				},
@@ -316,9 +323,8 @@ export class Parser<T> {
 				if (Either.isLeft(result)) {
 					return result
 				}
-				const [remaining, newState] = result.right
-				currentState = newState
-				current = iterator.next(remaining)
+				currentState = result.right.state
+				current = iterator.next(result.right.value)
 			}
 			return Parser.succeed(current.value, currentState)
 		})

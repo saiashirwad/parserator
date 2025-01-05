@@ -1,6 +1,6 @@
 import {
+	Either,
 	Parser,
-	alphabet,
 	char,
 	digit,
 	many0,
@@ -30,16 +30,12 @@ const parseString = char('"')
 		}),
 	)
 
-// const parseString = char('"')
-// 	.then(many0(or(digit, alphabet, char(" "), char("."))))
-// 	.thenDiscard(char('"'))
-// 	.map((s) =>
-// 		expr({
-// 			type: "string",
-// 			value: s.join(""),
-// 		}),
-// 	)
+// const result = whitespace
+// 	.then(betweenChars("(", ")", parseString))
+// 	.parse('("hi there")')
 
-console.log(
-	parseString.parse('"hello there .>>> -- +++ 234" -- " "'),
-)
+// if (Either.isLeft(result)) {
+// 	console.error(result.left.message)
+// } else {
+// 	console.log(result.right)
+// }

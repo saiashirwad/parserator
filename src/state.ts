@@ -19,8 +19,13 @@ export class ParserError {
 	}
 }
 
+type ParserSuccess<T> = {
+	value: T
+	state: ParserState
+}
+
 export type ParserResult<T> = Either<
-	[T, ParserState],
+	ParserSuccess<T>,
 	ParserError
 >
 

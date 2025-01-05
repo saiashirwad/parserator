@@ -23,3 +23,9 @@ export const peekLine = new Parser((s) => {
 	console.log(restOfLine)
 	return Parser.succeed(restOfLine, s)
 })
+
+export const peekUntil = (ch: string) =>
+	new Parser((s) => {
+		const index = s.remaining.indexOf(ch)
+		return Parser.succeed(s.remaining.slice(0, index), s)
+	})

@@ -18,7 +18,7 @@ export function lookAhead<T>(parser: Parser<T>) {
 	return new Parser((state) => {
 		const result = parser.run(state)
 		if (Either.isRight(result)) {
-			return Parser.succeed(result.right[0], state)
+			return Parser.succeed(result.right.value, state)
 		}
 		return Parser.succeed(undefined, state)
 	})
@@ -231,8 +231,8 @@ export function sepBy<S, T>(
 		}
 
 		// Add first item and continue
-		results.push(firstResult.right[0])
-		currentState = firstResult.right[1]
+		results.push(firstResult.right.value)
+		currentState = firstResult.right.state
 
 		// Parse remaining items
 		while (true) {
@@ -241,7 +241,7 @@ export function sepBy<S, T>(
 			if (Either.isLeft(sepResult)) {
 				break
 			}
-			currentState = sepResult.right[1]
+			currentState = sepResult.right.state
 
 			// Try to parse next item
 			const itemResult = parser.run(currentState)
@@ -252,8 +252,8 @@ export function sepBy<S, T>(
 					itemResult.left.state,
 				)
 			}
-			results.push(itemResult.right[0])
-			currentState = itemResult.right[1]
+			results.push(itemResult.right.value)
+			currentState = itemResult.right.state
 		}
 
 		return Parser.succeed(results, currentState)
@@ -287,24 +287,73 @@ export function between<T>(
 		}
 
 		// Parse content
-		const contentResult = parser.run(startResult.right[1])
+		const contentResult = parser.run(
+			startResult.right.state,
+		)
 		if (Either.isLeft(contentResult)) {
 			return contentResult
 		}
 
 		// Parse closing delimiter
-		const endResult = end.run(contentResult.right[1])
+		const endResult = end.run(contentResult.right.state)
 		if (Either.isLeft(endResult)) {
 			return endResult
 		}
 
 		// Return the content and final state
 		return Parser.succeed(
-			contentResult.right[0],
-			endResult.right[1],
+			contentResult.right.value,
+			endResult.right.state,
 		)
 	})
 }
+
+export function anyChar() {
+	return new Parser((state) => {
+		if (State.isAtEnd(state)) {
+			return Parser.error(
+				"Unexpected end of input",
+				[],
+				state,
+			)
+		}
+		return Parser.succeed(
+			state.remaining[0],
+			State.consume(state, 1),
+		)
+	})
+}
+
+// export function betweenChars<T>(
+// 	open: string,
+// 	close: string,
+// 	parser: Parser<T>,
+// ) {
+// 	return new Parser((state) => {
+// 		const startResult = char(open).run(state)
+// 		if (Either.isLeft(startResult)) {
+// 			return startResult
+// 		}
+// 		const newState = startResult.right[1]
+// 	})
+// 	// return Parser.gen(function* () {
+// 	// 	yield* char(open)
+// 	// 	let acc = ""
+// 	// 	const str = string(yield* peekUntil(close)).map(
+// 	// 		(str) => {
+
+// 	// 		}
+// 	// 	)
+// 	// 	// const result = yield* string(str).map(parser)
+// 	// 	// while (true) {
+// 	// 	// 	const next = yield* anyChar()
+// 	// 	// 	if (next === close) {
+// 	// 	// 		// return acc
+// 	// 	// 	}
+// 	// 	// 	acc += next
+// 	// 	// }
+// 	// })
+// }
 
 /**
  * Internal helper function for creating repetition parsers.
@@ -338,7 +387,7 @@ function many_<S, T>(count: number) {
 				}
 
 				// Add the item and update state
-				const [value, newState] = itemResult.right
+				const { value, state: newState } = itemResult.right
 				results.push(value)
 				currentState = newState
 
@@ -348,7 +397,7 @@ function many_<S, T>(count: number) {
 					if (Either.isLeft(sepResult)) {
 						break
 					}
-					currentState = sepResult.right[1]
+					currentState = sepResult.right.state
 				}
 			}
 
@@ -442,7 +491,7 @@ function skipMany_<T>(count: number) {
 					break
 				}
 				successes++
-				currentState = result.right[1]
+				currentState = result.right.state
 			}
 
 			if (successes >= count) {
@@ -503,7 +552,7 @@ export function skipUntil<T>(
 		while (!State.isAtEnd(currentState)) {
 			const result = parser.run(currentState)
 			if (Either.isRight(result)) {
-				return Parser.succeed(undefined, result.right[1])
+				return Parser.succeed(undefined, result.right.state)
 			}
 			currentState = State.consume(currentState, 1)
 		}
@@ -528,7 +577,7 @@ export function takeUntil<T>(
 		while (!State.isAtEnd(currentState)) {
 			const result = parser.run(currentState)
 			if (Either.isRight(result)) {
-				return Parser.succeed(collected, result.right[1])
+				return Parser.succeed(collected, result.right.state)
 			}
 			collected += currentState.remaining[0]
 			currentState = State.consume(currentState, 1)
@@ -658,7 +707,7 @@ export function sequence<Parsers extends Parser<any>[]>(
 			if (Either.isLeft(result)) {
 				return result
 			}
-			const [value, newState] = result.right
+			const { value, state: newState } = result.right
 			results.push(value)
 			currentState = newState
 		}
