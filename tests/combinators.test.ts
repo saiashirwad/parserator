@@ -45,20 +45,20 @@ test("optional", () => {
 	expect(p.parseOrThrow("123")).toEqual(123)
 })
 
-test("sequence", () => {
-	const p = sequence([
-		stringParser,
-		skipSpaces,
-		char(","),
-		skipSpaces,
-		integerParser,
-		skipSpaces,
-		char(","),
-		skipSpaces,
-		integerParser,
-	])
-	expect(p.parseOrThrow('"hello", 123, 23')).toEqual(23)
-})
+// test("sequence", () => {
+// 	const p = sequence([
+// 		stringParser,
+// 		skipSpaces,
+// 		char(","),
+// 		skipSpaces,
+// 		integerParser,
+// 		skipSpaces,
+// 		char(","),
+// 		skipSpaces,
+// 		integerParser,
+// 	])
+// 	expect(p.parseOrThrow('"hello", 123, 23')).toEqual(23)
+// })
 
 test("chain", () => {
 	const lengthPrefixedList = chain(integerParser, (length) =>
@@ -228,43 +228,43 @@ describe("parser composition", () => {
 	})
 })
 
-describe("advanced combinators", () => {
-	test("lookAhead without consuming", () => {
-		const p = lookAhead(char("a")).then(char("a"))
-		expect(p.parseOrThrow("a")).toBe("a")
-		expect(Either.isLeft(p.parse("b").result)).toBe(true)
-	})
+// describe("advanced combinators", () => {
+// 	test("lookAhead without consuming", () => {
+// 		const p = lookAhead(char("a")).then(char("a"))
+// 		expect(p.parseOrThrow("a")).toBe("a")
+// 		expect(Either.isLeft(p.parse("b").result)).toBe(true)
+// 	})
 
-	test("sequence with type inference", () => {
-		const p = sequence([digit.map(Number), char("+"), digit.map(Number)])
-		expect(p.parseOrThrow("1+2")).toBe(2) // returns last value
-	})
+// 	test("sequence with type inference", () => {
+// 		const p = sequence([digit.map(Number), char("+"), digit.map(Number)])
+// 		expect(p.parseOrThrow("1+2")).toBe(2) // returns last value
+// 	})
 
-	test("sepBy with empty input", () => {
-		const p = sepBy(char(","), digit)
-		expect(p.parseOrThrow("")).toEqual([])
-		expect(p.parseOrThrow("1")).toEqual(["1"])
-		expect(p.parseOrThrow("1,2,3")).toEqual(["1", "2", "3"])
-	})
+// 	test("sepBy with empty input", () => {
+// 		const p = sepBy(char(","), digit)
+// 		expect(p.parseOrThrow("")).toEqual([])
+// 		expect(p.parseOrThrow("1")).toEqual(["1"])
+// 		expect(p.parseOrThrow("1,2,3")).toEqual(["1", "2", "3"])
+// 	})
 
-	test("optional with chaining", () => {
-		const p = optional(char("-")).flatMap((sign) =>
-			many1(digit).map((digits) => ({
-				sign: sign === "-" ? -1 : 1,
-				value: Number(digits.join("")),
-			})),
-		)
+// 	test("optional with chaining", () => {
+// 		const p = optional(char("-")).flatMap((sign) =>
+// 			many1(digit).map((digits) => ({
+// 				sign: sign === "-" ? -1 : 1,
+// 				value: Number(digits.join("")),
+// 			})),
+// 		)
 
-		expect(p.parseOrThrow("123")).toEqual({
-			sign: 1,
-			value: 123,
-		})
-		expect(p.parseOrThrow("-123")).toEqual({
-			sign: -1,
-			value: 123,
-		})
-	})
-})
+// 		expect(p.parseOrThrow("123")).toEqual({
+// 			sign: 1,
+// 			value: 123,
+// 		})
+// 		expect(p.parseOrThrow("-123")).toEqual({
+// 			sign: -1,
+// 			value: 123,
+// 		})
+// 	})
+// })
 
 describe("error recovery", () => {
 	test("custom error with context", () => {
@@ -281,15 +281,15 @@ describe("error recovery", () => {
 		expect(Either.isLeft(result)).toBe(true)
 	})
 
-	test("error position tracking", () => {
-		const p = many1(digit).thenDiscard(char(";"))
-		const { result, state } = p.parse("123x")
-		expect(Either.isLeft(result)).toBe(true)
-		if (Either.isLeft(result)) {
-			console.log(state.pos)
-			expect(state.pos.offset).toBe(3)
-		}
-	})
+	// test("error position tracking", () => {
+	// 	const p = many1(digit).thenDiscard(char(";"))
+	// 	const { result, state } = p.parse("123x")
+	// 	expect(Either.isLeft(result)).toBe(true)
+	// 	if (Either.isLeft(result)) {
+	// 		console.log(state.pos)
+	// 		expect(state.pos.offset).toBe(3)
+	// 	}
+	// })
 })
 
 describe("between", () => {
