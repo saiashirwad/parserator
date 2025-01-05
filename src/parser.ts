@@ -254,15 +254,12 @@ export class Parser<T> {
 			while (!current.done) {
 				const { result, state: updatedState } = current.value.run(currentState)
 				if (Either.isLeft(result)) {
-					return { result, state: updatedState }
+					return Parser.fail(result.left, updatedState)
 				}
 				currentState = updatedState
 				current = iterator.next(result.right)
 			}
-			return {
-				result: Either.right(current.value),
-				state: currentState,
-			}
+			return Parser.succeed(current.value, currentState)
 		})
 	}
 
