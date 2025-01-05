@@ -1,8 +1,8 @@
 import type { Either } from "./either"
 import type { Prettify } from "./types"
 
-export type ParserContext<C> = Prettify<
-	C & {
+export type ParserContext<Ctx = {}> = Prettify<
+	Ctx & {
 		debug?: boolean
 		source: string
 	}
@@ -45,7 +45,10 @@ export const State = {
 	 * @param input - The input string to parse
 	 * @returns A new parser state initialized at the start of the input
 	 */
-	fromInput<C = {}>(input: string, context: ParserContext<C>): ParserState<C> {
+	fromInput<Ctx = {}>(
+		input: string,
+		context: ParserContext<Ctx>,
+	): ParserState<Ctx> {
 		return {
 			remaining: input,
 			pos: {
@@ -65,7 +68,7 @@ export const State = {
 	 * @returns A new state with n characters consumed and position updated
 	 * @throws Error if attempting to consume more characters than remaining
 	 */
-	consume<C = {}>(state: ParserState<C>, n: number): ParserState<C> {
+	consume<Ctx = {}>(state: ParserState<Ctx>, n: number): ParserState<Ctx> {
 		if (n === 0) return state
 		if (n > state.remaining.length) {
 			throw new Error("Cannot consume more characters than remaining")
@@ -99,7 +102,10 @@ export const State = {
 	 * @returns A new state with the string consumed and position updated
 	 * @throws Error if the input doesn't start with the specified string
 	 */
-	consumeString<C = {}>(state: ParserState<C>, str: string): ParserState<C> {
+	consumeString<Ctx = {}>(
+		state: ParserState<Ctx>,
+		str: string,
+	): ParserState<Ctx> {
 		if (!state.remaining.startsWith(str)) {
 			throw new Error(
 				`Cannot consume "${str}" - input "${state.remaining}" doesn't start with it`,
@@ -115,10 +121,10 @@ export const State = {
 	 * @param predicate - Function that tests each character
 	 * @returns A new state with matching characters consumed
 	 */
-	consumeWhile<C = {}>(
-		state: ParserState<C>,
+	consumeWhile<Ctx = {}>(
+		state: ParserState<Ctx>,
 		predicate: (char: string) => boolean,
-	): ParserState<C> {
+	): ParserState<Ctx> {
 		let i = 0
 		while (i < state.remaining.length && predicate(state.remaining[i])) {
 			i++
@@ -133,7 +139,7 @@ export const State = {
 	 * @param n - Number of characters to peek (default: 1)
 	 * @returns The next n characters as a string
 	 */
-	peek<C = {}>(state: ParserState<C>, n: number = 1): string {
+	peek<Ctx = {}>(state: ParserState<Ctx>, n: number = 1): string {
 		return state.remaining.slice(0, n)
 	},
 
@@ -143,11 +149,11 @@ export const State = {
 	 * @param state - The current parser state
 	 * @returns True if at end of input, false otherwise
 	 */
-	isAtEnd<C = {}>(state: ParserState<C>): boolean {
+	isAtEnd<Ctx = {}>(state: ParserState<Ctx>): boolean {
 		return state.remaining.length === 0
 	},
 
-	printPosition<C = {}>(state: ParserState<C>): string {
+	printPosition<Ctx = {}>(state: ParserState<Ctx>): string {
 		return `line ${state.pos.line}, column ${state.pos.column}, offset ${state.pos.offset}`
 	},
 }
