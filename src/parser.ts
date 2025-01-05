@@ -263,15 +263,15 @@ export class Parser<T, Ctx = {}> {
 		})
 	}
 
-	trim(parser: Parser<any>) {
+	trim(parser: Parser<any, Ctx>) {
 		return parser.then(this).thenDiscard(parser)
 	}
 
-	trimLeft(parser: Parser<any>): Parser<T> {
+	trimLeft(parser: Parser<any, Ctx>): Parser<T, Ctx> {
 		return parser.then(this)
 	}
 
-	trimRight(parser: Parser<any>): Parser<T> {
+	trimRight(parser: Parser<any, Ctx>): Parser<T, Ctx> {
 		return this.thenDiscard(parser)
 	}
 }
