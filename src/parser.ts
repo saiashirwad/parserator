@@ -94,10 +94,7 @@ export class Parser<T> {
 		if (Either.isLeft(result)) {
 			return Parser.fail(result.left, state)
 		}
-		return {
-			state,
-			result: Either.right(result.right),
-		}
+		return Parser.succeed(result.right, state)
 	}
 
 	withTrace(label: string): Parser<T> {
@@ -129,12 +126,9 @@ export class Parser<T> {
 		return new Parser<B>((state) => {
 			const { result, state: newState } = this.run(state)
 			if (Either.isLeft(result)) {
-				return { state, result: Either.left(result.left) }
+				return Parser.fail(result.left, state)
 			}
-			return {
-				state: newState,
-				result: Either.right(f(result.right)),
-			}
+			return Parser.succeed(f(result.right), newState)
 		})
 	}
 
@@ -142,10 +136,7 @@ export class Parser<T> {
 		return new Parser<B>((state) => {
 			const { result, state: newState } = this.run(state)
 			if (Either.isLeft(result)) {
-				return {
-					state: newState,
-					result: Either.left(result.left),
-				}
+				return Parser.fail(result.left, newState)
 			}
 			const nextParser = f(result.right)
 			return nextParser.run(newState)
@@ -153,10 +144,7 @@ export class Parser<T> {
 	}
 
 	static pure = <A>(a: A): Parser<A> =>
-		new Parser((state) => ({
-			state,
-			result: Either.right(a),
-		}))
+		new Parser((state) => Parser.succeed(a, state))
 
 	static Do = Parser.pure({})
 
@@ -191,22 +179,13 @@ export class Parser<T> {
 		return new Parser((state) => {
 			const { result: a, state: stateA } = this.run(state)
 			if (Either.isLeft(a)) {
-				return {
-					state: stateA,
-					result: Either.left(a.left),
-				}
+				return Parser.fail(a.left, stateA)
 			}
 			const { result: b, state: stateB } = parserB.run(stateA)
 			if (Either.isLeft(b)) {
-				return {
-					state: stateB,
-					result: Either.left(b.left),
-				}
+				return Parser.fail(b.left, stateB)
 			}
-			return {
-				state: stateB,
-				result: Either.right([a.right, b.right]),
-			}
+			return Parser.succeed([a.right, b.right], stateB)
 		})
 	}
 
