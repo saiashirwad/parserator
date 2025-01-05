@@ -239,9 +239,13 @@ export class Parser<T> {
 		return this.zip(parserB).map(([_, b]) => b)
 	}
 
+	zipRight = this.then
+
 	thenDiscard<B>(parserB: Parser<B>): Parser<T> {
 		return this.zip(parserB).map(([a, _]) => a)
 	}
+
+	zipLeft = this.thenDiscard
 
 	bind<K extends string, B>(
 		k: K,

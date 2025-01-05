@@ -756,3 +756,20 @@ export function zip<A, B>(
 ): Parser<[A, B]> {
 	return parserA.zip(parserB)
 }
+
+export function then<A, B>(
+	parserA: Parser<A>,
+	parserB: Parser<B>,
+): Parser<B> {
+	return parserA.then(parserB)
+}
+
+export const zipRight = then
+
+export function thenDiscard<A, B>(
+	parserA: Parser<A>,
+	parserB: Parser<B>,
+): Parser<A> {
+	return parserA.thenDiscard(parserB)
+}
+export const zipLeft = thenDiscard
