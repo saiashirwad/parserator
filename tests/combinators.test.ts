@@ -56,29 +56,8 @@ test("sequence", () => {
 		skipSpaces,
 		integerParser,
 	])
-	console.log(p.parseOrError('"hello", 123, 23'))
-	// expect(p.parseOrThrow('"hello", 123, 23')).toEqual(23)
+	expect(p.parseOrThrow('"hello", 123, 23')).toEqual(23)
 })
-
-// test("chain", () => {
-// 	const lengthPrefixedList = chain(integerParser, (length) =>
-// 		skipSpaces
-// 			.then(char("["))
-// 			.then(manyN(stringParser, length, char(",")))
-// 			.thenDiscard(char("]"))
-// 			.map((items) => ({ items, length })),
-// 	)
-// 	const p = Parser.gen(function* () {
-// 		const s = yield* lengthPrefixedList
-// 		if (s.length !== s.items.length) {
-// 			return yield* Parser.error("Length mismatch")
-// 		}
-// 		return s.items
-// 	})
-
-// 	expect(p.parseOrError('2 ["foo", "bar"]')).toEqual(["foo", "bar"])
-// 	expect(Either.isLeft(p.parse('2 ["foo"]').result)).toEqual(true)
-// })
 
 describe("regex", () => {
 	test("should match at the start of the input", () => {
