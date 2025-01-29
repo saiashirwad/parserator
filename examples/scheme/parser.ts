@@ -48,7 +48,7 @@ const boolean = parser(function* () {
 	return LispExpr.bool(val === "#t")
 })
 
-const listParser = parser(function* () {
+const list = parser(function* () {
 	yield* char("(")
 	yield* optionalWhitespace
 
@@ -62,9 +62,9 @@ const listParser = parser(function* () {
 	return items
 })
 
-const lispList = listParser.map(LispExpr.list)
+const listParser = list.map(LispExpr.list)
 
-const letParser = listParser.flatMap((list) =>
+const letParser = list.flatMap((list) =>
 	parser(function* () {
 		if (list.length !== 3) {
 			return yield* Parser.error("Invalid let expression")
@@ -108,7 +108,7 @@ expr = Parser.lazy(() =>
 	parser(function* () {
 		yield* optionalWhitespace
 		// yield* peekRemaining
-		const result = yield* or(atom, letParser, lispList).withError(
+		const result = yield* or(atom, letParser, listParser).withError(
 			({ error, state }) => {
 				return `Expected an atom or list at ${State.printPosition(state)}`
 			},
