@@ -48,6 +48,8 @@ const boolean = parser(function* () {
 	return LispExpr.bool(val === "#t")
 })
 
+const atom = or(boolean, number, stringLiteral, symbol)
+
 const list = parser(function* () {
 	yield* char("(")
 	yield* optionalWhitespace
@@ -97,8 +99,6 @@ const letParser = (bindingsExpr: LispExpr.List, bodyExpr: LispExpr.LispExpr) =>
 
 		return LispExpr.let(bindings, bodyExpr)
 	})
-
-const atom = or(boolean, number, stringLiteral, symbol)
 
 const listParser = list.flatMap((list) =>
 	parser(function* () {
