@@ -69,8 +69,36 @@ const letParser = listParser.flatMap((list) =>
 		if (list.length !== 3) {
 			return yield* Parser.error("Invalid let expression")
 		}
+		const [first, bindingsExpr, bodyExpr] = list
 
-		let bindings: LispExpr.Let["bindings"] = []
+		if (!(first.type === "Symbol" && first.name === "let")) {
+			return yield* Parser.error("Invalid let expression")
+		}
+
+		if (!(bindingsExpr.type === "List" && bindingsExpr.items)) {
+			return yield* Parser.error("Invalid bindings for let expression")
+		}
+
+		const bindings: LispExpr.Let["bindings"] = []
+		for (const item of bindingsExpr.items) {
+			if (!(item.type === "List" && item.items.length === 2)) {
+				return yield* Parser.error("Invalid let expression")
+			}
+			const [keyExpr, valExpr] = item.items
+			if (keyExpr.type !== "Symbol") {
+				return yield* Parser.error("Invalid let expression")
+			}
+			if (!("value" in valExpr)) {
+				return yield* Parser.error("Invalid let expression")
+			}
+
+			bindings.push({
+				name: keyExpr.name,
+				value: valExpr,
+			})
+		}
+
+		return LispExpr.let(bindings, bodyExpr)
 	}),
 )
 
@@ -80,95 +108,14 @@ expr = Parser.lazy(() =>
 	parser(function* () {
 		yield* optionalWhitespace
 		// yield* peekRemaining
-		const result = yield* or(atom, lispList).withError(({ error, state }) => {
-			return `Expected an atom or list at ${State.printPosition(state)}`
-		})
+		const result = yield* or(atom, letParser, lispList).withError(
+			({ error, state }) => {
+				return `Expected an atom or list at ${State.printPosition(state)}`
+			},
+		)
 		yield* optionalWhitespace
 		return result
 	}),
 )
 
 export const lispParser = many0(whitespace.then(expr).thenDiscard(whitespace))
-
-// while (true) {
-// 	const next = yield* lookAhead(char("("))
-// 	if (next !== "(") break
-// 	yield* char("(")
-// 	yield* optionalWhitespace
-// 	const name = yield* symbol
-// 	yield* optionalWhitespace
-// 	const value = yield* expr
-// 	yield* optionalWhitespace
-// 	yield* char(")")
-// 	yield* optionalWhitespace
-
-// 	if (name.type !== "Symbol") {
-// 		return yield* Parser.error(
-// 			"Let binding name must be a symbol",
-// 		)
-// 	}
-// 	bindings.push({ name: name.name, value })
-// 	yield* peekRemaining
-// }
-
-// if (items[0].type === "Symbol") {
-// 	// Let expression
-// 	if (items[0].name === "let") {
-// 		if (items.length !== 3) {
-// 			return yield* Parser.error("Invalid let expression")
-// 		}
-// 		let bindings: LispExpr.Let["bindings"] = []
-// 		if (items[1].type !== "List") {
-// 			return yield* Parser.error(
-// 				"Expected a list of bindings in let expression, but got " +
-// 					items[1].type,
-// 			)
-// 		}
-// 		const bindExpressions = items[1].items
-// 		for (const bindExpression of bindExpressions) {
-// 			if (bindExpression.type === "List") {
-// 				const bind = bindExpression.items[0]
-// 				const value = bindExpression.items[1]
-// 				bindings.push({
-// 					name: (bind as any).name,
-// 					value: value as any,
-// 				})
-// 			}
-// 		}
-// 		const body = items[2]
-// 		return LispExpr.let(bindings, body)
-// 	}
-
-// 	// If expression
-// 	if (items[0].name === "if") {
-// 		if (items.length !== 4) {
-// 			return yield* Parser.error("Invalid if expression")
-// 		}
-// 		return LispExpr.if(items[1], items[2], items[3])
-// 	}
-
-// 	// Lambda expression
-// 	if (items[0].name === "lambda") {
-// 		if (items.length !== 3) {
-// 			return yield* Parser.error(
-// 				"Invalid lambda expression",
-// 			)
-// 		}
-// 		const params = items[1]
-// 		if (params.type !== "List") {
-// 			return yield* Parser.error(
-// 				"Lambda params must be a list",
-// 			)
-// 		}
-// 		const paramNames: string[] = []
-// 		for (const p of params.items) {
-// 			if (p.type !== "Symbol") {
-// 				return yield* Parser.error(
-// 					"Lambda params must be symbols",
-// 				)
-// 			}
-// 			paramNames.push(p.name)
-// 		}
-// 		return LispExpr.lambda(paramNames, items[2])
-// 	}
-// }
