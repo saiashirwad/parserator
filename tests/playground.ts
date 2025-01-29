@@ -30,7 +30,6 @@ const something = parser(function* () {
 
 const result = something.parseOrError("h\n\n.hasdf")
 if (result instanceof ParserError) {
-	console.log(result)
 	console.error(result.message)
 } else {
 }

@@ -50,7 +50,11 @@ export function notFollowedBy<T, Ctx = {}>(
 				return Parser.fail({ message, expected: [] }, newState)
 			}
 			return Parser.fail(
-				{ message: "Expected not to follow", expected: [] },
+				{
+					message: "Expected not to follow",
+					expected: [],
+					found: state.remaining.at(0),
+				},
 				newState,
 			)
 		}
@@ -80,7 +84,14 @@ export const string = <Ctx = {}>(str: string): Parser<string, Ctx> =>
 				`Expected '${str}', ` +
 				`but found '${state.remaining.slice(0, str.length)}'`
 
-			return Parser.fail({ message, expected: [str] }, state)
+			return Parser.fail(
+				{
+					message,
+					expected: [str],
+					found: state.remaining.slice(0, str.length),
+				},
+				state,
+			)
 		},
 		{ name: str },
 	)
@@ -128,7 +139,10 @@ export const char = <T extends string, Ctx = {}>(ch: T): Parser<T, Ctx> => {
 			}
 
 			const message = `Expected ${ch} but found ${state.remaining.at(0)}.`
-			return Parser.fail({ message, expected: [ch] }, state)
+			return Parser.fail(
+				{ message, expected: [ch], found: state.remaining.at(0) },
+				state,
+			)
 		},
 		{ name: ch },
 	)
@@ -156,7 +170,10 @@ export const alphabet = new Parser(
 			return Parser.succeed(first, State.consume(state, 1))
 		}
 		const message = `Expected alphabetic character, but got '${first}'`
-		return Parser.fail({ message, expected: [] }, state)
+		return Parser.fail(
+			{ message, expected: [], found: state.remaining[0] },
+			state,
+		)
 	},
 	{ name: "alphabet" },
 )
@@ -183,7 +200,10 @@ export const digit = new Parser(
 			return Parser.succeed(first, State.consume(state, 1))
 		}
 		const message = `Expected digit, but got '${first}'`
-		return Parser.fail({ message, expected: [] }, state)
+		return Parser.fail(
+			{ message, expected: [], found: state.remaining[0] },
+			state,
+		)
 	},
 	{ name: "digit" },
 )

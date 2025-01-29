@@ -14,6 +14,7 @@ export class ParserError {
 	constructor(
 		public message: string,
 		public expected: string[],
+		public found?: string,
 	) {}
 }
 

@@ -45,6 +45,7 @@ export class Parser<T, Ctx = {}> {
 		error: {
 			message: string
 			expected?: string[]
+			found?: string
 		},
 		state: ParserState<Ctx>,
 	): ParserOutput<never, Ctx> {
@@ -54,7 +55,9 @@ export class Parser<T, Ctx = {}> {
 
 		return {
 			state,
-			result: Either.left(new ParserError(errorMessage, error.expected ?? [])),
+			result: Either.left(
+				new ParserError(errorMessage, error.expected ?? [], error.found),
+			),
 		}
 	}
 
