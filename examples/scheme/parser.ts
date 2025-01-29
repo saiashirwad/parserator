@@ -68,6 +68,23 @@ const list = parser(function* () {
 	return items
 })
 
+const listParser = list.flatMap((list) =>
+	parser(function* () {
+		if (list.length === 3) {
+			const [first, paramsExpr, bodyExpr] = list
+			if (first.type === "Symbol" && paramsExpr.type === "List") {
+				if (first.name === "lambda") {
+					return yield* lambdaParser(paramsExpr, bodyExpr)
+				}
+				if (first.name === "let") {
+					return yield* letParser(paramsExpr, bodyExpr)
+				}
+			}
+		}
+		return LispExpr.list(list)
+	}),
+)
+
 const lambdaParser = (paramsExpr: LispExpr.List, bodyExpr: LispExpr.LispExpr) =>
 	parser(function* () {
 		const params: string[] = []
@@ -103,23 +120,6 @@ const letParser = (bindingsExpr: LispExpr.List, bodyExpr: LispExpr.LispExpr) =>
 
 		return LispExpr.let(bindings, bodyExpr)
 	})
-
-const listParser = list.flatMap((list) =>
-	parser(function* () {
-		if (list.length === 3) {
-			const [first, paramsExpr, bodyExpr] = list
-			if (first.type === "Symbol" && paramsExpr.type === "List") {
-				if (first.name === "lambda") {
-					return yield* lambdaParser(paramsExpr, bodyExpr)
-				}
-				if (first.name === "let") {
-					return yield* letParser(paramsExpr, bodyExpr)
-				}
-			}
-		}
-		return LispExpr.list(list)
-	}),
-)
 
 expr = Parser.lazy(() =>
 	parser(function* () {

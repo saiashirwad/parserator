@@ -1,7 +1,7 @@
 import { ParserError } from "../../src"
 import { lispParser } from "./parser"
 
-const program = `(+ 5 (+ 3 5)`
+const program = `(+ 5 (+ 3 5))`
 
 const result = lispParser.parseOrError(program)
 if (result instanceof ParserError) {
