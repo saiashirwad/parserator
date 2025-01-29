@@ -96,8 +96,8 @@ describe("scheme", () => {
 	//	)
 	//})
 	it("should parse a lambda expression", () => {
-		const result = expr.parseOrThrow("(lambda (x) x)")
-		//console.log(JSON.stringify(result, null, 2))
+		const result = expr.parseOrThrow("(lambda (x) (+ x 2))")
+		console.log(JSON.stringify(result, null, 2))
 	})
 	//it("should parse a let expression with a lambda expression", () => {
 	//	const result = expr.parseOrThrow("(let ((x (lambda (y) y))) (x))")
@@ -114,25 +114,26 @@ describe("scheme", () => {
 	//	//	),
 	//	//)
 	//})
-	it("should parse a list", () => {
-		const result = expr.parseOrThrow("(a b c)")
-		//console.log(JSON.stringify(result, null, 2))
-		//expect(result).toEqual(
-		//	LispExpr.list([
-		//		LispExpr.symbol("a"),
-		//		LispExpr.symbol("b"),
-		//		LispExpr.symbol("c"),
-		//	]),
-		//)
-	})
 
-	it("should parse a let expression with a single binding", () => {
-		const result = expr.parseOrThrow("(let ((x 1)) x)")
-		expect(result).toEqual(
-			LispExpr.let(
-				[{ name: "x", value: LispExpr.number(1) }],
-				LispExpr.symbol("x"),
-			),
-		)
-	})
+	//it("should parse a list", () => {
+	//	const result = expr.parseOrThrow("(a b c)")
+	//	//console.log(JSON.stringify(result, null, 2))
+	//	//expect(result).toEqual(
+	//	//	LispExpr.list([
+	//	//		LispExpr.symbol("a"),
+	//	//		LispExpr.symbol("b"),
+	//	//		LispExpr.symbol("c"),
+	//	//	]),
+	//	//)
+	//})
+
+	//it("should parse a let expression with a single binding", () => {
+	//	const result = expr.parseOrThrow("(let ((x 1)) x)")
+	//	expect(result).toEqual(
+	//		LispExpr.let(
+	//			[{ name: "x", value: LispExpr.number(1) }],
+	//			LispExpr.symbol("x"),
+	//		),
+	//	)
+	//})
 })

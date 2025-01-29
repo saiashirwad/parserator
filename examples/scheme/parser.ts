@@ -12,6 +12,7 @@ import {
 	string,
 	takeUpto,
 } from "../../src"
+import { peekRemaining } from "../../src/utils"
 import { LispExpr } from "./ast"
 
 const whitespace = skipMany0(or(char(" "), char("\n"), char("\t")))
@@ -64,6 +65,35 @@ const list = parser(function* () {
 
 const listParser = list.map(LispExpr.list)
 
+const lambdaParser = list.flatMap((list) =>
+	parser(function* () {
+		if (list.length !== 3) {
+			return yield* Parser.error("Invalid lambda expression")
+		}
+		const [first, paramsExpr, bodyExpr] = list
+
+		if (!(first.type === "Symbol" && first.name === "lambda")) {
+			return yield* Parser.error("Invalid lambda expression")
+		}
+
+		if (!(paramsExpr.type === "List" && paramsExpr.items)) {
+			return yield* Parser.error("Invalid params for lambda expression")
+		}
+
+		const params: string[] = []
+		for (const item of paramsExpr.items) {
+			if (item.type !== "Symbol") {
+				return yield* Parser.error(
+					"Invalid param definition for lambda expression",
+				)
+			}
+			params.push(item.name)
+		}
+
+		return LispExpr.lambda(params, bodyExpr)
+	}),
+)
+
 const letParser = list.flatMap((list) =>
 	parser(function* () {
 		if (list.length !== 3) {
@@ -107,12 +137,14 @@ const atom = or(boolean, number, stringLiteral, symbol)
 expr = Parser.lazy(() =>
 	parser(function* () {
 		yield* optionalWhitespace
-		// yield* peekRemaining
-		const result = yield* or(atom, letParser, listParser).withError(
-			({ error, state }) => {
-				return `Expected an atom or list at ${State.printPosition(state)}`
-			},
-		)
+		const result = yield* or(
+			atom,
+			lambdaParser,
+			letParser,
+			listParser,
+		).withError(({ error, state }) => {
+			return `Expected an atom or list at ${State.printPosition(state)}`
+		})
 		yield* optionalWhitespace
 		return result
 	}),
