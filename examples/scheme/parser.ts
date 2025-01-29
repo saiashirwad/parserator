@@ -115,8 +115,8 @@ const atom = or(boolean, number, stringLiteral, symbol)
 const listParser = list.flatMap((list) =>
 	parser(function* () {
 		if (list.length === 3) {
-			const first = list[0]
-			if (first.type === "Symbol") {
+			const [first, bindingsOrParamsExpr, bodyExpr] = list
+			if (first.type === "Symbol" && bindingsOrParamsExpr.type === "List") {
 				if (first.name === "lambda") {
 					return yield* lambdaParser(list)
 				}
