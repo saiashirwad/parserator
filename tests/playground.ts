@@ -9,16 +9,17 @@ import {
 	parser,
 } from "../src"
 
-const whitespace = many0(or(char(" "), char("\n")))
+const whitespace = or(char(" "), char("\n"))
 
 const something = parser(function* () {
 	yield* char("h")
-	yield* whitespace
+	yield* whitespace.withError(() => "hi")
+	yield* whitespace.withError(() => "hi")
+	yield* whitespace.withError(() => "hi")
 	const something = yield* optional(char("."))
 	if (something) {
-		return yield* Parser.error("I did not expect a '.' there :(", [], (state) =>
-			State.move(state, -1),
-		)
+		const message = "I did not expect a '.' there :("
+		return yield* Parser.error(message, [], (state) => State.move(state, -1))
 	}
 	yield* char("i")
 	yield* whitespace
@@ -28,8 +29,6 @@ const something = parser(function* () {
 
 const result = something.parseOrError("h\n\n\n.hasdf")
 if (result instanceof ParserError) {
-	console.log(result)
 	console.error(result.message)
 } else {
-	console.log(result)
 }

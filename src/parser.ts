@@ -48,7 +48,7 @@ export class Parser<T, Ctx = {}> {
 		},
 		state: ParserState<Ctx>,
 	): ParserOutput<never, Ctx> {
-		const errorMessage = error.message.includes("Parser Error:")
+		const errorMessage = error.message.startsWith("Parser Error:")
 			? error.message
 			: printErrorContext(state, error.message)
 
@@ -141,6 +141,7 @@ export class Parser<T, Ctx = {}> {
 				source: input,
 			},
 		)
+
 		if (Either.isLeft(result)) {
 			throw new Error(result.left.message)
 		}

@@ -9,13 +9,10 @@ export function printArrow(position: SourcePosition) {
 	return " ".repeat(lineNumberDigits + 3 + position.column - 1) + "^"
 }
 
-let count = 0
-
 export function printErrorContext<Ctx = {}>(
 	state: ParserState<Ctx>,
 	message?: string,
 ) {
-	console.log("printErrorContext", count++)
 	return (
 		"Parser Error:\n" +
 		printErrorLine(state) +
