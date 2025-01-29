@@ -1,9 +1,19 @@
-import { ParserError, char, string } from "../src"
+import { Parser, char } from "../src"
 
-const lol = string("abc")
-const result = lol.parseOrError(".abc")
+const lol = Parser.gen(function* () {
+	const a = yield* char("h")
+	return { a }
+})
 
-if (result instanceof ParserError) {
-	console.log(result.pos)
-	console.error(result.message)
-}
+// const lolol = Parser.gen(function* () {
+// 	const b = yield* char("y")
+// 	return { b }
+// })
+
+// const result = or(lol, lolol).map((s) => {
+// 	if ("a" in s) {
+// 		return s
+// 	} else {
+// 		return s.b
+// 	}
+// })

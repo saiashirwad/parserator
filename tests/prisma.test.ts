@@ -34,8 +34,6 @@ const expression = Parser.gen(function* () {
 
 const result = expression.parseOrError(`
 
-
-
 _hi -= 2234`)
 
 if (result instanceof ParserError) {

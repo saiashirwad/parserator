@@ -16,10 +16,13 @@ export const peekAhead = (n: number) =>
 	})
 
 export const peekLine = new Parser((s) => {
-	const restOfLine = s.remaining.slice(
-		0,
-		s.remaining.indexOf("\n"),
-	)
+	const restOfLine = s.remaining.slice(0, s.remaining.indexOf("\n"))
 	console.log(restOfLine)
 	return Parser.succeed(restOfLine, s)
 })
+
+export const peekUntil = (ch: string) =>
+	new Parser((s) => {
+		const index = s.remaining.indexOf(ch)
+		return Parser.succeed(s.remaining.slice(0, index), s)
+	})
