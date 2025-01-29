@@ -62,18 +62,9 @@ const list = parser(function* () {
 	return items
 })
 
-const listParser = list.map(LispExpr.list)
-
-const lambdaParser = list.flatMap((list) =>
+const lambdaParser = (list: LispExpr.LispExpr[]) =>
 	parser(function* () {
-		if (list.length !== 3) {
-			return yield* Parser.error("Invalid lambda expression")
-		}
-		const [first, paramsExpr, bodyExpr] = list
-
-		if (!(first.type === "Symbol" && first.name === "lambda")) {
-			return yield* Parser.error("Invalid lambda expression")
-		}
+		const [_, paramsExpr, bodyExpr] = list
 
 		if (!(paramsExpr.type === "List" && paramsExpr.items)) {
 			return yield* Parser.error("Invalid params for lambda expression")
@@ -90,19 +81,11 @@ const lambdaParser = list.flatMap((list) =>
 		}
 
 		return LispExpr.lambda(params, bodyExpr)
-	}),
-)
+	})
 
-const letParser = list.flatMap((list) =>
+const letParser = (list: LispExpr.LispExpr[]) =>
 	parser(function* () {
-		if (list.length !== 3) {
-			return yield* Parser.error("Invalid let expression")
-		}
-		const [first, bindingsExpr, bodyExpr] = list
-
-		if (!(first.type === "Symbol" && first.name === "let")) {
-			return yield* Parser.error("Invalid let expression")
-		}
+		const [_, bindingsExpr, bodyExpr] = list
 
 		if (!(bindingsExpr.type === "List" && bindingsExpr.items)) {
 			return yield* Parser.error("Invalid bindings for let expression")
@@ -125,20 +108,31 @@ const letParser = list.flatMap((list) =>
 		}
 
 		return LispExpr.let(bindings, bodyExpr)
-	}),
-)
+	})
 
 const atom = or(boolean, number, stringLiteral, symbol)
+
+const listParser = list.flatMap((list) =>
+	parser(function* () {
+		if (list.length === 3) {
+			const first = list[0]
+			if (first.type === "Symbol") {
+				if (first.name === "lambda") {
+					return yield* lambdaParser(list)
+				}
+				if (first.name === "let") {
+					return yield* letParser(list)
+				}
+			}
+		}
+		return LispExpr.list(list)
+	}),
+)
 
 expr = Parser.lazy(() =>
 	parser(function* () {
 		yield* optionalWhitespace
-		const result = yield* or(
-			atom,
-			lambdaParser,
-			letParser,
-			listParser,
-		).withError(({ error, state }) => {
+		const result = yield* or(atom, listParser).withError(({ error, state }) => {
 			return `Expected an atom or list at ${State.printPosition(state)}`
 		})
 		yield* optionalWhitespace
