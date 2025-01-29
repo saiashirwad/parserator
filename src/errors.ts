@@ -13,22 +13,31 @@ export function printErrorContext<Ctx = {}>(
 	state: ParserState<Ctx>,
 	message?: string,
 ) {
+	console.log(state)
 	return (
 		"Parser Error:\n" +
-		printLastNLines(state, 3) +
+		printErrorLine(state) +
 		"\n" +
 		printArrow(state.pos) +
 		`${message ? `\n${message}` : ""}`
 	)
 }
 
-export function printLastNLines<Ctx = {}>(state: ParserState<Ctx>, n: number) {
-	const lines = state.context.source.split("\n").slice(-n)
-	const withNumbers = lines.map((line, i) => {
-		const lineNumber = state.context.source.split("\n").length - n + i + 1
-		return `${lineNumber} | ${line}`
-	})
-	return withNumbers.join("\n")
+export function printErrorLine<Ctx = {}>(state: ParserState<Ctx>) {
+	const lines = state.context.source.split("\n")
+	const lineNum = state.pos.line
+	const startLine = Math.max(0, lineNum - 1)
+	const endLine = lineNum
+	const relevantLines = lines.slice(startLine, endLine + 1)
+	const padding = lineNum.toString().length
+
+	return relevantLines
+		.map((line, i) => {
+			const num = startLine + i + 1
+			const paddedNum = num.toString().padStart(padding, " ")
+			return `${paddedNum} | ${line}`
+		})
+		.join("\n")
 }
 
 export function printPositionWithOffset(position: SourcePosition) {

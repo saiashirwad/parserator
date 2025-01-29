@@ -26,7 +26,7 @@ export class Parser<T, Ctx = {}> {
 		public options?: ParserOptions,
 	) {}
 
-	withName(name: string) {
+	name(name: string) {
 		this.options = { ...this.options, name }
 		return this
 	}
@@ -48,6 +48,7 @@ export class Parser<T, Ctx = {}> {
 		},
 		state: ParserState<Ctx>,
 	): ParserOutput<never, Ctx> {
+		// console.log(error)
 		const errorMessage = error.message.includes("Parser Error:")
 			? error.message
 			: printErrorContext(state, error.message)
@@ -297,4 +298,23 @@ export class Parser<T, Ctx = {}> {
 	trimRight(parser: Parser<any, Ctx>): Parser<T, Ctx> {
 		return this.thenDiscard(parser)
 	}
+}
+
+export function parser<T, Ctx = unknown>(
+	f: () => Generator<Parser<any, Ctx>, T, any>,
+): Parser<T, Ctx> {
+	return new Parser<T, Ctx>((state) => {
+		const iterator = f()
+		let current = iterator.next()
+		let currentState: ParserState<Ctx> = state
+		while (!current.done) {
+			const { result, state: updatedState } = current.value.run(currentState)
+			if (Either.isLeft(result)) {
+				return Parser.fail(result.left, updatedState)
+			}
+			currentState = updatedState
+			current = iterator.next(result.right)
+		}
+		return Parser.succeed(current.value, currentState)
+	})
 }

@@ -34,7 +34,6 @@ export type ParserState<Ctx = {}> = {
 	context: ParserContext<Ctx>
 }
 
-// Add static methods to help create and manipulate parser state
 /**
  * Utility object containing static methods for creating and manipulating parser state.
  */
