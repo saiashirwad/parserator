@@ -1,4 +1,3 @@
-import exp from "node:constants"
 import { Either } from "./either"
 import { Parser } from "./parser"
 import { type ParserState, State } from "./state"
@@ -704,3 +703,27 @@ export function thenDiscard<A, B>(
 	return parserA.thenDiscard(parserB)
 }
 export const zipLeft = thenDiscard
+
+/**
+ * Creates a parser that takes input until the given parser would succeed, without consuming the parser.
+ *
+ * @param parser - The parser to look for
+ * @returns A parser that takes input until before a match would be found
+ */
+export function takeUpto<T>(parser: Parser<T>): Parser<string> {
+	return new Parser((state) => {
+		let currentState = state
+		let collected = ""
+
+		while (!State.isAtEnd(currentState)) {
+			const { result } = parser.run(currentState)
+			if (Either.isRight(result)) {
+				return Parser.succeed(collected, currentState)
+			}
+			collected += currentState.remaining[0]
+			currentState = State.consume(currentState, 1)
+		}
+
+		return Parser.succeed(collected, currentState)
+	})
+}
