@@ -12,6 +12,7 @@ import {
 	string,
 	takeUpto,
 } from "../../src"
+import { peekAhead, peekState } from "../../src/utils"
 import { LispExpr } from "./ast"
 
 const whitespace = skipMany0(or(char(" "), char("\n"), char("\t")))
@@ -48,7 +49,10 @@ const boolean = parser(function* () {
 	return LispExpr.bool(val === "#t")
 })
 
-const atom = or(boolean, number, stringLiteral, symbol)
+const atom = parser(function* () {
+	const atom = yield* or(boolean, number, stringLiteral, symbol)
+	return atom
+})
 
 const list = parser(function* () {
 	yield* char("(")
@@ -60,7 +64,7 @@ const list = parser(function* () {
 	}
 
 	yield* optionalWhitespace
-	yield* char(")")
+	yield* char(")").withError(() => "list should be closed")
 	return items
 })
 
@@ -120,12 +124,14 @@ const listParser = list.flatMap((list) =>
 expr = Parser.lazy(() =>
 	parser(function* () {
 		yield* optionalWhitespace
-		const result = yield* or(atom, listParser).withError(({ error, state }) => {
-			return `Expected an atom or list at ${State.printPosition(state)}`
-		})
+		const state = yield* peekState
+		const isList = yield* peekAhead(1).map((x) => x === "(")
+		const result = yield* isList ? listParser : atom
 		yield* optionalWhitespace
 		return result
 	}),
 )
 
-export const lispParser = many0(whitespace.then(expr).thenDiscard(whitespace))
+//export const lispParser = many0(whitespace.then(expr).thenDiscard(whitespace))
+
+export const lispParser = expr

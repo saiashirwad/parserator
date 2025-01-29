@@ -1,8 +1,7 @@
 import { Parser } from "./parser"
 
 export const peekState = new Parser((s) => {
-	console.log(s)
-	return Parser.succeed(undefined, s)
+	return Parser.succeed(s, s)
 })
 
 export const peekRemaining = new Parser((s) => {
