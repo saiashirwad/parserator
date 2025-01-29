@@ -62,14 +62,8 @@ const list = parser(function* () {
 	return items
 })
 
-const lambdaParser = (list: LispExpr.LispExpr[]) =>
+const lambdaParser = (paramsExpr: LispExpr.List, bodyExpr: LispExpr.LispExpr) =>
 	parser(function* () {
-		const [_, paramsExpr, bodyExpr] = list
-
-		if (!(paramsExpr.type === "List" && paramsExpr.items)) {
-			return yield* Parser.error("Invalid params for lambda expression")
-		}
-
 		const params: string[] = []
 		for (const item of paramsExpr.items) {
 			if (item.type !== "Symbol") {
@@ -83,14 +77,8 @@ const lambdaParser = (list: LispExpr.LispExpr[]) =>
 		return LispExpr.lambda(params, bodyExpr)
 	})
 
-const letParser = (list: LispExpr.LispExpr[]) =>
+const letParser = (bindingsExpr: LispExpr.List, bodyExpr: LispExpr.LispExpr) =>
 	parser(function* () {
-		const [_, bindingsExpr, bodyExpr] = list
-
-		if (!(bindingsExpr.type === "List" && bindingsExpr.items)) {
-			return yield* Parser.error("Invalid bindings for let expression")
-		}
-
 		const bindings: LispExpr.Let["bindings"] = []
 		for (const item of bindingsExpr.items) {
 			if (!(item.type === "List" && item.items.length === 2)) {
@@ -118,10 +106,10 @@ const listParser = list.flatMap((list) =>
 			const [first, bindingsOrParamsExpr, bodyExpr] = list
 			if (first.type === "Symbol" && bindingsOrParamsExpr.type === "List") {
 				if (first.name === "lambda") {
-					return yield* lambdaParser(list)
+					return yield* lambdaParser(bindingsOrParamsExpr, bodyExpr)
 				}
 				if (first.name === "let") {
-					return yield* letParser(list)
+					return yield* letParser(bindingsOrParamsExpr, bodyExpr)
 				}
 			}
 		}
