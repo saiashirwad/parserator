@@ -79,25 +79,36 @@ describe("scheme", () => {
 	//		),
 	//	)
 	//})
-	//it("should parse a let expression with a nested let expression", () => {
-	//	const result = expr.parseOrThrow("(let ((x 1)) (let ((y 2)) (+ x y)))")
-	//	expect(result).toEqual(
-	//		LispExpr.let(
-	//			[{ name: "x", value: LispExpr.number(1) }],
-	//			LispExpr.let(
-	//				[{ name: "y", value: LispExpr.number(2) }],
-	//				LispExpr.list([
-	//					LispExpr.symbol("+"),
-	//					LispExpr.symbol("x"),
-	//					LispExpr.symbol("y"),
-	//				]),
-	//			),
-	//		),
-	//	)
-	//})
+
+	it("should parse a let expression with a nested let expression", () => {
+		const result = expr.parseOrThrow("(let ((x 1)) (let ((y 2)) (+ x y)))")
+		expect(result).toEqual(
+			LispExpr.let(
+				[{ name: "x", value: LispExpr.number(1) }],
+				LispExpr.let(
+					[{ name: "y", value: LispExpr.number(2) }],
+					LispExpr.list([
+						LispExpr.symbol("+"),
+						LispExpr.symbol("x"),
+						LispExpr.symbol("y"),
+					]),
+				),
+			),
+		)
+	})
 
 	it("should parse a lambda expression", () => {
 		const result = expr.parseOrThrow("(lambda (x) (+ x 2))")
+		expect(result).toEqual(
+			LispExpr.lambda(
+				["x"],
+				LispExpr.list([
+					LispExpr.symbol("+"),
+					LispExpr.symbol("x"),
+					LispExpr.number(2),
+				]),
+			),
+		)
 	})
 
 	it("should parse a let expression with a lambda expression", () => {
