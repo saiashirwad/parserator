@@ -103,13 +103,13 @@ const letParser = (bindingsExpr: LispExpr.List, bodyExpr: LispExpr.LispExpr) =>
 const listParser = list.flatMap((list) =>
 	parser(function* () {
 		if (list.length === 3) {
-			const [first, bindingsOrParamsExpr, bodyExpr] = list
-			if (first.type === "Symbol" && bindingsOrParamsExpr.type === "List") {
+			const [first, paramsExpr, bodyExpr] = list
+			if (first.type === "Symbol" && paramsExpr.type === "List") {
 				if (first.name === "lambda") {
-					return yield* lambdaParser(bindingsOrParamsExpr, bodyExpr)
+					return yield* lambdaParser(paramsExpr, bodyExpr)
 				}
 				if (first.name === "let") {
-					return yield* letParser(bindingsOrParamsExpr, bodyExpr)
+					return yield* letParser(paramsExpr, bodyExpr)
 				}
 			}
 		}
