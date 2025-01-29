@@ -12,7 +12,6 @@ import {
 	string,
 	takeUpto,
 } from "../../src"
-import { peekRemaining } from "../../src/utils"
 import { LispExpr } from "./ast"
 
 const whitespace = skipMany0(or(char(" "), char("\n"), char("\t")))
@@ -116,9 +115,6 @@ const letParser = list.flatMap((list) =>
 			}
 			const [keyExpr, valExpr] = item.items
 			if (keyExpr.type !== "Symbol") {
-				return yield* Parser.error("Invalid let expression")
-			}
-			if (!("value" in valExpr)) {
 				return yield* Parser.error("Invalid let expression")
 			}
 
