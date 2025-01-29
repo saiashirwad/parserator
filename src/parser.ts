@@ -48,7 +48,6 @@ export class Parser<T, Ctx = {}> {
 		},
 		state: ParserState<Ctx>,
 	): ParserOutput<never, Ctx> {
-		// console.log(error)
 		const errorMessage = error.message.includes("Parser Error:")
 			? error.message
 			: printErrorContext(state, error.message)
@@ -62,9 +61,13 @@ export class Parser<T, Ctx = {}> {
 	static error<Ctx = {}>(
 		message: string,
 		expected: string[] = [],
+		stateCallback?: (state: ParserState<Ctx>) => ParserState<Ctx>,
 	): Parser<never, Ctx> {
 		return new Parser((state) => {
-			return Parser.fail({ message, expected }, state)
+			return Parser.fail(
+				{ message, expected },
+				stateCallback ? stateCallback(state) : state,
+			)
 		})
 	}
 

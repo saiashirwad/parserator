@@ -569,7 +569,6 @@ export function or<Parsers extends Parser<any, any>[], Ctx = {}>(
 		for (const parser of parsers) {
 			const { result, state: newState } = parser.run(state)
 			if (Either.isRight(result)) {
-				// return result
 				return Parser.succeed(result.right, newState)
 			}
 			if (parser.options?.name) {

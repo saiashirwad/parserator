@@ -109,6 +109,17 @@ export const State = {
 		return State.consume(state, str.length)
 	},
 
+	move<Ctx = {}>(state: ParserState<Ctx>, moveBy: number) {
+		return State.consume(
+			{
+				...state,
+				remaining: state.context.source,
+				pos: { line: 1, column: 1, offset: 0 },
+			},
+			state.pos.offset + moveBy,
+		)
+	},
+
 	/**
 	 * Creates a new state by consuming characters while a predicate is true.
 	 *
