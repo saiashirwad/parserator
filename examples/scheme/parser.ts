@@ -11,6 +11,7 @@ import {
 	string,
 	takeUpto,
 } from "../../src"
+import { error, lazy } from "../../src/core"
 import { peekAhead, peekState } from "../../src/utils"
 import { LispExpr } from "./ast"
 
@@ -25,7 +26,7 @@ const symbol = parser(function* () {
 		or(char(" "), char("\n"), char("\t"), char(")"), char("(")),
 	)
 	yield* optionalWhitespace
-	if (name === "") return yield* Parser.error("Empty symbol")
+	if (name === "") return yield* error("Empty symbol")
 	return LispExpr.symbol(name)
 })
 
@@ -59,7 +60,7 @@ const list = parser(function* () {
 
 	const items = yield* many0(expr)
 	if (items.length === 0) {
-		return yield* Parser.error("Empty list")
+		return yield* error("Empty list")
 	}
 
 	yield* optionalWhitespace
@@ -89,9 +90,7 @@ const lambdaParser = (paramsExpr: LispExpr.List, bodyExpr: LispExpr.LispExpr) =>
 		const params: string[] = []
 		for (const item of paramsExpr.items) {
 			if (item.type !== "Symbol") {
-				return yield* Parser.error(
-					"Invalid param definition for lambda expression",
-				)
+				return yield* error("Invalid param definition for lambda expression")
 			}
 			params.push(item.name)
 		}
@@ -104,11 +103,11 @@ const letParser = (bindingsExpr: LispExpr.List, bodyExpr: LispExpr.LispExpr) =>
 		const bindings: LispExpr.Let["bindings"] = []
 		for (const item of bindingsExpr.items) {
 			if (!(item.type === "List" && item.items.length === 2)) {
-				return yield* Parser.error("Invalid let expression")
+				return yield* error("Invalid let expression")
 			}
 			const [keyExpr, valExpr] = item.items
 			if (keyExpr.type !== "Symbol") {
-				return yield* Parser.error("Invalid let expression")
+				return yield* error("Invalid let expression")
 			}
 
 			bindings.push({
@@ -120,7 +119,7 @@ const letParser = (bindingsExpr: LispExpr.List, bodyExpr: LispExpr.LispExpr) =>
 		return LispExpr.let(bindings, bodyExpr)
 	})
 
-expr = Parser.lazy(() =>
+expr = lazy(() =>
 	parser(function* () {
 		yield* optionalWhitespace
 		const state = yield* peekState

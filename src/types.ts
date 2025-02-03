@@ -1,3 +1,6 @@
+import type { Either } from "./either"
+import type { ParserError } from "./errors"
+
 export type Prettify<T> = {
 	[K in keyof T]: T[K]
 } & {}
@@ -25,4 +28,9 @@ export type ParserState<Ctx = {}> = {
 
 export type ParserOptions = {
 	name?: string
+}
+
+export type ParserOutput<T, Ctx = {}> = {
+	state: ParserState<Ctx>
+	result: Either<T, ParserError>
 }

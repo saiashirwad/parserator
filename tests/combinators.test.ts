@@ -19,6 +19,7 @@ import {
 } from "../src/combinators"
 import { Either } from "../src/either"
 import { Parser } from "../src/parser"
+import { lazy, pure } from "../src/core"
 
 const stringParser = skipSpaces
 	.then(char('"'))
@@ -120,7 +121,7 @@ describe("many combinators", () => {
 
 	test("manyN with separator", () => {
 		const threeDigitsComma = manyN(digit, 3, char(",")).thenDiscard(
-			lookAhead(or(char("\n"), Parser.pure(undefined))),
+			lookAhead(or(char("\n"), pure(undefined))),
 		)
 		expect(threeDigitsComma.parseOrThrow("1,2,3")).toEqual(["1", "2", "3"])
 		expect(Either.isLeft(threeDigitsComma.parse("1,2").result)).toBe(true)
@@ -130,7 +131,7 @@ describe("many combinators", () => {
 describe("complex combinations", () => {
 	test("nested array of numbers", () => {
 		type Value = number | Value[]
-		const value = Parser.lazy(() => or(number, array))
+		const value = lazy(() => or(number, array))
 		const number = many1(digit).map((s) => parseInt(s.join("")))
 		const array: Parser<Value[]> = char("[")
 			.then(sepBy(char(","), value))
@@ -142,7 +143,7 @@ describe("complex combinations", () => {
 
 	test("simple expression parser", () => {
 		type Expr = number
-		const expr: Parser<Expr> = Parser.lazy(() => or(number, parens))
+		const expr: Parser<Expr> = lazy(() => or(number, parens))
 		const number = many1(digit).map((s) => parseInt(s.join("")))
 		const parens: Parser<number> = char("(")
 			.then(expr)

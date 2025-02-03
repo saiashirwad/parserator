@@ -1,11 +1,13 @@
 import { Either } from "./either"
-import { printErrorContext, ParserError } from "./errors"
+import { succeed, fail } from "./functions"
+import { ParserError } from "./errors"
 import { State } from "./state"
 import type {
 	Prettify,
 	ParserContext,
 	ParserOptions,
 	ParserState,
+	ParserOutput,
 } from "./types"
 
 type BindResult<T, K extends string, B> = Prettify<
@@ -13,11 +15,6 @@ type BindResult<T, K extends string, B> = Prettify<
 		[k in K]: B
 	}
 >
-
-export type ParserOutput<T, Ctx = {}> = {
-	state: ParserState<Ctx>
-	result: Either<T, ParserError>
-}
 
 export class Parser<T, Ctx = {}> {
 	constructor(
@@ -31,49 +28,6 @@ export class Parser<T, Ctx = {}> {
 	name(name: string) {
 		this.options = { ...this.options, name }
 		return this
-	}
-
-	static succeed<T, Ctx = {}>(
-		value: T,
-		state: ParserState<Ctx>,
-	): ParserOutput<T, Ctx> {
-		return {
-			state,
-			result: Either.right(value),
-		}
-	}
-
-	static fail<Ctx = {}>(
-		error: {
-			message: string
-			expected?: string[]
-			found?: string
-		},
-		state: ParserState<Ctx>,
-	): ParserOutput<never, Ctx> {
-		const errorMessage = error.message.startsWith("Parser Error:")
-			? error.message
-			: printErrorContext(state, error.message)
-
-		return {
-			state,
-			result: Either.left(
-				new ParserError(errorMessage, error.expected ?? [], error.found),
-			),
-		}
-	}
-
-	static error<Ctx = {}>(
-		message: string,
-		expected: string[] = [],
-		stateCallback?: (state: ParserState<Ctx>) => ParserState<Ctx>,
-	): Parser<never, Ctx> {
-		return new Parser((state) => {
-			return Parser.fail(
-				{ message, expected },
-				stateCallback ? stateCallback(state) : state,
-			)
-		})
 	}
 
 	/**
@@ -90,7 +44,7 @@ export class Parser<T, Ctx = {}> {
 		return new Parser<T, Ctx>((state) => {
 			const output = this.run(state)
 			if (Either.isLeft(output.result)) {
-				return Parser.fail(
+				return fail(
 					{
 						message: makeMessage({
 							error: output.result.left,
@@ -111,9 +65,9 @@ export class Parser<T, Ctx = {}> {
 	): ParserOutput<T, Ctx> {
 		const { result, state } = this.run(State.fromInput(input, context))
 		if (Either.isLeft(result)) {
-			return Parser.fail(result.left, state)
+			return fail(result.left, state)
 		}
-		return Parser.succeed(result.right, state)
+		return succeed(result.right, state)
 	}
 
 	//withTrace(label: string): Parser<T, Ctx> {
@@ -157,9 +111,9 @@ export class Parser<T, Ctx = {}> {
 		return new Parser<B, Ctx>((state) => {
 			const { result, state: newState } = this.run(state)
 			if (Either.isLeft(result)) {
-				return Parser.fail(result.left, state)
+				return fail(result.left, state)
 			}
-			return Parser.succeed(f(result.right), newState)
+			return succeed(f(result.right), newState)
 		})
 	}
 
@@ -167,42 +121,10 @@ export class Parser<T, Ctx = {}> {
 		return new Parser<B, Ctx>((state) => {
 			const { result, state: newState } = this.run(state)
 			if (Either.isLeft(result)) {
-				return Parser.fail(result.left, newState)
+				return fail(result.left, newState)
 			}
 			const nextParser = f(result.right)
 			return nextParser.run(newState)
-		})
-	}
-
-	static pure = <A>(a: A): Parser<A> =>
-		new Parser((state) => Parser.succeed(a, state))
-
-	static Do = Parser.pure({})
-
-	/**
-	 * Creates a new parser that lazily evaluates the given function.
-	 * This is useful for creating recursive parsers.
-	 *
-	 * @param fn - A function that returns a parser
-	 * @returns A new parser that evaluates the function when parsing
-	 * @template T The type of value produced by the parser
-	 *
-	 * @example
-	 * ```ts
-	 * // Create a recursive parser for nested parentheses
-	 * const parens: Parser<string> = Parser.lazy(() =>
-	 *   between(
-	 *     char('('),
-	 *     char(')'),
-	 *     parens
-	 *   )
-	 * )
-	 * ```
-	 */
-	static lazy<T>(fn: () => Parser<T>): Parser<T> {
-		return new Parser((state) => {
-			const parser = fn()
-			return parser.run(state)
 		})
 	}
 
@@ -210,13 +132,13 @@ export class Parser<T, Ctx = {}> {
 		return new Parser((state) => {
 			const { result: a, state: stateA } = this.run(state)
 			if (Either.isLeft(a)) {
-				return Parser.fail(a.left, stateA)
+				return fail(a.left, stateA)
 			}
 			const { result: b, state: stateB } = parserB.run(stateA)
 			if (Either.isLeft(b)) {
-				return Parser.fail(b.left, stateB)
+				return fail(b.left, stateB)
 			}
-			return Parser.succeed([a.right, b.right], stateB)
+			return succeed([a.right, b.right], stateB)
 		})
 	}
 
@@ -239,14 +161,14 @@ export class Parser<T, Ctx = {}> {
 		return new Parser<BindResult<T, K, B>, Ctx>((state) => {
 			const { result: resultA, state: stateA } = this.run(state)
 			if (Either.isLeft(resultA)) {
-				return Parser.fail(resultA.left, stateA)
+				return fail(resultA.left, stateA)
 			}
 			const nextParser = other instanceof Parser ? other : other(resultA.right)
 			const { result: resultB, state: stateB } = nextParser.run(stateA)
 			if (Either.isLeft(resultB)) {
-				return Parser.fail(resultB.left, stateB)
+				return fail(resultB.left, stateB)
 			}
-			return Parser.succeed(
+			return succeed(
 				{ ...resultA.right, [k]: resultB.right } as BindResult<T, K, B>,
 				stateB,
 			)
@@ -287,12 +209,12 @@ export class Parser<T, Ctx = {}> {
 			while (!current.done) {
 				const { result, state: updatedState } = current.value.run(currentState)
 				if (Either.isLeft(result)) {
-					return Parser.fail(result.left, updatedState)
+					return fail(result.left, updatedState)
 				}
 				currentState = updatedState
 				current = iterator.next(result.right)
 			}
-			return Parser.succeed(current.value, currentState)
+			return succeed(current.value, currentState)
 		})
 	}
 
@@ -319,11 +241,11 @@ export function parser<T, Ctx = unknown>(
 		while (!current.done) {
 			const { result, state: updatedState } = current.value.run(currentState)
 			if (Either.isLeft(result)) {
-				return Parser.fail(result.left, updatedState)
+				return fail(result.left, updatedState)
 			}
 			currentState = updatedState
 			current = iterator.next(result.right)
 		}
-		return Parser.succeed(current.value, currentState)
+		return succeed(current.value, currentState)
 	})
 }

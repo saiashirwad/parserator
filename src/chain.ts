@@ -1,4 +1,5 @@
 import { Either } from "./either"
+import { fail } from "./functions"
 import { Parser } from "./parser"
 
 export type Chain<Ctx = {}> = {
@@ -82,7 +83,7 @@ export const chain = <Ctx = {}>(
 		for (const fn of fns) {
 			const { result: parserResult, state: newState } = result
 			if (Either.isLeft(parserResult)) {
-				return Parser.fail(parserResult.left, newState)
+				return fail(parserResult.left, newState)
 			}
 			const value = parserResult.right
 			result = fn(value).run(newState)

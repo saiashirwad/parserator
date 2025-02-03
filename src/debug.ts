@@ -1,7 +1,8 @@
 import { Either } from "./either"
-import { Parser, type ParserOutput } from "./parser"
-import type { ParserState } from "./types"
+import { Parser } from "./parser"
+import type { ParserState, ParserOutput } from "./types"
 import { State } from "./state"
+import { succeed } from "./functions"
 /**
  * Creates a debug output for a parser's current state and result
  */
@@ -52,7 +53,7 @@ export function trace<Ctx = {}>(label: string): Parser<void, Ctx> {
 		console.log(`\n[TRACE] ${label}`)
 		console.log("Position:", State.printPosition(state))
 		console.log("Remaining:", JSON.stringify(state.remaining))
-		return Parser.succeed(undefined, state)
+		return succeed(undefined, state)
 	})
 }
 
