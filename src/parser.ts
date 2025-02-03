@@ -1,6 +1,6 @@
 import { Either } from "./either"
 import { succeed, fail } from "./functions"
-import { ParserError } from "./errors"
+import { ParserError, type RecoveryStrategy } from "./errors"
 import { State } from "./state"
 import type {
 	Prettify,
@@ -70,14 +70,38 @@ export class Parser<T, Ctx = {}> {
 		return succeed(result.right, state)
 	}
 
-	//withTrace(label: string): Parser<T, Ctx> {
-	//	return new Parser<T, Ctx>((state) => {
-	//		if (!state.context?.debug) {
-	//			return this.run(state)
-	//		}
-	//		return debug(this, label).run(state)
-	//	}, this.options)
-	//}
+	withRecovery(strategy: RecoveryStrategy): Parser<T, Ctx> {
+		return new Parser<T, Ctx>((state) => {
+			const { result } = this.run(state)
+
+			if (Either.isRight(result)) {
+				return result
+			}
+
+			if (strategy.defaultValue !== undefined) {
+				return succeed(strategy.defaultValue, state)
+			}
+
+			if (strategy.skipUntil) {
+				const recovery = skipUntilParser(strategy.skipUntil, strategy.maxSkip)
+				const recoveryResult = recovery.run(state)
+
+				if (Either.isRight(recoveryResult.result)) {
+					return {
+						state: recoveryResult.state,
+						result: Either.right(recoveryResult.result.right.value as T),
+					}
+				}
+			}
+
+			if (strategy.recover) {
+				const lo = strategy.recover(result.left, state).run(state)
+				return lo as any
+			}
+
+			return result
+		}, this.options)
+	}
 
 	parseOrError(
 		input: string,
@@ -210,4 +234,30 @@ export class Parser<T, Ctx = {}> {
 	trimRight(parser: Parser<any, Ctx>): Parser<T, Ctx> {
 		return this.thenDiscard(parser)
 	}
+}
+
+function skipUntilParser<T>(
+	parser: Parser<T>,
+	maxSkip: number = 100,
+): Parser<{ value: T; skipped: string }, {}> {
+	return new Parser((state) => {
+		let currentState = state
+		let skipped = ""
+		let count = 0
+
+		while (!State.isAtEnd(currentState) && count < maxSkip) {
+			const { result, state: newState } = parser.run(currentState)
+			if (Either.isRight(result)) {
+				return succeed({ value: result.right, skipped }, newState)
+			}
+			skipped += currentState.remaining[0]
+			currentState = State.consume(currentState, 1)
+			count++
+		}
+
+		return fail(
+			{ message: `Failed to recover within maxSkip limit of ${maxSkip}` },
+			currentState,
+		)
+	})
 }
