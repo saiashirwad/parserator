@@ -1,4 +1,3 @@
-import { debug } from "./debug"
 import { Either } from "./either"
 import { printErrorContext, ParserError } from "./errors"
 import { State } from "./state"
@@ -117,14 +116,14 @@ export class Parser<T, Ctx = {}> {
 		return Parser.succeed(result.right, state)
 	}
 
-	withTrace(label: string): Parser<T, Ctx> {
-		return new Parser<T, Ctx>((state) => {
-			if (!state.context?.debug) {
-				return this.run(state)
-			}
-			return debug(this, label).run(state)
-		}, this.options)
-	}
+	//withTrace(label: string): Parser<T, Ctx> {
+	//	return new Parser<T, Ctx>((state) => {
+	//		if (!state.context?.debug) {
+	//			return this.run(state)
+	//		}
+	//		return debug(this, label).run(state)
+	//	}, this.options)
+	//}
 
 	parseOrError(
 		input: string,
