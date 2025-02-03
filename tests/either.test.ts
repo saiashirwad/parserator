@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { Either } from "../src/either"
+import { Either } from "../src"
 
 const ea = (): Either<number, string> =>
 	Either.gen(function* () {
