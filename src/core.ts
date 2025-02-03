@@ -1,3 +1,4 @@
+import { Either } from "./either"
 import { fail, succeed } from "./functions"
 import { Parser } from "./parser"
 import type { ParserState } from "./types"
@@ -44,5 +45,24 @@ export function lazy<T>(fn: () => Parser<T>): Parser<T> {
 	return new Parser((state) => {
 		const parser = fn()
 		return parser.run(state)
+	})
+}
+
+export function parser<T, Ctx = unknown>(
+	f: () => Generator<Parser<any, Ctx>, T, any>,
+): Parser<T, Ctx> {
+	return new Parser<T, Ctx>((state) => {
+		const iterator = f()
+		let current = iterator.next()
+		let currentState: ParserState<Ctx> = state
+		while (!current.done) {
+			const { result, state: updatedState } = current.value.run(currentState)
+			if (Either.isLeft(result)) {
+				return fail(result.left, updatedState)
+			}
+			currentState = updatedState
+			current = iterator.next(result.right)
+		}
+		return succeed(current.value, currentState)
 	})
 }

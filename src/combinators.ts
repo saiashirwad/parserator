@@ -3,7 +3,7 @@ import { Parser } from "./parser"
 import type { ParserState } from "./types"
 import { State } from "./state"
 import { succeed, fail } from "./functions"
-import { error } from "./core"
+import { error, parser } from "./core"
 
 /**
  * Creates a parser that looks ahead in the input stream without consuming any input.
@@ -390,19 +390,19 @@ export const manyN = <S, T, Ctx>(
 /**
  * Creates a parser that matches exactly n occurrences of the input parser.
  *
- * @param parser - The parser to repeat
+ * @param p - The parser to repeat
  * @param n - Number of required repetitions
  * @param separator - Optional parser to match between occurrences
  * @returns A parser that produces an array of exactly n matches
  */
 
 export const manyNExact = <S, T, Ctx>(
-	parser: Parser<T, Ctx>,
+	p: Parser<T, Ctx>,
 	n: number,
 	separator?: Parser<S, Ctx>,
 ) =>
-	Parser.gen(function* () {
-		const results = yield* manyN(parser, n, separator)
+	parser(function* () {
+		const results = yield* manyN(p, n, separator)
 		if (results.length !== n) {
 			const message = `Expected exactly ${n} occurrences, but found ${results.length}`
 			return yield* error<Ctx>(message)

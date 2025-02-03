@@ -199,25 +199,6 @@ export class Parser<T, Ctx = {}> {
 		}, this.options)
 	}
 
-	static gen<T, Ctx = unknown>(
-		f: () => Generator<Parser<any, Ctx>, T, any>,
-	): Parser<T, Ctx> {
-		return new Parser<T, Ctx>((state) => {
-			const iterator = f()
-			let current = iterator.next()
-			let currentState: ParserState<Ctx> = state
-			while (!current.done) {
-				const { result, state: updatedState } = current.value.run(currentState)
-				if (Either.isLeft(result)) {
-					return fail(result.left, updatedState)
-				}
-				currentState = updatedState
-				current = iterator.next(result.right)
-			}
-			return succeed(current.value, currentState)
-		})
-	}
-
 	trim(parser: Parser<any, Ctx>) {
 		return parser.then(this).thenDiscard(parser)
 	}
@@ -229,23 +210,4 @@ export class Parser<T, Ctx = {}> {
 	trimRight(parser: Parser<any, Ctx>): Parser<T, Ctx> {
 		return this.thenDiscard(parser)
 	}
-}
-
-export function parser<T, Ctx = unknown>(
-	f: () => Generator<Parser<any, Ctx>, T, any>,
-): Parser<T, Ctx> {
-	return new Parser<T, Ctx>((state) => {
-		const iterator = f()
-		let current = iterator.next()
-		let currentState: ParserState<Ctx> = state
-		while (!current.done) {
-			const { result, state: updatedState } = current.value.run(currentState)
-			if (Either.isLeft(result)) {
-				return fail(result.left, updatedState)
-			}
-			currentState = updatedState
-			current = iterator.next(result.right)
-		}
-		return succeed(current.value, currentState)
-	})
 }
