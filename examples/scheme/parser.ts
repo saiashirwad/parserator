@@ -10,9 +10,11 @@ import {
 	skipMany0,
 	string,
 	takeUpto,
+	error,
+	lazy,
+	peekAhead,
+	peekState,
 } from "../../src"
-import { error, lazy } from "../../src/core"
-import { peekAhead, peekState } from "../../src/utils"
 import { LispExpr } from "./ast"
 
 const whitespace = skipMany0(or(char(" "), char("\n"), char("\t")))
