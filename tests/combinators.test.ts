@@ -16,10 +16,11 @@ import {
 	sequence,
 	skipSpaces,
 	takeUntil,
-} from "../src/combinators"
-import { Either } from "../src/either"
-import { Parser } from "../src/parser"
-import { lazy, pure } from "../src/core"
+	Either,
+	Parser,
+	lazy,
+	pure,
+} from "../src"
 
 const stringParser = skipSpaces
 	.then(char('"'))
