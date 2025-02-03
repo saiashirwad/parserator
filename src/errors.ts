@@ -25,7 +25,34 @@ export class ParserError {
 		public message: string,
 		public expected: string[],
 		public found?: string,
+		public pos?: SourcePosition,
+		public parserStack: string[] = [],
+		public skippedContent?: string,
 	) {}
+
+	toString() {
+		let msg = `Parser Error at ${printPosition(this.pos!)}\n`
+		msg += `${this.message}\n`
+		if (this.expected.length > 0) {
+			msg += `Expected: ${this.expected.join(", ")}\n`
+		}
+		if (this.found) {
+			msg += `Found: ${this.found}\n`
+		}
+		if (this.skippedContent) {
+			msg += `Skipped: "${this.skippedContent}"\n`
+		}
+		if (this.parserStack.length > 0) {
+			msg += `Parser stack: ${this.parserStack.join(" -> ")}`
+		}
+		return msg
+	}
+}
+
+export type ParseResult<T> = {
+	value: T | undefined
+	errors: ParserError[]
+	recovered: boolean
 }
 
 export function printPosition(position: SourcePosition) {
