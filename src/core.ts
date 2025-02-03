@@ -48,6 +48,38 @@ export function lazy<T>(fn: () => Parser<T>): Parser<T> {
 	})
 }
 
+/**
+ * Creates a parser using generator syntax. This provides a cleaner way to compose parsers
+ * using yield* expressions instead of chaining methods.
+ *
+ * @param f - A generator function that yields parsers and returns a final value
+ * @returns A new parser that runs the yielded parsers in sequence
+ * @template T - The type of value produced by the parser
+ * @template Ctx - Optional context type shared across parsers
+ *
+ * @example
+ * ```ts
+ * const numberParser = parser(function* () {
+ *   // Parse optional sign
+ *   const sign = yield* optional(char('-'))
+ *
+ *   // Parse digits
+ *   const digits = yield* many1(digit)
+ *
+ *   // Convert to number
+ *   return parseInt((sign ?? '') + digits.join(''))
+ * })
+ *
+ * numberParser.run('-123') // Right([123, {...}])
+ * ```
+ *
+ * The generator syntax allows writing parsers in a more imperative style, where each
+ * yield* expression represents a parsing step. This is often more readable than chaining
+ * methods, especially for complex parsers with many steps.
+ *
+ * The parser will fail if any of the yielded parsers fail. The final value returned from
+ * the generator becomes the result of the parser.
+ */
 export function parser<T, Ctx = unknown>(
 	f: () => Generator<Parser<any, Ctx>, T, any>,
 ): Parser<T, Ctx> {
