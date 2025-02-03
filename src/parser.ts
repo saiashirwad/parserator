@@ -1,21 +1,24 @@
 import { debug } from "./debug"
 import { Either } from "./either"
-import { printErrorContext } from "./errors"
-import {
-	type ParserContext,
-	ParserError,
-	type ParserOptions,
-	type ParserOutput,
-	type ParserState,
-	State,
-} from "./state"
-import type { Prettify } from "./types"
+import { printErrorContext, ParserError } from "./errors"
+import { State } from "./state"
+import type {
+	Prettify,
+	ParserContext,
+	ParserOptions,
+	ParserState,
+} from "./types"
 
 type BindResult<T, K extends string, B> = Prettify<
 	T & {
 		[k in K]: B
 	}
 >
+
+export type ParserOutput<T, Ctx = {}> = {
+	state: ParserState<Ctx>
+	result: Either<T, ParserError>
+}
 
 export class Parser<T, Ctx = {}> {
 	constructor(

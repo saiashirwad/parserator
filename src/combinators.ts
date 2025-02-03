@@ -1,6 +1,7 @@
 import { Either } from "./either"
 import { Parser } from "./parser"
-import { type ParserState, State } from "./state"
+import type { ParserState } from "./types"
+import { State } from "./state"
 
 /**
  * Creates a parser that looks ahead in the input stream without consuming any input.

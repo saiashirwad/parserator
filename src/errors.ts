@@ -1,4 +1,32 @@
-import type { ParserError, ParserState, SourcePosition } from "./state"
+import type { Parser } from "./parser"
+import type { ParserState, SourcePosition } from "./types"
+
+export type RecoveryStrategy = {
+	/**
+	 * Skip input until this parser would succeed
+	 */
+	skipUntil?: Parser<any>
+	/**
+	 * Provide a default value to continue parsing
+	 */
+	defaultValue?: any
+	/**
+	 * Maximum number of characters to skip for recovery
+	 */
+	maxSkip?: number
+	/**
+	 * Custom recovery function
+	 */
+	recover?: (error: ParserError, state: ParserState) => Parser<any>
+}
+
+export class ParserError {
+	constructor(
+		public message: string,
+		public expected: string[],
+		public found?: string,
+	) {}
+}
 
 export function printPosition(position: SourcePosition) {
 	return `line ${position.line}, column ${position.column}`

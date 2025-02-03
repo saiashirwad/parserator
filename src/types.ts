@@ -3,3 +3,26 @@ export type Prettify<T> = {
 } & {}
 
 export type Last<T> = T extends [...any[], infer L] ? L : never
+
+export type ParserContext<Ctx = {}> = Prettify<
+	Ctx & {
+		debug?: boolean
+		source: string
+	}
+>
+
+export type SourcePosition = {
+	line: number
+	column: number
+	offset: number
+}
+
+export type ParserState<Ctx = {}> = {
+	remaining: string
+	pos: SourcePosition
+	context: ParserContext<Ctx>
+}
+
+export type ParserOptions = {
+	name?: string
+}

@@ -1,4 +1,4 @@
-import { ParserError } from "../../src"
+import { ParserError } from "../../src/errors"
 import { lispParser } from "./parser"
 
 const program = `(+ 5 (+ 3 5))`

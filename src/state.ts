@@ -1,39 +1,4 @@
-import type { Either } from "./either"
-import type { Prettify } from "./types"
-
-export type ParserContext<Ctx = {}> = Prettify<
-	Ctx & {
-		debug?: boolean
-		source: string
-	}
->
-
-export type ParserOptions = { name?: string }
-
-export class ParserError {
-	constructor(
-		public message: string,
-		public expected: string[],
-		public found?: string,
-	) {}
-}
-
-export type ParserOutput<T, Ctx = {}> = {
-	state: ParserState<Ctx>
-	result: Either<T, ParserError>
-}
-
-export type SourcePosition = {
-	line: number
-	column: number
-	offset: number
-}
-
-export type ParserState<Ctx = {}> = {
-	remaining: string
-	pos: SourcePosition
-	context: ParserContext<Ctx>
-}
+import type { ParserContext, ParserState } from "./types"
 
 /**
  * Utility object containing static methods for creating and manipulating parser state.
