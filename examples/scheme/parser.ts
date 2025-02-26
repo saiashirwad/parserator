@@ -2,18 +2,18 @@ import {
 	Parser,
 	char,
 	digit,
+	error,
+	lazy,
 	many0,
 	many1,
 	optional,
 	or,
 	parser,
+	peekAhead,
+	peekState,
 	skipMany0,
 	string,
 	takeUpto,
-	error,
-	lazy,
-	peekAhead,
-	peekState,
 } from "../../src"
 import { LispExpr } from "./ast"
 

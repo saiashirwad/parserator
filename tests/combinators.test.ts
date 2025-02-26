@@ -1,9 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import {
+	Either,
+	type Parser,
 	alphabet,
 	between,
 	char,
 	digit,
+	lazy,
 	lookAhead,
 	many0,
 	many1,
@@ -11,15 +14,12 @@ import {
 	manyNExact,
 	optional,
 	or,
+	pure,
 	regex,
 	sepBy,
 	sequence,
 	skipSpaces,
 	takeUntil,
-	Either,
-	Parser,
-	lazy,
-	pure,
 } from "../src"
 
 const stringParser = skipSpaces
