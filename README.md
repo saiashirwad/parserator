@@ -1,11 +1,9 @@
-<img src="logo.svg" alt="Parserator logo" width="200"/>
-
 # Parserator
 
 [![npm version](https://badge.fury.io/js/parserator.svg)](https://badge.fury.io/js/parserator)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-TypeScript-first parser combinator library with static type inference
+An elegant parser combinators library for Typescript.
 
 ## Table of contents
 
