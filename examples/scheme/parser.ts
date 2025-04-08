@@ -1,13 +1,12 @@
 import {
-	Parser,
-	State,
 	char,
-	parser,
 	digit,
 	many0,
 	many1,
 	optional,
 	or,
+	Parser,
+	parser,
 	skipMany0,
 	string,
 	takeUpto,
@@ -49,10 +48,7 @@ const boolean = parser(function* () {
 	return LispExpr.bool(val === "#t")
 })
 
-const atom = parser(function* () {
-	const atom = yield* or(boolean, number, stringLiteral, symbol)
-	return atom
-})
+const atom = or(boolean, number, stringLiteral, symbol)
 
 const list = parser(function* () {
 	yield* char("(")
@@ -64,7 +60,7 @@ const list = parser(function* () {
 	}
 
 	yield* optionalWhitespace
-	yield* char(")").withError(() => "list should be closed")
+	yield* char(")").withError(() => "Incomplete List")
 	return items
 })
 
@@ -132,6 +128,6 @@ expr = Parser.lazy(() =>
 	}),
 )
 
-//export const lispParser = many0(whitespace.then(expr).thenDiscard(whitespace))
+// export const lispParser = many0(whitespace.then(expr).thenDiscard(whitespace))
 
 export const lispParser = expr

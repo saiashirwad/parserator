@@ -585,15 +585,15 @@ export function or<Parsers extends Parser<any, any>[], Ctx = {}>(
 	...parsers: Parsers
 ): Parser<Parsers[number] extends Parser<infer T, Ctx> ? T : never, Ctx> {
 	return new Parser((state) => {
-		//const expectedNames: string[] = []
+		// const expectedNames: string[] = []
 		for (const parser of parsers) {
 			const { result, state: newState } = parser.run(state)
 			if (Either.isRight(result)) {
 				return Parser.succeed(result.right, newState)
 			}
-			//if (parser.options?.name) {
-			//	expectedNames.push(parser.options.name)
-			//}
+			// if (parser.options?.name) {
+			// 	expectedNames.push(parser.options.name)
+			// }
 		}
 
 		const message = `None of the ${parsers.length} choices could be satisfied`
