@@ -128,6 +128,4 @@ expr = Parser.lazy(() =>
 	}),
 )
 
-// export const lispParser = many0(whitespace.then(expr).thenDiscard(whitespace))
-
 export const lispParser = expr
