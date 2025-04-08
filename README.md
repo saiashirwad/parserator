@@ -1,27 +1,46 @@
+<img src="logo.svg" alt="Parserator logo" width="200"/>
+
 # Parserator
 
-> **Warning**
-> This library is currently in early development and the API is subject to change.
+[![npm version](https://badge.fury.io/js/parserator.svg)](https://badge.fury.io/js/parserator)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A TypeScript parser combinator library inspired by [Parsec](https://github.com/haskell/parsec) and [Effect-TS](https://github.com/Effect-ts/Effect). Write parsers using a clean, generator-based syntax or compose them using functional combinators.
+TypeScript-first parser combinator library with static type inference
 
-## Table of Contents
+## Table of contents
 
+* [Introduction](#introduction)
 * [Installation](#installation)
 * [Basic Usage](#basic-usage)
-* [Generator Syntax](#generator-syntax)
 * [Primitive Parsers](#primitive-parsers)
 * [Combinators](#combinators)
+* [Generator Syntax](#generator-syntax)
 * [Error Handling](#error-handling)
 * [Debugging](#debugging)
 * [Advanced Usage](#advanced-usage)
-* [API Reference](#api-reference)
+
+## Introduction
+
+Parserator is a TypeScript-first parser combinator library. It allows you to build complex parsers from simple building blocks, with full type inference and a clean, generator-based syntax.
+
+Some key features:
+
+* Zero dependencies
+* Written in TypeScript with complete type inference
+* Clean, generator-based syntax similar to async/await
+* Rich set of built-in parsers and combinators
+* Detailed error reporting
+* Extensive debugging capabilities
 
 ## Installation
 
 ```bash
 npm install parserator
 ```
+
+Requirements:
+- TypeScript 4.5+
+- `strict` mode enabled in tsconfig
 
 ## Basic Usage
 
@@ -32,12 +51,82 @@ import { Parser, char, many1, digit } from 'parserator'
 const numberParser = many1(digit).map(digits => parseInt(digits.join(""), 10))
 
 // Parse a string
-const result = numberParser.run("123")
-// Right([123, {...}])
+numberParser.parse("123") // => 123
 
-// Handle errors
-const error = numberParser.run("abc")
-// Left(ParserError: Expected digit but found 'a')
+// Handle errors safely
+numberParser.safeParse("abc") 
+// => { success: false, error: ParserError }
+```
+
+## Primitive Parsers
+
+```typescript
+import { char, string, regex, alphabet, digit } from 'parserator'
+
+// Single character
+char("a").parse("abc") // => "a"
+
+// Exact string
+string("hello").parse("hello world") // => "hello"
+
+// Regular expression
+regex(/[0-9]+/).parse("123abc") // => "123"
+
+// Any letter
+alphabet.parse("abc") // => "a"
+
+// Any digit 
+digit.parse("123") // => "1"
+```
+
+## Combinators
+
+### Repetition
+
+```typescript
+import { many0, many1, manyN } from 'parserator'
+
+// Zero or more
+many0(digit).parse("123abc") // => ["1","2","3"]
+
+// One or more
+many1(digit).parse("123abc") // => ["1","2","3"]
+
+// Exact count
+manyN(digit, 2).parse("123") // => ["1","2"]
+```
+
+### Sequencing
+
+```typescript
+import { sequence, or, between, sepBy } from 'parserator'
+
+// Sequence of parsers
+sequence([char("a"), char("b")]).parse("abc") // => "b"
+
+// Choice between parsers
+or(char("a"), char("b")).parse("abc") // => "a"
+
+// Between delimiters
+between(char("("), char(")"), digit).parse("(5)") // => "5"
+
+// Separated values
+sepBy(char(","), digit).parse("1,2,3") // => ["1","2","3"]
+```
+
+### String Operations
+
+```typescript
+import { takeUntil, takeUpto, parseUntilChar } from 'parserator'
+
+// Take until parser succeeds
+takeUntil(char(";")).parse("hello;world") // => "hello"
+
+// Take until parser would succeed
+takeUpto(char(";")).parse("hello;world") // => "hello"
+
+// Parse until character
+parseUntilChar(";").parse("hello;world") // => "hello"
 ```
 
 ## Generator Syntax
@@ -84,128 +173,6 @@ const float = parser(function* () {
 })
 
 float.run("123.456e-7") // Right([1.23456e-5, ...])
-```
-
-## Primitive Parsers
-
-### Character Parsers
-
-```typescript
-import { char, string, regex, alphabet, digit } from 'parserator'
-
-// Match a single character
-char("a").run("abc") // Right(["a", ...])
-
-// Match an exact string
-string("hello").run("hello world") // Right(["hello", ...])
-
-// Match using regex
-regex(/[0-9]+/).run("123abc") // Right(["123", ...])
-
-// Match any letter
-alphabet.run("abc") // Right(["a", ...])
-
-// Match any digit
-digit.run("123") // Right(["1", ...])
-```
-
-## Combinators
-
-### Repetition
-
-```typescript
-import { many0, many1, manyN, digit } from 'parserator'
-
-// Match zero or more
-many0(digit).run("123abc") // Right([["1","2","3"], ...])
-
-// Match one or more
-many1(digit).run("123abc") // Right([["1","2","3"], ...])
-
-// Match exact number
-manyN(digit, 2).run("123") // Right([["1","2"], ...])
-```
-
-### Sequencing and Choice
-
-```typescript
-import { sequence, or, between, sepBy, zip, then, thenDiscard } from 'parserator'
-
-// Run parsers in sequence
-sequence([char("a"), char("b")]).run("abc")
-// Right(["b", ...])
-
-// Try multiple parsers
-or(char("a"), char("b")).run("abc")
-// Right(["a", ...])
-
-// Match between delimiters
-between(char("("), char(")"), digit).run("(5)")
-// Right(["5", ...])
-
-// Match separated values
-sepBy(char(","), digit).run("1,2,3")
-// Right([["1","2","3"], ...])
-
-// Combine results of two parsers
-zip(char("a"), digit).run("a1")
-// Right([["a", "1"], ...])
-
-// Keep only second result
-then(char("a"), digit).run("a1")
-// Right(["1", ...])
-
-// Keep only first result
-thenDiscard(char("a"), digit).run("a1")
-// Right(["a", ...])
-```
-
-### String and Pattern Matching
-
-```typescript
-import { regex, parseUntilChar, takeUntil, takeUpto } from 'parserator'
-
-// Match using regex
-regex(/[0-9]+/).run("123abc")
-// Right(["123", ...])
-
-// Parse until specific character
-parseUntilChar(";").run("hello;world")
-// Right(["hello", ...])
-
-// Take input until parser succeeds (consuming the parser)
-takeUntil(char(";")).run("hello;world")
-// Right(["hello", ...])
-
-// Take input until parser would succeed (not consuming the parser)
-takeUpto(char(";")).run("hello;world")
-// Right(["hello", ...])
-```
-
-### Skipping
-
-```typescript
-import { skipSpaces, skipMany0, skipMany1, skipManyN, skipUntil } from 'parserator'
-
-// Skip whitespace
-skipSpaces.then(char("a")).run("   abc")
-// Right(["a", ...])
-
-// Skip zero or more occurrences
-skipMany0(char(" ")).run("   abc")
-// Right([undefined, ...])
-
-// Skip one or more occurrences
-skipMany1(char(" ")).run("   abc")
-// Right([undefined, ...])
-
-// Skip exact number of occurrences
-skipManyN(char(" "), 3).run("   abc")
-// Right([undefined, ...])
-
-// Skip until parser succeeds
-skipUntil(char(";")).run("hello;world")
-// Right([undefined, ...])
 ```
 
 ## Error Handling
@@ -291,148 +258,94 @@ expr.run("(1+(2-(3+4)))")
 
 The core Parser class that represents a parsing computation.
 
-#### Methods
+### Methods
 
-* `run(input: string): ParserResult<T>` - Run the parser on an input string
-* `parseOrError(input: string): T | ParserError` - Run parser and return result or error
-* `parseOrThrow(input: string): T` - Run parser and throw on error
-* `map<B>(f: (a: T) => B): Parser<B>` - Transform parser result
-* `flatMap<B>(f: (a: T) => Parser<B>): Parser<B>` - Chain parsers
-* `error(message: string): Parser<T>` - Set error message
-* `errorCallback(cb: (error: ParserError, state: ParserState) => string): Parser<T>` - Custom error handling
-* `tap(callback: (state: ParserState, result: ParserResult<T>) => void): Parser<T>` - Adds a tap point to observe the current state and result during parsing
-* `withName(name: string): Parser<T>` - Name the parser for better errors
+#### run(input: string): ParserResult<T>
+Run the parser on an input string
 
-#### Static Methods
+#### parseOrError(input: string): T | ParserError
+Run parser and return result or error
 
-* `parser<T>(f: () => Generator<Parser<any>, T>): Parser<T>` - Create parser using generator syntax
-* `Parser.succeed<T>(value: T): Parser<T>` - Create always-succeeding parser
-* `Parser.fail(message: string): Parser<never>` - Create always-failing parser
-* `Parser.lazy<T>(f: () => Parser<T>): Parser<T>` - Creates a new parser that lazily evaluates the given function. This is useful for creating recursive parsers.
+#### parseOrThrow(input: string): T
+Run parser and throw on error
 
-### Combinators
+#### map<B>(f: (a: T) => B): Parser<B>
+Transform parser result
 
-#### Basic Parsers
+#### flatMap<B>(f: (a: T) => Parser<B>): Parser<B>
+Chain parsers
 
-* `char(ch: string): Parser<string>` - Creates a parser that matches a single character.
-  
+#### error(message: string): Parser<T>
+Set error message
 
-```ts
-  const parser = char("a")
-  parser.run("abc") // Right(["a", {...}])
-  parser.run("xyz") // Left(error)
-  ```
+#### errorCallback(cb: (error: ParserError, state: ParserState) => string): Parser<T>
+Custom error handling
 
-* `string(str: string): Parser<string>` - Creates a parser that matches an exact string in the input.
-  
+#### tap(callback: (state: ParserState, result: ParserResult<T>) => void): Parser<T>
+Adds a tap point to observe the current state and result during parsing
 
-```ts
-  const parser = string("hello")
-  parser.run("hello world") // Right(["hello", {...}])
-  parser.run("goodbye") // Left(error)
-  ```
+#### withName(name: string): Parser<T>
+Name the parser for better errors
 
-* `regex(re: RegExp): Parser<string>` - Creates a parser that matches input against a regular expression. The regex must match at the start of the input.
-  
+### Static Methods
 
-```ts
-  const parser = regex(/[0-9]+/)
-  parser.run("123abc") // Right(["123", {...}])
-  ```
+#### parser<T>(f: () => Generator<Parser<any>, T>): Parser<T>
+Create parser using generator syntax
 
-* `alphabet: Parser<string>` - A parser that matches any single alphabetic character (a-z, A-Z).
-  
+#### Parser.succeed<T>(value: T): Parser<T>
+Create always-succeeding parser
+
+#### Parser.fail(message: string): Parser<never>
+Create always-failing parser
+
+#### Parser.lazy<T>(f: () => Parser<T>): Parser<T>
+Creates a new parser that lazily evaluates the given function. This is useful for creating recursive parsers.
+
+### Basic Parsers
+
+#### char(ch: string): Parser<string>
+Creates a parser that matches a single character.
 
 ```ts
-  const parser = alphabet
-  parser.run("abc") // Right(["a", {...}])
-  parser.run("123") // Left(error)
-  ```
+const parser = char("a")
+parser.parse("abc") // => "a"
+parser.parse("xyz") // throws error
+```
 
-* `digit: Parser<string>` - A parser that matches any single digit character (0-9).
-  
-
-```ts
-  const parser = digit
-  parser.run("123") // Right(["1", {...}])
-  parser.run("abc") // Left(error)
-  ```
-
-#### Repetition
-
-* `many0<T>(parser: Parser<T>, separator?: Parser<any>): Parser<T[]>` - Creates a parser that matches zero or more occurrences of the input parser.
-
-* `many1<T>(parser: Parser<T>, separator?: Parser<any>): Parser<T[]>` - Creates a parser that matches one or more occurrences of the input parser.
-
-* `manyN<T>(parser: Parser<T>, n: number, separator?: Parser<any>): Parser<T[]>` - Creates a parser that matches at least n occurrences of the input parser.
-
-* `manyNExact<T>(parser: Parser<T>, n: number, separator?: Parser<any>): Parser<T[]>` - Creates a parser that matches exactly n occurrences of the input parser.
-
-#### Sequencing and Choice
-
-* `sequence<Parsers extends Parser<any>[]>(parsers: [...Parsers]): Parser<LastParser<Parsers>>` - Creates a parser that runs multiple parsers in sequence. Returns the result of the last parser in the sequence.
-
-* `between<T>(start: Parser<any>, end: Parser<any>, parser: Parser<T>): Parser<T>` - Creates a parser that matches content between two string delimiters.
-  
+#### string(str: string): Parser<string>
+Creates a parser that matches an exact string in the input.
 
 ```ts
-  const parser = between(char('('), char(')'), digit)
-  parser.run('(5)') // Right(['5', {...}])
-  parser.run('5') // Left(error)
-  ```
+const parser = string("hello")
+parser.parse("hello world") // => "hello"
+parser.parse("goodbye") // throws error
+```
 
-* `sepBy<S, T>(sepParser: Parser<S>, parser: Parser<T>): Parser<T[]>` - Creates a parser that matches zero or more occurrences of elements separated by a separator.
-  
-
-```ts
-  const parser = sepBy(char(','), digit)
-  parser.run("1,2,3") // Right([["1", "2", "3"], {...}])
-  parser.run("") // Right([[], {...}])
-  ```
-
-* `or<Parsers extends Parser<any>[]>(...parsers: Parsers): Parser<T>` - Creates a parser that tries multiple parsers in order until one succeeds.
-
-* `optional<T>(parser: Parser<T>): Parser<T | undefined>` - Creates a parser that optionally matches the input parser. If the parser fails, returns undefined without consuming input.
-
-#### Look-ahead and Skipping
-
-* `lookAhead<T>(parser: Parser<T>): Parser<T>` - Creates a parser that looks ahead in the input stream without consuming any input. The parser will succeed with the result of the given parser but won't advance the input position.
-  
+#### regex(re: RegExp): Parser<string>
+Creates a parser that matches input against a regular expression. The regex must match at the start of the input.
 
 ```ts
-  const parser = lookAhead(char('a'))
-  parser.run('abc') // Right(['a', {...}])
-  // Input position remains at 'abc', 'a' is not consumed
-  ```
+const parser = regex(/[0-9]+/)
+parser.parse("123abc") // => "123"
+```
 
-* `skipSpaces: Parser<undefined>` - A parser that skips any number of space characters.
+#### alphabet: Parser<string>
+A parser that matches any single alphabetic character (a-z, A-Z).
 
-* `skipMany0<T>(parser: Parser<T>): Parser<undefined>` - Creates a parser that skips zero or more occurrences of the input parser.
+```ts
+const parser = alphabet
+parser.parse("abc") // => "a"
+parser.parse("123") // throws error
+```
 
-* `skipMany1<T>(parser: Parser<T>): Parser<undefined>` - Creates a parser that skips one or more occurrences of the input parser.
+#### digit: Parser<string>
+A parser that matches any single digit character (0-9).
 
-* `skipManyN<T>(parser: Parser<T>, n: number): Parser<undefined>` - Creates a parser that skips exactly n occurrences of the input parser.
-
-* `skipUntil<T>(parser: Parser<T>): Parser<undefined>` - Creates a parser that skips input until the given parser succeeds.
-
-#### Debug Tools
-
-* `debug<T>(parser: Parser<T>, label: string): Parser<T>` - Adds debug output to a parser.
-
-* `trace(label: string): Parser<void>` - Creates a parser that logs its input state and continues.
-
-* `debugState(label: string, state: ParserState, result: ParserResult<any>, options?: { inputPreviewLength?: number, separator?: string })` - Creates a debug output for a parser's current state and result.
-
-* `zip<A, B>(parserA: Parser<A>, parserB: Parser<B>): Parser<[A, B]>` - Combines results of two parsers into a tuple
-* `then<A, B>(parserA: Parser<A>, parserB: Parser<B>): Parser<B>` - Keeps only the second result
-* `thenDiscard<A, B>(parserA: Parser<A>, parserB: Parser<B>): Parser<A>` - Keeps only the first result
-* `parseUntilChar(char: string): Parser<string>` - Parses input until a specific character is found
-* `takeUntil(parser: Parser<T>): Parser<string>` - Takes input until parser succeeds (consuming the parser)
-* `takeUpto(parser: Parser<T>): Parser<string>` - Takes input until parser would succeed (not consuming the parser)
-* `skipMany0(parser: Parser<T>): Parser<undefined>` - Skips zero or more occurrences
-* `skipMany1(parser: Parser<T>): Parser<undefined>` - Skips one or more occurrences
-* `skipManyN(parser: Parser<T>, n: number): Parser<undefined>` - Skips exact number of occurrences
-* `skipUntil(parser: Parser<T>): Parser<undefined>` - Skips input until parser succeeds
+```ts
+const parser = digit
+parser.parse("123") // => "1"
+parser.parse("abc") // throws error
+```
 
 ## Contributing
 
