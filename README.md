@@ -129,7 +129,7 @@ manyN(digit, 2).run("123") // Right([["1","2"], ...])
 ### Sequencing and Choice
 
 ```typescript
-import { sequence, or, between, sepBy } from 'parserator'
+import { sequence, or, between, sepBy, zip, then, thenDiscard } from 'parserator'
 
 // Run parsers in sequence
 sequence([char("a"), char("b")]).run("abc")
@@ -146,20 +146,66 @@ between(char("("), char(")"), digit).run("(5)")
 // Match separated values
 sepBy(char(","), digit).run("1,2,3")
 // Right([["1","2","3"], ...])
+
+// Combine results of two parsers
+zip(char("a"), digit).run("a1")
+// Right([["a", "1"], ...])
+
+// Keep only second result
+then(char("a"), digit).run("a1")
+// Right(["1", ...])
+
+// Keep only first result
+thenDiscard(char("a"), digit).run("a1")
+// Right(["a", ...])
 ```
 
-### Look-ahead and Skipping
+### String and Pattern Matching
 
 ```typescript
-import { lookAhead, skipSpaces } from 'parserator'
+import { regex, parseUntilChar, takeUntil, takeUpto } from 'parserator'
 
-// Look ahead without consuming
-lookAhead(char("a")).run("abc")
-// Right(["a", ...]) // Position stays at "abc"
+// Match using regex
+regex(/[0-9]+/).run("123abc")
+// Right(["123", ...])
+
+// Parse until specific character
+parseUntilChar(";").run("hello;world")
+// Right(["hello", ...])
+
+// Take input until parser succeeds (consuming the parser)
+takeUntil(char(";")).run("hello;world")
+// Right(["hello", ...])
+
+// Take input until parser would succeed (not consuming the parser)
+takeUpto(char(";")).run("hello;world")
+// Right(["hello", ...])
+```
+
+### Skipping
+
+```typescript
+import { skipSpaces, skipMany0, skipMany1, skipManyN, skipUntil } from 'parserator'
 
 // Skip whitespace
 skipSpaces.then(char("a")).run("   abc")
 // Right(["a", ...])
+
+// Skip zero or more occurrences
+skipMany0(char(" ")).run("   abc")
+// Right([undefined, ...])
+
+// Skip one or more occurrences
+skipMany1(char(" ")).run("   abc")
+// Right([undefined, ...])
+
+// Skip exact number of occurrences
+skipManyN(char(" "), 3).run("   abc")
+// Right([undefined, ...])
+
+// Skip until parser succeeds
+skipUntil(char(";")).run("hello;world")
+// Right([undefined, ...])
 ```
 
 ## Error Handling
@@ -376,6 +422,17 @@ The core Parser class that represents a parsing computation.
 * `trace(label: string): Parser<void>` - Creates a parser that logs its input state and continues.
 
 * `debugState(label: string, state: ParserState, result: ParserResult<any>, options?: { inputPreviewLength?: number, separator?: string })` - Creates a debug output for a parser's current state and result.
+
+* `zip<A, B>(parserA: Parser<A>, parserB: Parser<B>): Parser<[A, B]>` - Combines results of two parsers into a tuple
+* `then<A, B>(parserA: Parser<A>, parserB: Parser<B>): Parser<B>` - Keeps only the second result
+* `thenDiscard<A, B>(parserA: Parser<A>, parserB: Parser<B>): Parser<A>` - Keeps only the first result
+* `parseUntilChar(char: string): Parser<string>` - Parses input until a specific character is found
+* `takeUntil(parser: Parser<T>): Parser<string>` - Takes input until parser succeeds (consuming the parser)
+* `takeUpto(parser: Parser<T>): Parser<string>` - Takes input until parser would succeed (not consuming the parser)
+* `skipMany0(parser: Parser<T>): Parser<undefined>` - Skips zero or more occurrences
+* `skipMany1(parser: Parser<T>): Parser<undefined>` - Skips one or more occurrences
+* `skipManyN(parser: Parser<T>, n: number): Parser<undefined>` - Skips exact number of occurrences
+* `skipUntil(parser: Parser<T>): Parser<undefined>` - Skips input until parser succeeds
 
 ## Contributing
 
