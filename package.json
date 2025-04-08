@@ -1,6 +1,6 @@
 {
 	"name": "parserator",
-	"version": "0.1.32",
+	"version": "0.1.33",
 	"description": "An elegant parser combinators library for Typescript",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -17,7 +17,10 @@
 			}
 		}
 	},
-	"files": ["dist", "README.md"],
+	"files": [
+		"dist",
+		"README.md"
+	],
 	"scripts": {
 		"build": "tsup && bun build.ts",
 		"test": "bun test",
