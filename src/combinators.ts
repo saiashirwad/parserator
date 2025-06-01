@@ -58,7 +58,7 @@ export function notFollowedBy<T, Ctx = {}>(
         newState
       )
     }
-    return Parser.succeed(true, newState)
+    return Parser.succeed(true, state)
   })
 }
 
@@ -232,7 +232,7 @@ export function sepBy<S, T, Ctx>(
 
     const { result: firstResult, state: firstState } = parser.run(currentState)
     if (Either.isLeft(firstResult)) {
-      return { result: firstResult as unknown as Either<T[], ParseErrorBundle>, state: firstState }
+      return Parser.succeed([], state)
     }
 
     results.push(firstResult.right)
@@ -343,7 +343,12 @@ function many_<S, T, Ctx = {}>(count: number) {
         // Add the item and update state
         const { result: value, state: newState } = itemResult
         results.push(value.right)
-        currentState = newState
+        
+        // Check that parser advanced - prevent infinite loops
+        if (newState.pos.offset <= currentState.pos.offset) {
+          throw new Error("Parser did not advance - infinite loop prevented")
+        }
+        currentState = newState as ParserState<Ctx>
 
         // If we have a separator, try to parse it
         if (separator) {
@@ -351,7 +356,11 @@ function many_<S, T, Ctx = {}>(count: number) {
           if (Either.isLeft(sepResult)) {
             break
           }
-          currentState = state
+          // Check that separator advanced too
+          if (state.pos.offset <= currentState.pos.offset) {
+            throw new Error("Separator parser did not advance - infinite loop prevented")
+          }
+          currentState = state as ParserState<Ctx>
         }
       }
 
@@ -440,8 +449,14 @@ function skipMany_<T, Ctx>(count: number) {
         if (Either.isLeft(result)) {
           break
         }
+        
+        // Check that parser advanced - prevent infinite loops
+        if (newState.pos.offset <= currentState.pos.offset) {
+          throw new Error("Parser did not advance - infinite loop prevented")
+        }
+        
         successes++
-        currentState = newState
+        currentState = newState as ParserState<Ctx>
       }
 
       if (successes >= count) {
@@ -613,7 +628,7 @@ export function optional<T, Ctx = {}>(parser: Parser<T, Ctx>) {
   return new Parser((state: ParserState<Ctx>) => {
     const { result, state: newState } = parser.run(state)
     if (Either.isLeft(result)) {
-      return Parser.succeed(undefined, newState)
+      return Parser.succeed(undefined, state)
     }
     // return result
     return Parser.succeed(result.right, newState)
@@ -634,21 +649,19 @@ export function sequence<Parsers extends Parser<any>[], Ctx = {}>(
   parsers: [...Parsers]
 ): Parser<LastParser<Parsers, Ctx>, Ctx> {
   return new Parser((state: ParserState<Ctx>) => {
-    const results: Parsers[] = []
     let currentState = state
+    let lastResult: any
 
     for (const parser of parsers) {
       const { result, state: newState } = parser.run(currentState)
       if (Either.isLeft(result)) {
         return { result: result as unknown as Either<LastParser<Parsers, Ctx>, ParseErrorBundle>, state: newState }
       }
-      results.push(result.right)
-      // TODO: fix this
-      // @ts-expect-error this should be fine
-      currentState = newState
+      lastResult = result.right
+      currentState = newState as ParserState<Ctx>
     }
 
-    return Parser.succeed(results.at(-1), currentState) as any
+    return Parser.succeed(lastResult, currentState) as any
   })
 }
 
@@ -668,7 +681,7 @@ export const regex = <Ctx = {}>(re: RegExp): Parser<string, Ctx> => {
       const match = nonGlobalRe.exec(state.remaining)
       if (match && match.index === 0) {
         const value = match[0]
-        return Parser.succeed(value, state)
+        return Parser.succeed(value, State.consume<Ctx>(state, value.length))
       }
       const message = `Expected ${re} but found ${state.remaining.slice(0, 10)}...`
       return Parser.fail(
