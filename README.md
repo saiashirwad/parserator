@@ -1,7 +1,6 @@
 # Parserator
 
-⚠️ **Warning**: This library is still in early development and has still got some rough edges. The API will change without notice. 
-
+⚠️ **Warning**: This library is still in early development and has still got some rough edges. The API will change without notice.
 
 [![npm version](https://badge.fury.io/js/parserator.svg)](https://badge.fury.io/js/parserator)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
