@@ -1,5 +1,6 @@
 import { Either } from "./either"
 import { Parser } from "./parser"
+import type { ParseErrorBundle } from "./rich-errors"
 import { type ParserState, State } from "./state"
 
 /**
@@ -231,7 +232,7 @@ export function sepBy<S, T, Ctx>(
 
     const { result: firstResult, state: firstState } = parser.run(currentState)
     if (Either.isLeft(firstResult)) {
-      return Parser.fail(firstResult.left, firstState)
+      return { result: firstResult as unknown as Either<T[], ParseErrorBundle>, state: firstState }
     }
 
     results.push(firstResult.right)
@@ -247,7 +248,7 @@ export function sepBy<S, T, Ctx>(
       const { result: itemResult, state: itemResultState } =
         parser.run(currentState)
       if (Either.isLeft(itemResult)) {
-        return Parser.fail(itemResult.left, itemResultState)
+        return { result: itemResult as unknown as Either<T[], ParseErrorBundle>, state: itemResultState }
       }
       results.push(itemResult.right)
       currentState = itemResultState
@@ -639,7 +640,7 @@ export function sequence<Parsers extends Parser<any>[], Ctx = {}>(
     for (const parser of parsers) {
       const { result, state: newState } = parser.run(currentState)
       if (Either.isLeft(result)) {
-        return Parser.fail(result.left, newState)
+        return { result: result as unknown as Either<LastParser<Parsers, Ctx>, ParseErrorBundle>, state: newState }
       }
       results.push(result.right)
       // TODO: fix this

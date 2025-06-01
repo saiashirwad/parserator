@@ -1,5 +1,6 @@
 import { Either } from "./either"
 import { Parser } from "./parser"
+import type { ParseErrorBundle } from "./rich-errors"
 
 export type Chain<Ctx = {}> = {
   <T, U>(parser: Parser<T, Ctx>, fn1: (value: T) => Parser<U>): Parser<U>
@@ -82,7 +83,7 @@ export const chain = <Ctx = {}>(
     for (const fn of fns) {
       const { result: parserResult, state: newState } = result
       if (Either.isLeft(parserResult)) {
-        return Parser.fail(parserResult.left, newState)
+        return { result: parserResult as unknown as Either<any, ParseErrorBundle>, state: newState }
       }
       const value = parserResult.right
       result = fn(value).run(newState)

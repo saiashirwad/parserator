@@ -1,10 +1,8 @@
 import { debug } from "./debug"
 import { Either } from "./either"
-import { printErrorContext } from "./errors"
-import { type ParseErr, type ParseErrorBundle, createSpan } from "./rich-errors"
+import { type ParseErr, ParseErrorBundle, createSpan } from "./rich-errors"
 import {
   type ParserContext,
-  ParserError,
   type ParserOptions,
   type ParserOutput,
   type ParserState,
@@ -50,16 +48,27 @@ export class Parser<T, Ctx = {}> {
     },
     state: ParserState<Ctx>
   ): ParserOutput<never, Ctx> {
-    const errorMessage =
-      error.message.startsWith("Parser Error:") ?
-        error.message
-      : printErrorContext(state, error.message)
+    const span = createSpan({
+      pos: {
+        offset: state.pos.offset,
+        line: state.pos.line,
+        column: state.pos.column
+      }
+    })
+
+    const parseErr: ParseErr = {
+      tag: "Custom",
+      span,
+      message: error.message,
+      context: state.context?.labelStack ?? [],
+      hints: []
+    }
+
+    const bundle = new ParseErrorBundle([parseErr], state.context?.source ?? state.remaining)
 
     return {
       state,
-      result: Either.left(
-        new ParserError(errorMessage, error.expected ?? [], error.found)
-      )
+      result: Either.left(bundle)
     }
   }
 
@@ -83,7 +92,7 @@ export class Parser<T, Ctx = {}> {
    */
   withError(
     makeMessage: (errorCtx: {
-      error: ParserError
+      error: ParseErrorBundle
       state: ParserState<Ctx>
     }) => string
   ): Parser<T, Ctx> {
@@ -95,8 +104,7 @@ export class Parser<T, Ctx = {}> {
             message: makeMessage({
               error: output.result.left,
               state: output.state
-            }),
-            expected: output.result.left.expected
+            })
           },
           output.state
         )
@@ -110,10 +118,7 @@ export class Parser<T, Ctx = {}> {
     context = { source: input } as ParserContext<Ctx>
   ): ParserOutput<T, Ctx> {
     const { result, state } = this.run(State.fromInput(input, context))
-    if (Either.isLeft(result)) {
-      return Parser.fail(result.left, state)
-    }
-    return Parser.succeed(result.right, state)
+    return { result, state }
   }
 
   withTrace(label: string): Parser<T, Ctx> {
@@ -148,7 +153,7 @@ export class Parser<T, Ctx = {}> {
     )
 
     if (Either.isLeft(result)) {
-      throw new Error(result.left.message)
+      throw result.left
     }
     return result.right
   }
@@ -157,7 +162,7 @@ export class Parser<T, Ctx = {}> {
     return new Parser<B, Ctx>(state => {
       const { result, state: newState } = this.run(state)
       if (Either.isLeft(result)) {
-        return Parser.fail(result.left, state)
+        return { state, result: result as unknown as Either<B, ParseErrorBundle> }
       }
       return Parser.succeed(f(result.right), newState)
     })
@@ -167,7 +172,7 @@ export class Parser<T, Ctx = {}> {
     return new Parser<B, Ctx>(state => {
       const { result, state: newState } = this.run(state)
       if (Either.isLeft(result)) {
-        return Parser.fail(result.left, newState)
+        return { state: newState, result: result as unknown as Either<B, ParseErrorBundle> }
       }
       const nextParser = f(result.right)
       return nextParser.run(newState)
@@ -210,11 +215,11 @@ export class Parser<T, Ctx = {}> {
     return new Parser(state => {
       const { result: a, state: stateA } = this.run(state)
       if (Either.isLeft(a)) {
-        return Parser.fail(a.left, stateA)
+        return { result: a as unknown as Either<[T, B], ParseErrorBundle>, state: stateA }
       }
       const { result: b, state: stateB } = parserB.run(stateA)
       if (Either.isLeft(b)) {
-        return Parser.fail(b.left, stateB)
+        return { result: b as unknown as Either<[T, B], ParseErrorBundle>, state: stateB }
       }
       return Parser.succeed([a.right, b.right], stateB)
     })
@@ -239,12 +244,12 @@ export class Parser<T, Ctx = {}> {
     return new Parser<BindResult<T, K, B>, Ctx>(state => {
       const { result: resultA, state: stateA } = this.run(state)
       if (Either.isLeft(resultA)) {
-        return Parser.fail(resultA.left, stateA)
+        return { result: resultA as unknown as Either<BindResult<T, K, B>, ParseErrorBundle>, state: stateA }
       }
       const nextParser = other instanceof Parser ? other : other(resultA.right)
       const { result: resultB, state: stateB } = nextParser.run(stateA)
       if (Either.isLeft(resultB)) {
-        return Parser.fail(resultB.left, stateB)
+        return { result: resultB as unknown as Either<BindResult<T, K, B>, ParseErrorBundle>, state: stateB }
       }
       return Parser.succeed(
         { ...resultA.right, [k]: resultB.right } as BindResult<T, K, B>,
@@ -287,7 +292,7 @@ export class Parser<T, Ctx = {}> {
       while (!current.done) {
         const { result, state: updatedState } = current.value.run(currentState)
         if (Either.isLeft(result)) {
-          return Parser.fail(result.left, updatedState)
+          return { result: result as unknown as Either<T, ParseErrorBundle>, state: updatedState }
         }
         currentState = updatedState
         current = iterator.next(result.right)
@@ -354,23 +359,14 @@ export class Parser<T, Ctx = {}> {
     errorBundle: { errors: ParseErr[] },
     state: ParserState<Ctx>
   ): ParserOutput<never, Ctx> {
-    // For now, convert to legacy error for backwards compatibility
-    // In a future version, we'll return the rich error directly
-    const primary = errorBundle.errors.reduce((furthest, current) =>
-      current.span.offset > furthest.span.offset ? current : furthest
-    )
-    
-    const legacyError = new ParserError(
-      primary.tag === "Custom" 
-        ? primary.message 
-        : `${primary.tag}: ${JSON.stringify(primary)}`,
-      primary.tag === "Expected" ? primary.items : [],
-      primary.tag === "Unexpected" ? primary.found : undefined
+    const bundle = new ParseErrorBundle(
+      errorBundle.errors,
+      state.context?.source ?? state.remaining
     )
 
     return {
       state,
-      result: Either.left(legacyError)
+      result: Either.left(bundle)
     }
   }
 }
@@ -385,7 +381,7 @@ export function parser<T, Ctx = unknown>(
     while (!current.done) {
       const { result, state: updatedState } = current.value.run(currentState)
       if (Either.isLeft(result)) {
-        return Parser.fail(result.left, updatedState)
+        return { result: result as unknown as Either<T, ParseErrorBundle>, state: updatedState }
       }
       currentState = updatedState
       current = iterator.next(result.right)

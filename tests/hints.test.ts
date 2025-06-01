@@ -7,6 +7,19 @@ import {
 	levenshteinDistance,
 	stringWithHints,
 } from "../src/hints"
+import type { ParseErrorBundle } from "../src/rich-errors"
+
+// Helper to get error message from ParseErrorBundle
+function getErrorMessage(bundle: ParseErrorBundle): string {
+	const primary = bundle.primary
+	if (primary.tag === "Custom") {
+		return primary.message
+	} else if (primary.tag === "Unexpected") {
+		return `Unexpected: ${primary.found}`
+	} else {
+		return `Expected: ${primary.items.join(", ")}`
+	}
+}
 
 describe("hint generation", () => {
 	describe("levenshteinDistance", () => {
@@ -109,8 +122,14 @@ describe("hint generation", () => {
 			expect(Either.isLeft(result.result)).toBe(true)
 			if (Either.isLeft(result.result)) {
 				const error = result.result.left
-				expect(error.message).toContain("Unexpected")
-				expect(error.message).toContain("lamdba")
+				const primary = error.primary
+				if (primary.tag === "Unexpected") {
+					expect(primary.found).toBe("lamdba")
+					expect(primary.hints).toContain("lambda")
+				} else if (primary.tag === "Custom") {
+					expect(primary.message).toContain("Unexpected")
+					expect(primary.message).toContain("lamdba")
+				}
 			}
 		})
 
@@ -119,7 +138,7 @@ describe("hint generation", () => {
 			expect(Either.isLeft(result.result)).toBe(true)
 			if (Either.isLeft(result.result)) {
 				const error = result.result.left
-				expect(error.message).toContain("Unexpected")
+				expect(getErrorMessage(error)).toContain("Unexpected")
 			}
 		})
 
@@ -157,7 +176,7 @@ describe("hint generation", () => {
 			expect(Either.isLeft(result.result)).toBe(true)
 			if (Either.isLeft(result.result)) {
 				const error = result.result.left
-				expect(error.message).toContain("gren")
+				expect(getErrorMessage(error)).toContain("gren")
 			}
 		})
 
@@ -190,7 +209,7 @@ describe("hint generation", () => {
 			expect(Either.isLeft(result.result)).toBe(true)
 			if (Either.isLeft(result.result)) {
 				const error = result.result.left
-				expect(error.message).toContain("gren")
+				expect(getErrorMessage(error)).toContain("gren")
 			}
 		})
 
@@ -199,8 +218,8 @@ describe("hint generation", () => {
 			expect(Either.isLeft(result.result)).toBe(true)
 			if (Either.isLeft(result.result)) {
 				const error = result.result.left
-				expect(error.message).toContain("Expected")
-				expect(error.message).toContain("string literal")
+				expect(getErrorMessage(error)).toContain("Expected")
+				expect(getErrorMessage(error)).toContain("string literal")
 			}
 		})
 
@@ -209,7 +228,7 @@ describe("hint generation", () => {
 			expect(Either.isLeft(result.result)).toBe(true)
 			if (Either.isLeft(result.result)) {
 				const error = result.result.left
-				expect(error.message).toContain("closing quote")
+				expect(getErrorMessage(error)).toContain("closing quote")
 			}
 		})
 
@@ -232,7 +251,7 @@ describe("hint generation", () => {
 			expect(Either.isLeft(result.result)).toBe(true)
 			if (Either.isLeft(result.result)) {
 				const error = result.result.left
-				expect(error.message).toContain("Expected")
+				expect(getErrorMessage(error)).toContain("Expected")
 			}
 		})
 

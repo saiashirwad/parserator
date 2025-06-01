@@ -19,6 +19,19 @@ import {
 } from "../src/combinators"
 import { Either } from "../src/either"
 import { Parser } from "../src/parser"
+import type { ParseErrorBundle } from "../src/rich-errors"
+
+// Helper to get error message from ParseErrorBundle
+function getErrorMessage(bundle: ParseErrorBundle): string {
+	const primary = bundle.primary
+	if (primary.tag === "Custom") {
+		return primary.message
+	} else if (primary.tag === "Unexpected") {
+		return `Unexpected: ${primary.found}`
+	} else {
+		return `Expected: ${primary.items.join(", ")}`
+	}
+}
 
 const stringParser = skipSpaces
   .then(char('"'))
@@ -254,7 +267,7 @@ describe("error recovery", () => {
     const assignment = identifier
       .thenDiscard(char("=").thenDiscard(skipSpaces))
       .then(number)
-      .withError(({ error }) => error.message)
+      .withError(({ error }) => getErrorMessage(error))
 
     const { result } = assignment.parse("foo = bar")
     expect(Either.isLeft(result)).toBe(true)

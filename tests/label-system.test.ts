@@ -2,6 +2,19 @@ import { describe, expect, test } from "bun:test"
 import { char, regex } from "../src/combinators"
 import { Either } from "../src/either"
 import { Parser } from "../src/parser"
+import type { ParseErrorBundle } from "../src/rich-errors"
+
+// Helper to get error message from ParseErrorBundle
+function getErrorMessage(bundle: ParseErrorBundle): string {
+	const primary = bundle.primary
+	if (primary.tag === "Custom") {
+		return primary.message
+	} else if (primary.tag === "Unexpected") {
+		return `Unexpected: ${primary.found}`
+	} else {
+		return `Expected: ${primary.items.join(", ")}`
+	}
+}
 
 describe("label system", () => {
 	describe(".label() method", () => {
@@ -13,7 +26,7 @@ describe("label system", () => {
 			if (Either.isLeft(result.result)) {
 				const error = result.result.left
 				// The error should reference the label
-				expect(error.message).toContain("Expected")
+				expect(getErrorMessage(error)).toContain("Expected")
 			}
 		})
 
@@ -29,7 +42,7 @@ describe("label system", () => {
 			expect(Either.isLeft(result.result)).toBe(true)
 			if (Either.isLeft(result.result)) {
 				const error = result.result.left
-				expect(error.message).toContain("Expected")
+				expect(getErrorMessage(error)).toContain("Expected")
 			}
 		})
 
@@ -64,7 +77,7 @@ describe("label system", () => {
 				const error = result.result.left
 				// The expect method creates both a label and a withError message
 				// For now, just check that it contains some expected text
-				expect(error.message).toContain("Expected")
+				expect(getErrorMessage(error)).toContain("Expected")
 			}
 		})
 
@@ -103,7 +116,7 @@ describe("label system", () => {
 			expect(Either.isLeft(result.result)).toBe(true)
 			if (Either.isLeft(result.result)) {
 				const error = result.result.left
-				expect(error.message).toContain("Expected")
+				expect(getErrorMessage(error)).toContain("Expected")
 			}
 		})
 

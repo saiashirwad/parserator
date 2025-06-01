@@ -28,7 +28,9 @@ export function debugState<Ctx = {}>(
     "Result:",
     Either.isRight(result.result) ?
       `Success: ${JSON.stringify(result.result.right.value)}`
-    : `Error: ${result.result.left.message}`
+    : `Error: ${result.result.left.primary.tag === "Custom" ? 
+        result.result.left.primary.message : 
+        `${result.result.left.primary.tag}: ${JSON.stringify(result.result.left.primary)}`}`
   )
   console.log(separator)
 }

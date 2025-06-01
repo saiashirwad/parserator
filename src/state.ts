@@ -1,5 +1,6 @@
 import type { Either } from "./either"
 import type { Prettify } from "./types"
+import type { ParseErrorBundle } from "./rich-errors"
 
 export type ParserContext<Ctx = {}> = Prettify<
   Ctx & {
@@ -21,7 +22,7 @@ export class ParserError {
 
 export type ParserOutput<T, Ctx = {}> = {
   state: ParserState<Ctx>
-  result: Either<T, ParserError>
+  result: Either<T, ParseErrorBundle>
 }
 
 export type SourcePosition = {
