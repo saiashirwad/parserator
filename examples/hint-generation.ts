@@ -185,7 +185,7 @@ const configTestCases = [
 for (const testCase of configTestCases) {
 	const result = configLineParser.parse(testCase)
 	if (Either.isRight(result.result)) {
-		console.log(`✓ "${testCase}" -> ${JSON.stringify(result.result.right)}`)
+		console.log(result)
 	} else {
 		console.log(`✗ "${testCase}" -> ${result.result.left.message}`)
 	}

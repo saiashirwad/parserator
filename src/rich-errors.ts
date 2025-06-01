@@ -7,7 +7,13 @@ export type Span = {
 
 export type ParseErr =
   | { tag: "Expected"; span: Span; items: string[]; context: string[] }
-  | { tag: "Unexpected"; span: Span; found: string; context: string[] }
+  | {
+      tag: "Unexpected"
+      span: Span
+      found: string
+      context: string[]
+      hints?: string[]
+    }
   | {
       tag: "Custom"
       span: Span
