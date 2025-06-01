@@ -81,8 +81,10 @@ export class ErrorFormatter {
 			parts.push(`  ${errorLine}`)
 		}
 
-		// Add pointer arrow
-		const pointer = this.createPointer(primary.span.column, primary.span.length)
+		// Add pointer arrow (accounting for line prefix)
+		const linePrefix = `  >   ${primary.span.line.toString().padStart(3, " ")} | `
+		const adjustedColumn = primary.span.column + linePrefix.length - 2 // -2 for the "  " we add
+		const pointer = this.createPointer(adjustedColumn, primary.span.length)
 		parts.push(`  ${pointer}`)
 
 		// Error message
@@ -137,8 +139,10 @@ export class ErrorFormatter {
 			parts.push(`  ${errorLine}`)
 		}
 
-		// Add pointer
-		const pointer = this.createPointer(primary.span.column, primary.span.length, false)
+		// Add pointer (accounting for line prefix)
+		const linePrefix = `  >   ${primary.span.line.toString().padStart(3, " ")} | `
+		const adjustedColumn = primary.span.column + linePrefix.length - 2 // -2 for the "  " we add
+		const pointer = this.createPointer(adjustedColumn, primary.span.length, false)
 		parts.push(`  ${pointer}`)
 
 		// Error message
@@ -200,7 +204,7 @@ export class ErrorFormatter {
 			)
 		}
 
-		// Pointer
+		// Pointer (accounting for line prefix in plain text representation)
 		const pointer = this.createPointer(primary.span.column, primary.span.length, false)
 		parts.push(`    <div class="error-pointer">${pointer}</div>`)
 		parts.push("  </div>")

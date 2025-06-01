@@ -20,11 +20,9 @@ const optionalWhitespace = optional(whitespace)
 export let expr: Parser<LispExpr.LispExpr>
 
 const symbol = parser(function* () {
-  yield* optionalWhitespace
   const name = yield* takeUpto(
     or(char(" "), char("\n"), char("\t"), char(")"), char("("))
   )
-  yield* optionalWhitespace
   if (name === "") return yield* Parser.error("Empty symbol")
   return LispExpr.symbol(name)
 })
@@ -54,13 +52,18 @@ const list = parser(function* () {
   yield* char("(")
   yield* optionalWhitespace
 
-  const items = yield* many0(expr)
+  const items = yield* many0(parser(function* () {
+    yield* optionalWhitespace
+    const item = yield* expr
+    yield* optionalWhitespace
+    return item
+  }))
+  
   if (items.length === 0) {
-    return yield* Parser.error("Empty list")
+    return yield* Parser.error("Empty list not allowed")
   }
 
-  yield* optionalWhitespace
-  yield* char(")").withError(() => "Incomplete List")
+  yield* char(")").withError(() => "Missing closing parenthesis ')'")
   return items
 })
 
@@ -120,7 +123,6 @@ const letParser = (bindingsExpr: LispExpr.List, bodyExpr: LispExpr.LispExpr) =>
 expr = Parser.lazy(() =>
   parser(function* () {
     yield* optionalWhitespace
-    const state = yield* peekState
     const isList = yield* peekAhead(1).map(x => x === "(")
     const result = yield* isList ? listParser : atom
     yield* optionalWhitespace
