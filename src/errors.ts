@@ -1,4 +1,4 @@
-import type { ParserError, ParserState, SourcePosition } from "./state"
+import type { ParserState, SourcePosition } from "./state"
 
 export function printPosition(position: SourcePosition) {
   return `line ${position.line}, column ${position.column}`
@@ -41,15 +41,4 @@ export function printErrorLine<Ctx = {}>(state: ParserState<Ctx>) {
 
 export function printPositionWithOffset(position: SourcePosition) {
   return `line ${position.line}, column ${position.column}, offset ${position.offset}`
-}
-
-export function getErrorLine<Ctx = {}>(
-  error: ParserError,
-  state: ParserState<Ctx>
-) {
-  const errorLine = state.context.source.slice(
-    state.pos.offset,
-    state.context.source.indexOf("\n", state.pos.offset)
-  )
-  return errorLine
 }

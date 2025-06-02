@@ -55,16 +55,16 @@ export function createSpan(
   }
 }
 
-// Adapter to maintain backwards compatibility with existing ParserError
-import { ParserError } from "./state"
+// // Adapter to maintain backwards compatibility with existing ParserError
+// import { ParserError } from "./state"
 
-export function legacyError(bundle: ParseErrorBundle): ParserError {
-  const primary = bundle.primary
-  return new ParserError(
-    primary.tag === "Custom" ?
-      primary.message
-    : `${primary.tag}: ${JSON.stringify(primary)}`,
-    primary.tag === "Expected" ? primary.items : [],
-    primary.tag === "Unexpected" ? primary.found : undefined
-  )
-}
+// export function legacyError(bundle: ParseErrorBundle): ParserError {
+//   const primary = bundle.primary
+//   return new ParserError(
+//     primary.tag === "Custom" ?
+//       primary.message
+//     : `${primary.tag}: ${JSON.stringify(primary)}`,
+//     primary.tag === "Expected" ? primary.items : [],
+//     primary.tag === "Unexpected" ? primary.found : undefined
+//   )
+// }

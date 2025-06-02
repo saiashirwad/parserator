@@ -22,20 +22,19 @@
 
 import { describe, expect, it } from "bun:test"
 import {
-  regex,
+  char,
+  lookAhead,
   many0,
   many1,
-  optional,
-  sepBy,
-  sequence,
-  lookAhead,
   notFollowedBy,
+  optional,
   or,
-  char
+  regex,
+  sepBy,
+  sequence
 } from "../src/combinators"
-import { Parser } from "../src/parser"
-import { State } from "../src/state"
 import { Either } from "../src/either"
+import { State } from "../src/state"
 
 describe("regex parsers", () => {
   describe("basic regex matching", () => {

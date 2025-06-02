@@ -11,7 +11,7 @@ import {
   string,
   takeUpto
 } from "../../src"
-import { peekAhead, peekState } from "../../src/utils"
+import { peekAhead } from "../../src/utils"
 import { LispExpr } from "./ast"
 
 const whitespace = skipMany0(or(char(" "), char("\n"), char("\t")))
@@ -52,13 +52,15 @@ const list = parser(function* () {
   yield* char("(")
   yield* optionalWhitespace
 
-  const items = yield* many0(parser(function* () {
-    yield* optionalWhitespace
-    const item = yield* expr
-    yield* optionalWhitespace
-    return item
-  }))
-  
+  const items = yield* many0(
+    parser(function* () {
+      yield* optionalWhitespace
+      const item = yield* expr
+      yield* optionalWhitespace
+      return item
+    })
+  )
+
   if (items.length === 0) {
     return yield* Parser.error("Empty list not allowed")
   }
