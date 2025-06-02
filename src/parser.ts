@@ -40,6 +40,18 @@ export class Parser<T, Ctx = {}> {
     }
   }
 
+  static lift = <A, Ctx = {}>(a: A): Parser<A, Ctx> =>
+    new Parser(state => Parser.succeed(a, state))
+
+  static liftA2 = <A, B, C>(
+    ma: Parser<A>,
+    mb: Parser<B>,
+    f: (a: A, b: B) => C
+  ) => ma.zip(mb).map(args => f(...args))
+
+  static ap = <A, B>(ma: Parser<A>, mf: Parser<(_: A) => B>) =>
+    mf.zip(ma).map(([f, a]) => f(a))
+
   static fail<Ctx = {}>(
     error: {
       message: string

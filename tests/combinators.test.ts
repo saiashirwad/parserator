@@ -23,14 +23,14 @@ import type { ParseErrorBundle } from "../src/rich-errors"
 
 // Helper to get error message from ParseErrorBundle
 function getErrorMessage(bundle: ParseErrorBundle): string {
-	const primary = bundle.primary
-	if (primary.tag === "Custom") {
-		return primary.message
-	} else if (primary.tag === "Unexpected") {
-		return `Unexpected: ${primary.found}`
-	} else {
-		return `Expected: ${primary.items.join(", ")}`
-	}
+  const primary = bundle.primary
+  if (primary.tag === "Custom") {
+    return primary.message
+  } else if (primary.tag === "Unexpected") {
+    return `Unexpected: ${primary.found}`
+  } else {
+    return `Expected: ${primary.items.join(", ")}`
+  }
 }
 
 const stringParser = skipSpaces

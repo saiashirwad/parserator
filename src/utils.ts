@@ -5,7 +5,6 @@ export const peekState = new Parser(s => {
 })
 
 export const peekRemaining = new Parser(s => {
-  console.log(s.remaining)
   return Parser.succeed(s.remaining, s)
 })
 

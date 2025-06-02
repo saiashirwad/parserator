@@ -3,10 +3,10 @@ import {
   digit,
   many0,
   many1,
+  parser,
   optional,
   or,
   Parser,
-  parser,
   skipMany0,
   string,
   takeUpto
@@ -29,7 +29,7 @@ const symbol = parser(function* () {
 
 const number = parser(function* () {
   const sign = (yield* optional(char("-"))) ?? ""
-  const digits = yield* many1(digit)
+  const digits = yield* many1(digit).withError(() => "Expected digit")
   const value = parseInt(sign + digits.join(""))
   return LispExpr.number(value)
 })

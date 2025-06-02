@@ -1,9 +1,9 @@
 import {
   char,
   ErrorFormatter,
+  parser,
   optional,
   or,
-  parser,
   regex,
   string,
   takeUpto

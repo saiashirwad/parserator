@@ -83,7 +83,10 @@ export const chain = <Ctx = {}>(
     for (const fn of fns) {
       const { result: parserResult, state: newState } = result
       if (Either.isLeft(parserResult)) {
-        return { result: parserResult as unknown as Either<any, ParseErrorBundle>, state: newState }
+        return {
+          result: parserResult as unknown as Either<any, ParseErrorBundle>,
+          state: newState
+        }
       }
       const value = parserResult.right
       result = fn(value).run(newState)

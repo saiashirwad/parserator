@@ -248,7 +248,10 @@ export function sepBy<S, T, Ctx>(
       const { result: itemResult, state: itemResultState } =
         parser.run(currentState)
       if (Either.isLeft(itemResult)) {
-        return { result: itemResult as unknown as Either<T[], ParseErrorBundle>, state: itemResultState }
+        return {
+          result: itemResult as unknown as Either<T[], ParseErrorBundle>,
+          state: itemResultState
+        }
       }
       results.push(itemResult.right)
       currentState = itemResultState
@@ -343,7 +346,7 @@ function many_<S, T, Ctx = {}>(count: number) {
         // Add the item and update state
         const { result: value, state: newState } = itemResult
         results.push(value.right)
-        
+
         // Check that parser advanced - prevent infinite loops
         if (newState.pos.offset <= currentState.pos.offset) {
           throw new Error("Parser did not advance - infinite loop prevented")
@@ -358,7 +361,9 @@ function many_<S, T, Ctx = {}>(count: number) {
           }
           // Check that separator advanced too
           if (state.pos.offset <= currentState.pos.offset) {
-            throw new Error("Separator parser did not advance - infinite loop prevented")
+            throw new Error(
+              "Separator parser did not advance - infinite loop prevented"
+            )
           }
           currentState = state as ParserState<Ctx>
         }
@@ -449,12 +454,12 @@ function skipMany_<T, Ctx>(count: number) {
         if (Either.isLeft(result)) {
           break
         }
-        
+
         // Check that parser advanced - prevent infinite loops
         if (newState.pos.offset <= currentState.pos.offset) {
           throw new Error("Parser did not advance - infinite loop prevented")
         }
-        
+
         successes++
         currentState = newState as ParserState<Ctx>
       }
@@ -655,7 +660,13 @@ export function sequence<Parsers extends Parser<any>[], Ctx = {}>(
     for (const parser of parsers) {
       const { result, state: newState } = parser.run(currentState)
       if (Either.isLeft(result)) {
-        return { result: result as unknown as Either<LastParser<Parsers, Ctx>, ParseErrorBundle>, state: newState }
+        return {
+          result: result as unknown as Either<
+            LastParser<Parsers, Ctx>,
+            ParseErrorBundle
+          >,
+          state: newState
+        }
       }
       lastResult = result.right
       currentState = newState as ParserState<Ctx>

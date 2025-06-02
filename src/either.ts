@@ -33,17 +33,16 @@ export const Either = {
     return either._tag === "Right"
   },
 
-  match<R, L, T>(
-    either: Either<R, L>,
-    patterns: {
-      onLeft: (left: L) => T
-      onRight: (right: R) => T
+  match<R, L, T>(patterns: {
+    onLeft: (left: L) => T
+    onRight: (right: R) => T
+  }) {
+    return (either: Either<R, L>): T => {
+      if (Either.isLeft(either)) {
+        return patterns.onLeft(either.left)
+      }
+      return patterns.onRight(either.right)
     }
-  ): T {
-    if (Either.isLeft(either)) {
-      return patterns.onLeft(either.left)
-    }
-    return patterns.onRight(either.right)
   },
 
   gen<R, L>(f: () => Generator<Either<any, L>, R, any>): Either<R, L> {
