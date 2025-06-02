@@ -8,7 +8,7 @@ export class Left<L, R = never> {
   }
 }
 
-export class Right<R, L> {
+export class Right<R, L = any> {
   readonly _tag = "Right"
   constructor(public readonly right: R) {}
   *[Symbol.iterator](): Generator<Either<R, L>, R, any> {
@@ -33,15 +33,12 @@ export const Either = {
     return either._tag === "Right"
   },
 
-  match<R, L, T>(patterns: {
-    onLeft: (left: L) => T
-    onRight: (right: R) => T
-  }) {
+  match<R, L, T>(onLeft: (left: L) => T, onRight: (right: R) => T) {
     return (either: Either<R, L>): T => {
       if (Either.isLeft(either)) {
-        return patterns.onLeft(either.left)
+        return onLeft(either.left)
       }
-      return patterns.onRight(either.right)
+      return onRight(either.right)
     }
   },
 

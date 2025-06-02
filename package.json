@@ -62,7 +62,7 @@
   },
   "homepage": "https://github.com/saiashirwad/parserator#readme",
   "prettier": {
-    "printWidth": 80,
+    "printWidth": 100,
     "useTabs": false,
     "semi": false,
     "trailingComma": "none",
