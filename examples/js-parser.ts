@@ -9,6 +9,7 @@ import {
   many,
   optional,
   or,
+  parser,
   Parser,
   regex,
   sepBy,
@@ -160,18 +161,18 @@ const primaryExpression: Parser<Expression> = or(
           const key = yield* or(identifier, stringLiteral).expect("property key");
           // Check if we have a colon (for key: value syntax)
           const hasColon = yield* optional(token(char(":")));
-          
+
           let value: Expression;
           if (hasColon) {
             value = yield* Parser.lazy(() => expression).expect("property value");
           } else {
             // Shorthand property - key must be an identifier
-            if (typeof key !== 'string') {
+            if (typeof key !== "string") {
               return yield* Parser.error("Shorthand properties must use identifiers");
             }
             value = { type: "identifier" as const, name: key };
           }
-          
+
           return { key, value };
         }),
         token(char(","))
@@ -351,7 +352,7 @@ const functionStatement: Parser<Statement> = Parser.gen(function* () {
   };
 });
 
-const ifStatement: Parser<Statement> = Parser.gen(function* () {
+const ifStatement: Parser<Statement> = parser(function* () {
   yield* keyword("if");
   yield* commit();
 
@@ -362,7 +363,7 @@ const ifStatement: Parser<Statement> = Parser.gen(function* () {
   const consequent = yield* statement.expect("if body");
 
   const alternate = yield* optional(
-    Parser.gen(function* () {
+    parser(function* () {
       yield* keyword("else");
       yield* commit();
       return yield* statement.expect("else body");
@@ -428,18 +429,18 @@ const testCases = [
   `const obj = { name: "Alice", age: 30 };`,
   `const arr = [1, 2, 3];`,
   `result = fn(x, y) + z;`,
-  
+
   // Object literal test cases
   `const obj = { name: "Alice", age };`, // Shorthand property
   `const obj2 = { x };`, // Single shorthand property
   `const mixed = { a: 1, b, c: 3, d };`, // Mixed regular and shorthand
   `const nested = { a: { b: 1 }, c };`, // Nested object with shorthand
   `const empty = {};`, // Empty object
-  
+
   // Array literal test cases
   `const empty = [];`, // Empty array
   `const nested = [1, [2, 3], 4];`, // Nested array
-  
+
   // Complex expressions
   `const result = { x: fn(a, b), y };`, // Function call in object
   `const val = obj.prop.method();`, // Chained member access
@@ -453,7 +454,7 @@ const testCases = [
   `let if = 10;`, // Reserved keyword as identifier
   `return 42`, // Missing semicolon
   `{ let x = 1; let y = 2; }`, // Block statement
-  `const obj = { "str": value };`, // String key with colon
+  `const obj = { "str": value };` // String key with colon
 ];
 
 console.log("=== Simple JavaScript Parser ===\n");

@@ -1,138 +1,120 @@
-import { char, ErrorFormatter, parser, optional, or, regex, string, takeUpto } from "../src";
+import {
+  atomic,
+  between,
+  char,
+  commit,
+  Either,
+  eof,
+  ErrorFormatter,
+  many,
+  optional,
+  or,
+  Parser,
+  regex,
+  skipMany0,
+  string
+} from "../src";
 
-// Data structures for INI file representation
-interface IniSection {
+const whitespace = regex(/[ \t]+/).label("whitespace");
+const lineBreak = or(string("\r\n"), string("\n"), string("\r")).label("line break");
+const blankLine = regex(/[ \t]*[\r\n]/).label("blank line");
+const comment = regex(/[;#][^\n\r]*/).label("comment");
+const space = or(whitespace, comment);
+const spaces = skipMany0(space);
+const spacesNewlines = skipMany0(or(space, lineBreak, blankLine));
+
+function token<T>(parser: Parser<T>): Parser<T> {
+  return parser.trimLeft(spaces);
+}
+
+type IniValue = {
+  type: "section";
   name: string;
-  properties: Map<string, string>;
-}
+  properties: Array<{ key: string; value: string }>;
+};
 
-// Helper parsers
-const whitespace = regex(/\s*/);
-const horizontalSpace = regex(/[ \t]*/);
-const eol = or(string("\n"), string("\r\n"), string("\r"));
+type IniFile = IniValue[];
 
-// Parse section header like [database]
-const sectionHeader = parser(function* () {
-  yield* char("[");
-  const name = yield* takeUpto(char("]"));
-  yield* char("]");
-  return name.trim();
+const sectionName = between(
+  char("["),
+  char("]"),
+  regex(/[^\]]+/).map(s => s.trim())
+).label("section name");
+
+const key = token(regex(/[a-zA-Z0-9_\-\.]+/).label("property key"));
+
+const value = regex(/[^\r\n]*/)
+  .map(s => s.trim())
+  .label("property value");
+
+const property = atomic(
+  Parser.gen(function* () {
+    const k = yield* key;
+    yield* token(char("="));
+    yield* commit();
+    const v = yield* value.expect("property value after '='");
+    return { key: k, value: v };
+  })
+);
+
+const section: Parser<IniValue> = atomic(
+  Parser.gen(function* () {
+    yield* spacesNewlines;
+    yield* token(char("["));
+    yield* commit();
+    const name = yield* regex(/[^\]]+/)
+      .map(s => s.trim())
+      .expect("section name");
+    yield* char("]").expect("closing bracket ']'");
+    yield* optional(lineBreak);
+
+    const properties = yield* many(
+      Parser.gen(function* () {
+        yield* spaces;
+        const prop = yield* property;
+        yield* optional(lineBreak);
+        yield* spacesNewlines;
+        return prop;
+      })
+    );
+
+    return {
+      type: "section" as const,
+      name,
+      properties
+    };
+  })
+);
+
+const iniFile: Parser<IniFile> = Parser.gen(function* () {
+  yield* spacesNewlines;
+  const sections = yield* many(section);
+  yield* spacesNewlines;
+  yield* eof.expect("end of input");
+  return sections;
 });
 
-// Parse key (left side of =)
-const key = parser(function* () {
-  const k = yield* takeUpto(char("="));
-  return k.trim();
-});
+const formatter = new ErrorFormatter("ansi");
 
-// Parse value (right side of =, until end of line)
-const value = parser(function* () {
-  const v = yield* takeUpto(eol);
-  return v.trim();
-});
+const testCase = `
+[database]
+host = localhost
+port = 5432
+user = admin
+; This is a comment
+password = secret123
 
-// Parse key-value pair like "host=localhost"
-const keyValue = parser(function* () {
-  yield* horizontalSpace;
-  const k = yield* key;
-  yield* char("=");
-  const v = yield* value;
-  return { key: k, value: v };
-});
-
-// Parse a complete section with key-value pairs
-const iniSection = parser(function* () {
-  // Parse section header
-  yield* horizontalSpace;
-  const header = yield* sectionHeader;
-  yield* horizontalSpace;
-  yield* optional(eol);
-
-  const pairs: Array<{ key: string; value: string }> = [];
-
-  // Parse key-value pairs
-  while (true) {
-    yield* horizontalSpace;
-
-    // Try to parse a key-value pair
-    const pair = yield* optional(keyValue);
-    if (!pair) {
-      break;
-    }
-
-    pairs.push(pair);
-    yield* optional(eol);
-  }
-
-  const properties = new Map<string, string>();
-  for (const pair of pairs) {
-    properties.set(pair.key, pair.value);
-  }
-
-  return { name: header, properties };
-});
-
-// Test cases demonstrating the comparison with Megaparsec
-console.log("=== Test 1: Valid section header ===");
-const input1 = "[database]";
-const result1 = sectionHeader.parse(input1);
-if (result1.result._tag === "Left") {
-  const formatter = new ErrorFormatter("ansi");
-  console.log(formatter.format(result1.result.left));
-} else {
-  console.log("Success:", result1.result.right);
-}
-
-console.log("\n=== Test 2: Section with key-value pairs ===");
-const input2 = `[database]
-host=localhost
-port=5432
-user=admin`;
-
-const result2 = iniSection.parse(input2);
-if (result2.result._tag === "Left") {
-  const formatter = new ErrorFormatter("ansi");
-  console.log(formatter.format(result2.result.left));
-} else {
-  console.log("Success:");
-  console.log("Section name:", result2.result.right.name);
-  console.log("Properties:", Object.fromEntries(result2.result.right.properties));
-}
-
-console.log("\n=== Test 3: Original failing input (malformed) ===");
-const input3 = "[database\nhost=localhost";
-const result3 = iniSection.parse(input3);
-if (result3.result._tag === "Left") {
-  const formatter = new ErrorFormatter("ansi");
-  console.log("Expected error (missing closing bracket):");
-  console.log(formatter.format(result3.result.left));
-} else {
-  console.log("Unexpected success:", result3.result.right);
-}
-
-console.log("\n=== Test 4: Section with whitespace ===");
-const input4 = `[ cache ]
+[cache]
 enabled = true
-ttl = 3600`;
+ttl = 3600
+# Another comment style
 
-const result4 = iniSection.parse(input4);
-if (result4.result._tag === "Left") {
-  const formatter = new ErrorFormatter("ansi");
-  console.log(formatter.format(result4.result.left));
+`;
+
+const result = iniFile.parse(testCase);
+
+if (Either.isLeft(result.result)) {
+  console.log(formatter.format(result.result.left));
 } else {
-  console.log("Success:");
-  console.log("Section name:", result4.result.right.name);
-  console.log("Properties:", Object.fromEntries(result4.result.right.properties));
+  console.log("Sections:", JSON.stringify(result.result.right, null, 2));
 }
-
-// Analysis: Missing features compared to Megaparsec Haskell version
-console.log("\n=== Missing Features Analysis ===");
-console.log("Compared to the Haskell Megaparsec INI parser, parserator is missing:");
-console.log("1. takeWhile/takeWhile1 combinators for character-based parsing");
-console.log("2. skipLineComment combinator for handling ; and # comments");
-console.log("3. lexeme combinator for automatic trailing whitespace handling");
-console.log("4. notFollowedBy combinator for lookahead without consumption");
-console.log("5. Built-in space consumer with comment support");
-console.log("6. eof combinator to ensure complete input consumption");
-console.log("7. Multiple section parsing with proper section separation");
-console.log("8. Text trimming utilities integrated with parsing");
