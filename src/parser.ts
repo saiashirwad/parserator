@@ -280,9 +280,15 @@ export class Parser<T, Ctx = {}> {
           // Check if any error is fatal
           const hasFatalError = result.left.errors.some(e => e.tag === "Fatal");
 
-          // For now, just return the error regardless of type
-          // We'll add commit handling later
-          return { result: result as unknown as Either<T, ParseErrorBundle>, state: updatedState };
+          // Check if we're in a committed state
+          const isCommitted = updatedState.context?.committed || state.context?.committed;
+
+          // For Parser.gen, we always fail immediately since it's sequential
+          // But we preserve the commit flag for parent combinators
+          return {
+            result: result as unknown as Either<T, ParseErrorBundle>,
+            state: updatedState
+          };
         }
         currentState = updatedState;
         current = iterator.next(result.right);
@@ -355,13 +361,13 @@ export class Parser<T, Ctx = {}> {
 
   /**
    * Commits to the current parsing path, preventing backtracking beyond this point.
-   * 
+   *
    * Once a parser is committed, if it fails later in the sequence, the error won't
    * backtrack to try other alternatives in a `choice` or `or` combinator. This leads
    * to more specific error messages instead of generic "expected one of" errors.
-   * 
+   *
    * @returns A new parser that sets the commit flag after successful parsing
-   * 
+   *
    * @example
    * ```ts
    * // Use commit after matching a keyword to ensure specific error messages
@@ -374,19 +380,19 @@ export class Parser<T, Ctx = {}> {
    *   const body = yield* block
    *   return { type: "if", condition, body }
    * })
-   * 
+   *
    * // In a choice, commit prevents backtracking
    * const statement = choice([
    *   ifStatement,
    *   whileStatement,
    *   assignment
    * ])
-   * 
+   *
    * // Input: "if x > 5 {}"  (missing parentheses)
    * // Without commit: "Expected if, while, or assignment"
    * // With commit: "Expected opening parenthesis after 'if'"
    * ```
-   * 
+   *
    * @example
    * ```ts
    * // Commit can be chained with other methods
@@ -396,7 +402,7 @@ export class Parser<T, Ctx = {}> {
    *   .then(objectContent)
    *   .expect("valid JSON object")
    * ```
-   * 
+   *
    * @see {@link commit} - Standalone function version
    * @see {@link cut} - Alias with Prolog-style naming
    */
@@ -410,6 +416,67 @@ export class Parser<T, Ctx = {}> {
             ...result.state,
             context: { ...result.state.context, committed: true }
           }
+        };
+      }
+      return result;
+    }, this.options);
+  }
+
+  /**
+   * Creates an atomic parser that either fully succeeds or resets to the original state.
+   *
+   * This is useful for "all-or-nothing" parsing where you want to try a complex
+   * parser but not consume any input if it fails. The parser acts as a transaction -
+   * if any part fails, the entire parse is rolled back.
+   *
+   * @returns A new parser that resets state on failure
+   *
+   * @example
+   * ```ts
+   * // Without atomic - partial consumption on failure
+   * const badParser = Parser.gen(function* () {
+   *   yield* string("foo")
+   *   yield* string("bar")  // If this fails, "foo" is already consumed
+   * })
+   *
+   * // With atomic - no consumption on failure
+   * const goodParser = Parser.gen(function* () {
+   *   yield* string("foo")
+   *   yield* string("bar")  // If this fails, we reset to before "foo"
+   * }).atomic()
+   * ```
+   *
+   * @example
+   * ```ts
+   * // Useful for trying complex alternatives
+   * const value = or(
+   *   // Try to parse as a complex expression
+   *   expression.atomic(),
+   *   // If that fails completely, try as a simple literal
+   *   literal
+   * )
+   * ```
+   *
+   * @example
+   * ```ts
+   * // Lookahead parsing without consumption
+   * const startsWithKeyword = or(
+   *   string("function").atomic(),
+   *   string("const").atomic(),
+   *   string("let").atomic()
+   * ).map(() => true).or(Parser.succeed(false))
+   * ```
+   *
+   * @see {@link atomic} - Standalone function version
+   */
+  atomic(): Parser<T, Ctx> {
+    return new Parser(state => {
+      const result = this.run(state);
+      if (Either.isLeft(result.result)) {
+        // On failure, return the error but with the original state
+        return {
+          result: result.result,
+          state // Reset to original state
         };
       }
       return result;

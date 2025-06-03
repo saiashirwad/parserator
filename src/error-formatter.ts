@@ -282,6 +282,8 @@ export class ErrorFormatter {
         return `  ${red}Unexpected:${reset} ${error.found}`;
       case "Custom":
         return `  ${error.message}`;
+      case "Fatal":
+        return `  ${red}Fatal:${reset} ${error.message}`;
     }
   }
 
@@ -296,6 +298,8 @@ export class ErrorFormatter {
         return `Unexpected: ${error.found}`;
       case "Custom":
         return error.message;
+      case "Fatal":
+        return `Fatal: ${error.message}`;
     }
   }
 

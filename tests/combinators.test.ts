@@ -28,8 +28,10 @@ function getErrorMessage(bundle: ParseErrorBundle): string {
     return primary.message;
   } else if (primary.tag === "Unexpected") {
     return `Unexpected: ${primary.found}`;
-  } else {
+  } else if (primary.tag === "Expected") {
     return `Expected: ${primary.items.join(", ")}`;
+  } else {
+    return primary.message;
   }
 }
 

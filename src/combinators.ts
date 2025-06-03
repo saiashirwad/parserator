@@ -1,6 +1,6 @@
 import { Either } from "./either";
 import { Parser } from "./parser";
-import type { ParseErrorBundle } from "./errors";
+import type { ParseErr, ParseErrorBundle } from "./errors";
 import { type ParserState, State } from "./state";
 
 /**
@@ -543,23 +543,80 @@ export const skipSpaces = new Parser(
  * @param parsers - Array of parsers to try
  * @returns A parser that succeeds if any of the input parsers succeed
  */
+/**
+ * Creates a parser that tries each of the given parsers in order until one succeeds.
+ * 
+ * This combinator is commit-aware: if any parser sets the `committed` flag during
+ * parsing, no further alternatives will be tried. This enables better error messages
+ * by preventing backtracking once we've identified the intended parse path.
+ * 
+ * @param parsers - Array of parsers to try in order
+ * @returns A parser that succeeds with the first successful parser's result
+ * 
+ * @example
+ * ```ts
+ * // Basic usage - tries each alternative
+ * const value = or(
+ *   numberLiteral,
+ *   stringLiteral,
+ *   booleanLiteral
+ * )
+ * ```
+ * 
+ * @example
+ * ```ts
+ * // With commit for better errors
+ * const statement = or(
+ *   Parser.gen(function* () {
+ *     yield* keyword("if")
+ *     yield* commit()  // No backtracking after this
+ *     yield* char('(').expect("opening parenthesis")
+ *     // ...
+ *   }),
+ *   whileStatement,
+ *   assignment
+ * )
+ * 
+ * // Input: "if x > 5"  (missing parentheses)
+ * // Without commit: "Expected if, while, or assignment"
+ * // With commit: "Expected opening parenthesis"
+ * ```
+ * 
+ * @example
+ * ```ts
+ * // Error accumulation without commit
+ * const config = or(
+ *   jsonParser.label("JSON format"),
+ *   yamlParser.label("YAML format"),
+ *   tomlParser.label("TOML format")
+ * )
+ * // Errors from all three parsers are accumulated
+ * ```
+ */
 export function or<Parsers extends Parser<any, any>[], Ctx = {}>(
   ...parsers: Parsers
 ): Parser<Parsers[number] extends Parser<infer T, Ctx> ? T : never, Ctx> {
   return new Parser(state => {
-    // const expectedNames: string[] = []
+    const errors: ParseErr[] = [];
+    
     for (const parser of parsers) {
       const { result, state: newState } = parser.run(state);
+      
       if (Either.isRight(result)) {
         return Parser.succeed(result.right, newState);
       }
-      // if (parser.options?.name) {
-      // 	expectedNames.push(parser.options.name)
-      // }
+      
+      // Accumulate errors from this branch
+      errors.push(...result.left.errors);
+      
+      // Check if we're committed - if so, don't try other alternatives
+      if (newState.context?.committed && !state.context?.committed) {
+        return Parser.failRich({ errors }, newState);
+      }
     }
 
-    const message = `None of the ${parsers.length} choices could be satisfied`;
-    return Parser.fail({ message }, state);
+    // All alternatives failed, return accumulated errors
+    return Parser.failRich({ errors }, state);
   });
 }
 
@@ -762,3 +819,59 @@ export function commit<Ctx extends { source: string }>(): Parser<void, Ctx> {
  * ```
  */
 export const cut = commit;
+
+/**
+ * Creates an atomic parser that either fully succeeds or resets to the original state.
+ * 
+ * This combinator wraps a parser in a transaction-like behavior. If the parser fails
+ * at any point, the input position is reset to where it was before the atomic parser
+ * started, as if no input was consumed.
+ * 
+ * @param parser - The parser to make atomic
+ * @returns A new parser with atomic (all-or-nothing) behavior
+ * 
+ * @example
+ * ```ts
+ * // Try to parse a complex structure without consuming input on failure
+ * const functionCall = atomic(
+ *   Parser.gen(function* () {
+ *     const name = yield* identifier
+ *     yield* char('(')
+ *     const args = yield* sepBy(expression, char(','))
+ *     yield* char(')')
+ *     return { name, args }
+ *   })
+ * )
+ * ```
+ * 
+ * @example
+ * ```ts
+ * // Use atomic for lookahead without consumption
+ * const nextIsOperator = atomic(
+ *   or(
+ *     string("++"),
+ *     string("--"),
+ *     string("+="),
+ *     string("-=")
+ *   )
+ * ).map(() => true).or(Parser.succeed(false))
+ * ```
+ * 
+ * @example
+ * ```ts
+ * // Combine with 'or' for clean alternatives
+ * const value = or(
+ *   atomic(complexExpression),  // Try complex first
+ *   atomic(simpleExpression),   // Then simpler
+ *   literal                     // Finally, just a literal
+ * )
+ * 
+ * // If complexExpression fails after consuming "foo + ",
+ * // atomic ensures we backtrack completely
+ * ```
+ * 
+ * @see {@link Parser.atomic} - Instance method version
+ */
+export function atomic<T, Ctx = {}>(parser: Parser<T, Ctx>): Parser<T, Ctx> {
+  return parser.atomic();
+}

@@ -2,7 +2,7 @@
 
 ## 1. Add commit/cut functionality
 
-[ ] Add `committed` flag to ParserContext
+[x] Add `committed` flag to ParserContext
 
 ```ts
 interface ParserContext<T = {}> {
@@ -11,35 +11,35 @@ interface ParserContext<T = {}> {
 }
 ```
 
-[ ] Add `commit()` method to Parser class
+[x] Add `commit()` method to Parser class
 
 ```ts
 commit(): Parser<T, Ctx> {
   return new Parser(state => {
-    const result = this.run(state)
+    const result = this.run(state);
     if (Either.isRight(result.result)) {
       return {
         ...result,
         state: {
           ...result.state,
-          context: {
-            ...result.state.context,
-            committed: true
-          }
+          context: { ...result.state.context, committed: true }
         }
-      }
+      };
     }
-    return result
-  })
+    return result;
+  }, this.options);
 }
 ```
 
-[ ] Add standalone `commit()` and `cut()` functions
+[x] Add standalone `commit()` and `cut()` functions
 
 ```ts
-export function commit<Ctx = {}>(): Parser<void, Ctx> {
+export function commit<Ctx extends { source: string }>(): Parser<void, Ctx> {
   return new Parser(state => {
-    return Parser.succeed(void 0, { ...state, context: { ...state.context, committed: true } });
+    return Parser.succeed(void 0, {
+      ...state,
+      context: { ...state.context, committed: true }
+    }) as any;
   });
 }
 
@@ -48,25 +48,25 @@ export const cut = commit; // Alias for Prolog-style naming
 
 ## 2. Add atomic parser functionality
 
-[ ] Add `atomic()` method to Parser class
+[x] Add `atomic()` method to Parser class
 
 ```ts
 atomic(): Parser<T, Ctx> {
   return new Parser(state => {
-    const result = this.run(state)
+    const result = this.run(state);
     if (Either.isLeft(result.result)) {
-      // Reset to original state on failure
+      // On failure, return the error but with the original state
       return {
         result: result.result,
-        state // Return original state, not updated state
-      }
+        state // Reset to original state
+      };
     }
-    return result
-  })
+    return result;
+  }, this.options);
 }
 ```
 
-[ ] Add standalone `atomic()` combinator
+[x] Add standalone `atomic()` combinator
 
 ```ts
 export function atomic<T, Ctx = {}>(parser: Parser<T, Ctx>): Parser<T, Ctx> {
@@ -103,7 +103,7 @@ recover(defaultValue: T): Parser<T, Ctx> {
 
 ## 4. Add fatal error functionality
 
-[ ] Add "Fatal" error type to ParseErr union
+[x] Add "Fatal" error type to ParseErr union
 
 ```ts
 export type ParseErr =
@@ -113,27 +113,27 @@ export type ParseErr =
   | { tag: "Fatal"; span: Span; message: string; context: string[] }; // New
 ```
 
-[ ] Add `fatal()` static method to Parser class
+[x] Add `fatal()` static method to Parser class
 
 ```ts
 static fatal<Ctx = {}>(message: string): Parser<never, Ctx> {
   return new Parser(state => {
-    const span = createSpan(state)
+    const span = createSpan(state);
     const fatalError: ParseErr = {
       tag: "Fatal",
       span,
       message,
       context: state.context?.labelStack ?? []
-    }
+    };
 
-    return Parser.failRich({ errors: [fatalError] }, state)
-  })
+    return Parser.failRich({ errors: [fatalError] }, state);
+  });
 }
 ```
 
 ## 5. Update Parser.gen error handling
 
-[ ] Modify the error handling in `Parser.gen` to respect commit state
+[x] Modify the error handling in `Parser.gen` to respect commit state
 
 ```ts
 static gen = <T, Ctx = unknown>(
@@ -176,7 +176,7 @@ static gen = <T, Ctx = unknown>(
 
 ## 6. Update error handling in combinators
 
-[ ] Update `or` combinator to accumulate errors when not committed
+[x] Update `or` combinator to accumulate errors when not committed
 
 ```ts
 // In or combinator implementation
