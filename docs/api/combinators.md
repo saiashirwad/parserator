@@ -13,15 +13,17 @@ char<T extends string, Ctx = {}>(ch: T): Parser<T, Ctx>
 ```
 
 **Parameters:**
+
 - `ch`: The character to match (must be exactly one character)
 
 **Returns:** A parser that matches the specified character
 
 **Example:**
+
 ```typescript
-const aParser = char('a')
-console.log(aParser.parseOrThrow('abc')) // 'a'
-console.log(aParser.parse('xyz').result._tag) // 'Left' (failure)
+const aParser = char("a");
+console.log(aParser.parseOrThrow("abc")); // 'a'
+console.log(aParser.parse("xyz").result._tag); // 'Left' (failure)
 ```
 
 ### `string(text)`
@@ -33,14 +35,16 @@ string<Ctx = {}>(str: string): Parser<string, Ctx>
 ```
 
 **Parameters:**
+
 - `str`: The exact string to match
 
 **Returns:** A parser that matches the specified string
 
 **Example:**
+
 ```typescript
-const helloParser = string('hello')
-console.log(helloParser.parseOrThrow('hello world')) // 'hello'
+const helloParser = string("hello");
+console.log(helloParser.parseOrThrow("hello world")); // 'hello'
 ```
 
 ### `narrowedString(text)`
@@ -52,14 +56,16 @@ narrowedString<const T extends string, Ctx>(str: T): Parser<T, Ctx>
 ```
 
 **Parameters:**
+
 - `str`: The string literal to match
 
 **Returns:** A parser that matches the string with preserved literal type
 
 **Example:**
+
 ```typescript
-const helloParser = narrowedString('hello') // Parser<"hello">
-const result: "hello" = helloParser.parseOrThrow('hello')
+const helloParser = narrowedString("hello"); // Parser<"hello">
+const result: "hello" = helloParser.parseOrThrow("hello");
 ```
 
 ### `regex(pattern)`
@@ -71,17 +77,19 @@ regex<Ctx = {}>(re: RegExp): Parser<string, Ctx>
 ```
 
 **Parameters:**
+
 - `re`: The regular expression to match
 
 **Returns:** A parser that matches the regex pattern
 
 **Example:**
-```typescript
-const numberParser = regex(/\d+/)
-console.log(numberParser.parseOrThrow('123abc')) // '123'
 
-const emailParser = regex(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)
-console.log(emailParser.parseOrThrow('user@example.com')) // 'user@example.com'
+```typescript
+const numberParser = regex(/\d+/);
+console.log(numberParser.parseOrThrow("123abc")); // '123'
+
+const emailParser = regex(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+console.log(emailParser.parseOrThrow("user@example.com")); // 'user@example.com'
 ```
 
 ### `digit`
@@ -89,13 +97,14 @@ console.log(emailParser.parseOrThrow('user@example.com')) // 'user@example.com'
 A parser that matches any single digit character (0-9).
 
 ```typescript
-const digit: Parser<string>
+const digit: Parser<string>;
 ```
 
 **Example:**
+
 ```typescript
-console.log(digit.parseOrThrow('5abc')) // '5'
-console.log(digit.parse('abc').result._tag) // 'Left' (failure)
+console.log(digit.parseOrThrow("5abc")); // '5'
+console.log(digit.parse("abc").result._tag); // 'Left' (failure)
 ```
 
 ### `alphabet`
@@ -103,13 +112,14 @@ console.log(digit.parse('abc').result._tag) // 'Left' (failure)
 A parser that matches any single alphabetic character (a-z, A-Z).
 
 ```typescript
-const alphabet: Parser<string>
+const alphabet: Parser<string>;
 ```
 
 **Example:**
+
 ```typescript
-console.log(alphabet.parseOrThrow('hello')) // 'h'
-console.log(alphabet.parse('123').result._tag) // 'Left' (failure)
+console.log(alphabet.parseOrThrow("hello")); // 'h'
+console.log(alphabet.parse("123").result._tag); // 'Left' (failure)
 ```
 
 ### `anyChar()`
@@ -121,11 +131,12 @@ anyChar<Ctx = {}>(): Parser<string, Ctx>
 ```
 
 **Example:**
+
 ```typescript
-const any = anyChar()
-console.log(any.parseOrThrow('x')) // 'x'
-console.log(any.parseOrThrow('5')) // '5'
-console.log(any.parseOrThrow('!')) // '!'
+const any = anyChar();
+console.log(any.parseOrThrow("x")); // 'x'
+console.log(any.parseOrThrow("5")); // '5'
+console.log(any.parseOrThrow("!")); // '!'
 ```
 
 ## Choice Combinators
@@ -141,20 +152,18 @@ or<Parsers extends Parser<any, any>[], Ctx = {}>(
 ```
 
 **Parameters:**
+
 - `parsers`: Array of parsers to try
 
 **Returns:** A parser that succeeds if any of the input parsers succeed
 
 **Example:**
-```typescript
-const greeting = or(
-  string('hello'),
-  string('hi'),
-  string('hey')
-)
 
-console.log(greeting.parseOrThrow('hi there')) // 'hi'
-console.log(greeting.parseOrThrow('hey you')) // 'hey'
+```typescript
+const greeting = or(string("hello"), string("hi"), string("hey"));
+
+console.log(greeting.parseOrThrow("hi there")); // 'hi'
+console.log(greeting.parseOrThrow("hey you")); // 'hey'
 ```
 
 ### `optional(parser)`
@@ -166,15 +175,17 @@ optional<T, Ctx = {}>(parser: Parser<T, Ctx>): Parser<T | undefined, Ctx>
 ```
 
 **Parameters:**
+
 - `parser`: The parser to make optional
 
 **Returns:** A parser that either succeeds with a value or `undefined`
 
 **Example:**
+
 ```typescript
-const optionalMinus = optional(char('-'))
-console.log(optionalMinus.parseOrThrow('123')) // undefined
-console.log(optionalMinus.parseOrThrow('-123')) // '-'
+const optionalMinus = optional(char("-"));
+console.log(optionalMinus.parseOrThrow("123")); // undefined
+console.log(optionalMinus.parseOrThrow("-123")); // '-'
 ```
 
 ## Repetition Combinators
@@ -191,20 +202,25 @@ many0<S, T, Ctx = {}>(
 ```
 
 **Parameters:**
+
 - `parser`: The parser to repeat
 - `separator`: Optional separator parser
 
 **Returns:** A parser that produces an array of matched values
 
 **Example:**
+
 ```typescript
-const digits = many0(digit)
-console.log(digits.parseOrThrow('123abc')) // ['1', '2', '3']
-console.log(digits.parseOrThrow('abc')) // []
+const digits = many0(digit);
+console.log(digits.parseOrThrow("123abc")); // ['1', '2', '3']
+console.log(digits.parseOrThrow("abc")); // []
 
 // With separator
-const csvNumbers = many0(many1(digit).map(d => parseInt(d.join(''))), char(','))
-console.log(csvNumbers.parseOrThrow('1,2,3')) // [1, 2, 3]
+const csvNumbers = many0(
+  many1(digit).map(d => parseInt(d.join(""))),
+  char(",")
+);
+console.log(csvNumbers.parseOrThrow("1,2,3")); // [1, 2, 3]
 ```
 
 ### `many1(parser, separator?)`
@@ -219,16 +235,18 @@ many1<S, T, Ctx>(
 ```
 
 **Parameters:**
+
 - `parser`: The parser to repeat
 - `separator`: Optional separator parser
 
 **Returns:** A parser that produces an array of at least one matched value
 
 **Example:**
+
 ```typescript
-const digits = many1(digit)
-console.log(digits.parseOrThrow('123abc')) // ['1', '2', '3']
-console.log(digits.parse('abc').result._tag) // 'Left' (failure - needs at least one)
+const digits = many1(digit);
+console.log(digits.parseOrThrow("123abc")); // ['1', '2', '3']
+console.log(digits.parse("abc").result._tag); // 'Left' (failure - needs at least one)
 ```
 
 ### `manyN(parser, n, separator?)`
@@ -244,15 +262,17 @@ manyN<S, T, Ctx>(
 ```
 
 **Parameters:**
+
 - `parser`: The parser to repeat
 - `n`: Minimum number of repetitions required
 - `separator`: Optional separator parser
 
 **Example:**
+
 ```typescript
-const atLeastThreeDigits = manyN(digit, 3)
-console.log(atLeastThreeDigits.parseOrThrow('12345')) // ['1', '2', '3', '4', '5']
-console.log(atLeastThreeDigits.parse('12').result._tag) // 'Left' (failure - needs at least 3)
+const atLeastThreeDigits = manyN(digit, 3);
+console.log(atLeastThreeDigits.parseOrThrow("12345")); // ['1', '2', '3', '4', '5']
+console.log(atLeastThreeDigits.parse("12").result._tag); // 'Left' (failure - needs at least 3)
 ```
 
 ### `manyNExact(parser, n, separator?)`
@@ -268,15 +288,17 @@ manyNExact<S, T, Ctx>(
 ```
 
 **Parameters:**
+
 - `parser`: The parser to repeat
 - `n`: Exact number of repetitions required
 - `separator`: Optional separator parser
 
 **Example:**
+
 ```typescript
-const exactlyThreeDigits = manyNExact(digit, 3)
-console.log(exactlyThreeDigits.parseOrThrow('123abc')) // ['1', '2', '3']
-console.log(exactlyThreeDigits.parse('1234').result._tag) // 'Left' (failure - needs exactly 3)
+const exactlyThreeDigits = manyNExact(digit, 3);
+console.log(exactlyThreeDigits.parseOrThrow("123abc")); // ['1', '2', '3']
+console.log(exactlyThreeDigits.parse("1234").result._tag); // 'Left' (failure - needs exactly 3)
 ```
 
 ### `sepBy(separator, parser)`
@@ -291,17 +313,22 @@ sepBy<S, T, Ctx>(
 ```
 
 **Parameters:**
+
 - `sepParser`: Parser for the separator
 - `parser`: Parser for the elements
 
 **Returns:** A parser that produces an array of matched elements
 
 **Example:**
+
 ```typescript
-const commaSeparated = sepBy(char(','), many1(digit).map(d => parseInt(d.join(''))))
-console.log(commaSeparated.parseOrThrow('1,2,3,4')) // [1, 2, 3, 4]
-console.log(commaSeparated.parseOrThrow('42')) // [42]
-console.log(commaSeparated.parseOrThrow('')) // []
+const commaSeparated = sepBy(
+  char(","),
+  many1(digit).map(d => parseInt(d.join("")))
+);
+console.log(commaSeparated.parseOrThrow("1,2,3,4")); // [1, 2, 3, 4]
+console.log(commaSeparated.parseOrThrow("42")); // [42]
+console.log(commaSeparated.parseOrThrow("")); // []
 ```
 
 ## Skip Combinators
@@ -315,8 +342,9 @@ skipMany0<T, Ctx = {}>(parser: Parser<T, Ctx>): Parser<undefined, Ctx>
 ```
 
 **Example:**
+
 ```typescript
-const skipWhitespace = skipMany0(or(char(' '), char('\t'), char('\n')))
+const skipWhitespace = skipMany0(or(char(" "), char("\t"), char("\n")));
 ```
 
 ### `skipMany1(parser)`
@@ -340,12 +368,13 @@ skipManyN<T, Ctx>(parser: Parser<T, Ctx>, n: number): Parser<undefined, Ctx>
 A parser that skips any number of space characters.
 
 ```typescript
-const skipSpaces: Parser<undefined>
+const skipSpaces: Parser<undefined>;
 ```
 
 **Example:**
+
 ```typescript
-const trimmedWord = skipSpaces.then(many1(alphabet)).thenDiscard(skipSpaces)
+const trimmedWord = skipSpaces.then(many1(alphabet)).thenDiscard(skipSpaces);
 ```
 
 ## Lookahead Combinators
@@ -359,15 +388,17 @@ lookAhead<T, Ctx = {}>(parser: Parser<T, Ctx>): Parser<T | undefined, Ctx>
 ```
 
 **Parameters:**
+
 - `parser`: The parser to look ahead with
 
 **Returns:** A parser that peeks at the input without consuming it
 
 **Example:**
+
 ```typescript
-const checkForDigit = lookAhead(digit)
-const parser = checkForDigit.then(many1(digit))
-console.log(parser.parseOrThrow('123')) // ['1', '2', '3'] (digit is parsed twice)
+const checkForDigit = lookAhead(digit);
+const parser = checkForDigit.then(many1(digit));
+console.log(parser.parseOrThrow("123")); // ['1', '2', '3'] (digit is parsed twice)
 ```
 
 ### `notFollowedBy(parser)`
@@ -379,14 +410,16 @@ notFollowedBy<T, Ctx = {}>(parser: Parser<T, Ctx>): Parser<boolean, Ctx>
 ```
 
 **Parameters:**
+
 - `parser`: The parser that should not match
 
 **Returns:** A parser that succeeds only if the input parser fails
 
 **Example:**
+
 ```typescript
-const notDigit = notFollowedBy(digit)
-const letter = alphabet.thenDiscard(notDigit) // Letter not followed by digit
+const notDigit = notFollowedBy(digit);
+const letter = alphabet.thenDiscard(notDigit); // Letter not followed by digit
 ```
 
 ## Sequence Combinators
@@ -402,14 +435,16 @@ sequence<Parsers extends Parser<any>[], Ctx = {}>(
 ```
 
 **Parameters:**
+
 - `parsers`: Array of parsers to run in sequence
 
 **Returns:** A parser that succeeds if all parsers succeed in sequence
 
 **Example:**
+
 ```typescript
-const abc = sequence([char('a'), char('b'), char('c')])
-console.log(abc.parseOrThrow('abc')) // 'c' (returns last result)
+const abc = sequence([char("a"), char("b"), char("c")]);
+console.log(abc.parseOrThrow("abc")); // 'c' (returns last result)
 ```
 
 ### `between(start, end, parser)`
@@ -425,19 +460,21 @@ between<T, Ctx = {}>(
 ```
 
 **Parameters:**
+
 - `start`: Opening delimiter parser
-- `end`: Closing delimiter parser  
+- `end`: Closing delimiter parser
 - `parser`: Content parser
 
 **Returns:** A parser that matches content between delimiters
 
 **Example:**
-```typescript
-const parenthesized = between(char('('), char(')'), many1(digit))
-console.log(parenthesized.parseOrThrow('(123)')) // ['1', '2', '3']
 
-const quoted = between(char('"'), char('"'), many0(or(alphabet, digit)))
-console.log(quoted.parseOrThrow('"hello123"')) // ['h', 'e', 'l', 'l', 'o', '1', '2', '3']
+```typescript
+const parenthesized = between(char("("), char(")"), many1(digit));
+console.log(parenthesized.parseOrThrow("(123)")); // ['1', '2', '3']
+
+const quoted = between(char('"'), char('"'), many0(or(alphabet, digit)));
+console.log(quoted.parseOrThrow('"hello123"')); // ['h', 'e', 'l', 'l', 'o', '1', '2', '3']
 ```
 
 ## Text Processing Combinators
@@ -451,17 +488,19 @@ takeUntil<T, Ctx = {}>(parser: Parser<T, Ctx>): Parser<string, Ctx>
 ```
 
 **Parameters:**
+
 - `parser`: The parser to look for as a terminator
 
 **Returns:** A parser that takes input until a match is found
 
 **Example:**
-```typescript
-const untilComma = takeUntil(char(','))
-console.log(untilComma.parseOrThrow('hello,world')) // 'hello'
 
-const untilQuote = takeUntil(char('"'))
-console.log(untilQuote.parseOrThrow('say "hello"')) // 'say '
+```typescript
+const untilComma = takeUntil(char(","));
+console.log(untilComma.parseOrThrow("hello,world")); // 'hello'
+
+const untilQuote = takeUntil(char('"'));
+console.log(untilQuote.parseOrThrow('say "hello"')); // 'say '
 ```
 
 ### `takeUpto(parser)`
@@ -473,14 +512,16 @@ takeUpto<T>(parser: Parser<T>): Parser<string>
 ```
 
 **Parameters:**
+
 - `parser`: The parser to look for as a boundary
 
 **Returns:** A parser that takes input until before a match would be found
 
 **Example:**
+
 ```typescript
-const uptoComma = takeUpto(char(','))
-console.log(uptoComma.parseOrThrow('hello,world')) // 'hello' (comma not consumed)
+const uptoComma = takeUpto(char(","));
+console.log(uptoComma.parseOrThrow("hello,world")); // 'hello' (comma not consumed)
 ```
 
 ### `parseUntilChar(char)`
@@ -492,12 +533,14 @@ parseUntilChar<Ctx = {}>(char: string): Parser<string, Ctx>
 ```
 
 **Parameters:**
+
 - `char`: The character to look for (must be exactly one character)
 
 **Example:**
+
 ```typescript
-const untilNewline = parseUntilChar('\n')
-console.log(untilNewline.parseOrThrow('first line\nsecond line')) // 'first line'
+const untilNewline = parseUntilChar("\n");
+console.log(untilNewline.parseOrThrow("first line\nsecond line")); // 'first line'
 ```
 
 ### `skipUntil(parser)`
@@ -509,8 +552,9 @@ skipUntil<T, Ctx = {}>(parser: Parser<T, Ctx>): Parser<undefined, Ctx>
 ```
 
 **Example:**
+
 ```typescript
-const skipToQuote = skipUntil(char('"'))
+const skipToQuote = skipUntil(char('"'));
 ```
 
 ## Helper Combinators
@@ -524,8 +568,9 @@ zip<A, B>(parserA: Parser<A>, parserB: Parser<B>): Parser<[A, B]>
 ```
 
 **Example:**
+
 ```typescript
-const nameAge = zip(stringParser, numberParser)
+const nameAge = zip(stringParser, numberParser);
 ```
 
 ### `then(parserA, parserB)`
@@ -549,8 +594,8 @@ thenDiscard<A, B>(parserA: Parser<A>, parserB: Parser<B>): Parser<A>
 Aliases for `then` and `thenDiscard` respectively.
 
 ```typescript
-const zipRight = then
-const zipLeft = thenDiscard
+const zipRight = then;
+const zipLeft = thenDiscard;
 ```
 
 ## Advanced Usage Patterns
@@ -562,21 +607,17 @@ You can create your own combinators by combining existing ones:
 ```typescript
 // Parse a comma-separated list enclosed in brackets
 function bracketList<T>(parser: Parser<T>): Parser<T[]> {
-  return between(
-    char('['),
-    char(']'),
-    sepBy(char(','), parser)
-  )
+  return between(char("["), char("]"), sepBy(char(","), parser));
 }
 
 // Parse whitespace-trimmed content
 function lexeme<T>(parser: Parser<T>): Parser<T> {
-  return parser.trimRight(skipSpaces)
+  return parser.trimRight(skipSpaces);
 }
 
 // Parse a keyword (identifier that matches exactly)
 function keyword(word: string): Parser<string> {
-  return string(word).thenDiscard(notFollowedBy(or(alphabet, digit)))
+  return string(word).thenDiscard(notFollowedBy(or(alphabet, digit)));
 }
 ```
 
@@ -588,7 +629,7 @@ Add error handling to your combinators:
 function expectedList<T>(parser: Parser<T>, itemName: string): Parser<T[]> {
   return bracketList(parser)
     .withError(() => `Expected a list of ${itemName}`)
-    .label(`${itemName} list`)
+    .label(`${itemName} list`);
 }
 ```
 
@@ -603,9 +644,9 @@ function debug<T, Ctx extends { debug: boolean }>(
 ): Parser<T, Ctx> {
   return parser.tap(({ state, result }) => {
     if (state.context.debug) {
-      console.log(`[${label}]`, result)
+      console.log(`[${label}]`, result);
     }
-  })
+  });
 }
 ```
 
@@ -622,29 +663,33 @@ function debug<T, Ctx extends { debug: boolean }>(
 ### Whitespace-insensitive parsing
 
 ```typescript
-const ws = regex(/\s*/)
-const token = <T>(parser: Parser<T>) => parser.thenDiscard(ws)
+const ws = regex(/\s*/);
+const token = <T>(parser: Parser<T>) => parser.thenDiscard(ws);
 
-const number = token(many1(digit).map(d => parseInt(d.join(''))))
-const plus = token(char('+'))
-const expr = number.then(plus).then(number)
+const number = token(many1(digit).map(d => parseInt(d.join(""))));
+const plus = token(char("+"));
+const expr = number.then(plus).then(number);
 ```
 
 ### Recursive structures
 
 ```typescript
-let expr: Parser<any>
-const atom = or(number, between(char('('), char(')'), Parser.lazy(() => expr)))
-expr = sepBy1(or(char('+'), char('-')), atom)
+let expr: Parser<any>;
+const atom = or(
+  number,
+  between(
+    char("("),
+    char(")"),
+    Parser.lazy(() => expr)
+  )
+);
+expr = sepBy1(or(char("+"), char("-")), atom);
 ```
 
 ### Error recovery
 
 ```typescript
-const robustParser = or(
-  goodParser,
-  takeUntil(char(';')).then(char(';')).then(Parser.pure(null))
-)
+const robustParser = or(goodParser, takeUntil(char(";")).then(char(";")).then(Parser.pure(null)));
 ```
 
 ## See Also

@@ -64,7 +64,8 @@
   "prettier": {
     "printWidth": 100,
     "useTabs": false,
-    "semi": false,
+    "semi": true,
+    "objectWrap": "preserve",
     "trailingComma": "none",
     "experimentalTernaries": true,
     "experimentalOperatorPosition": "end",

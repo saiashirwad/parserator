@@ -7,42 +7,43 @@ This guide will walk you through creating your first parser with Parserator, sta
 Let's start with the simplest possible parser - one that matches the string "Hello":
 
 ```typescript
-import { string } from 'parserator'
+import { string } from "parserator";
 
-const helloParser = string('Hello')
+const helloParser = string("Hello");
 
 // Test it
-const result = helloParser.parse('Hello')
-console.log(result) // { result: Right("Hello"), state: {...} }
+const result = helloParser.parse("Hello");
+console.log(result); // { result: Right("Hello"), state: {...} }
 
 // Or use the simpler parseOrThrow method
-const value = helloParser.parseOrThrow('Hello')
-console.log(value) // "Hello"
+const value = helloParser.parseOrThrow("Hello");
+console.log(value); // "Hello"
 ```
 
 ## Understanding Parser Results
 
 Parsers return a result object with two fields:
+
 - `result`: Either a success (`Right`) or failure (`Left`)
 - `state`: Information about the parsing state
 
 ```typescript
-import { string } from 'parserator'
-import { Either } from 'parserator'
+import { string } from "parserator";
+import { Either } from "parserator";
 
-const parser = string('Hello')
+const parser = string("Hello");
 
 // Successful parse
-const success = parser.parse('Hello World')
+const success = parser.parse("Hello World");
 if (Either.isRight(success.result)) {
-  console.log('Parsed:', success.result.right) // "Hello"
-  console.log('Remaining:', success.state.remaining) // " World"
+  console.log("Parsed:", success.result.right); // "Hello"
+  console.log("Remaining:", success.state.remaining); // " World"
 }
 
 // Failed parse
-const failure = parser.parse('Goodbye')
+const failure = parser.parse("Goodbye");
 if (Either.isLeft(failure.result)) {
-  console.log('Error:', failure.result.left) // ParseErrorBundle
+  console.log("Error:", failure.result.left); // ParseErrorBundle
 }
 ```
 
@@ -51,21 +52,19 @@ if (Either.isLeft(failure.result)) {
 The real power of parser combinators comes from combining simple parsers into complex ones:
 
 ```typescript
-import { string, char } from 'parserator'
+import { string, char } from "parserator";
 
 // Parse "Hello" followed by a space and then "World"
-const greeting = string('Hello')
-  .then(char(' '))
-  .then(string('World'))
+const greeting = string("Hello").then(char(" ")).then(string("World"));
 
-console.log(greeting.parseOrThrow('Hello World')) // "World"
+console.log(greeting.parseOrThrow("Hello World")); // "World"
 ```
 
 Notice that `.then()` returns the result of the second parser. If you want to keep both results, use `.zip()`:
 
 ```typescript
-const greeting = string('Hello').zip(string('World'))
-console.log(greeting.parseOrThrow('HelloWorld')) // ["Hello", "World"]
+const greeting = string("Hello").zip(string("World"));
+console.log(greeting.parseOrThrow("HelloWorld")); // ["Hello", "World"]
 ```
 
 ## Parsing Numbers
@@ -73,13 +72,13 @@ console.log(greeting.parseOrThrow('HelloWorld')) // ["Hello", "World"]
 Let's create a parser for integers:
 
 ```typescript
-import { digit, many1 } from 'parserator'
+import { digit, many1 } from "parserator";
 
 // Parse one or more digits
-const number = many1(digit).map(digits => parseInt(digits.join('')))
+const number = many1(digit).map(digits => parseInt(digits.join("")));
 
-console.log(number.parseOrThrow('123')) // 123
-console.log(number.parseOrThrow('456abc')) // 456 (stops at 'a')
+console.log(number.parseOrThrow("123")); // 123
+console.log(number.parseOrThrow("456abc")); // 456 (stops at 'a')
 ```
 
 ## Handling Optional Content
@@ -87,18 +86,18 @@ console.log(number.parseOrThrow('456abc')) // 456 (stops at 'a')
 Use `optional` for content that may or may not be present:
 
 ```typescript
-import { char, digit, many1, optional } from 'parserator'
+import { char, digit, many1, optional } from "parserator";
 
 // Parse an optional minus sign followed by digits
-const signedNumber = optional(char('-'))
+const signedNumber = optional(char("-"))
   .zip(many1(digit))
   .map(([sign, digits]) => {
-    const num = parseInt(digits.join(''))
-    return sign === '-' ? -num : num
-  })
+    const num = parseInt(digits.join(""));
+    return sign === "-" ? -num : num;
+  });
 
-console.log(signedNumber.parseOrThrow('123'))  // 123
-console.log(signedNumber.parseOrThrow('-456')) // -456
+console.log(signedNumber.parseOrThrow("123")); // 123
+console.log(signedNumber.parseOrThrow("-456")); // -456
 ```
 
 ## Choices with `or`
@@ -106,16 +105,12 @@ console.log(signedNumber.parseOrThrow('-456')) // -456
 Use `or` to try multiple alternatives:
 
 ```typescript
-import { string, or } from 'parserator'
+import { string, or } from "parserator";
 
-const greeting = or(
-  string('Hello'),
-  string('Hi'),
-  string('Hey')
-)
+const greeting = or(string("Hello"), string("Hi"), string("Hey"));
 
-console.log(greeting.parseOrThrow('Hi there')) // "Hi"
-console.log(greeting.parseOrThrow('Hey you'))  // "Hey"
+console.log(greeting.parseOrThrow("Hi there")); // "Hi"
+console.log(greeting.parseOrThrow("Hey you")); // "Hey"
 ```
 
 ## Whitespace Handling
@@ -123,24 +118,24 @@ console.log(greeting.parseOrThrow('Hey you'))  // "Hey"
 Real parsers often need to handle whitespace:
 
 ```typescript
-import { string, char, regex, many0 } from 'parserator'
+import { string, char, regex, many0 } from "parserator";
 
 // Parser for optional whitespace
-const ws = many0(or(char(' '), char('\t'), char('\n')))
+const ws = many0(or(char(" "), char("\t"), char("\n")));
 
 // Parser for required whitespace
-const ws1 = many1(or(char(' '), char('\t'), char('\n')))
+const ws1 = many1(or(char(" "), char("\t"), char("\n")));
 
 // Or use regex for convenience
-const whitespace = regex(/\s*/) // Zero or more whitespace
-const space = regex(/\s+/)      // One or more whitespace
+const whitespace = regex(/\s*/); // Zero or more whitespace
+const space = regex(/\s+/); // One or more whitespace
 
 // Parse "Hello World" with flexible whitespace
-const greeting = string('Hello')
-  .thenDiscard(space)  // Consume but ignore whitespace
-  .then(string('World'))
+const greeting = string("Hello")
+  .thenDiscard(space) // Consume but ignore whitespace
+  .then(string("World"));
 
-console.log(greeting.parseOrThrow('Hello    World')) // "World"
+console.log(greeting.parseOrThrow("Hello    World")); // "World"
 ```
 
 ## Error Handling
@@ -148,25 +143,25 @@ console.log(greeting.parseOrThrow('Hello    World')) // "World"
 Parserator provides helpful error messages:
 
 ```typescript
-import { string, char } from 'parserator'
+import { string, char } from "parserator";
 
-const parser = string('Hello').then(char(' ')).then(string('World'))
+const parser = string("Hello").then(char(" ")).then(string("World"));
 
 try {
-  parser.parseOrThrow('Hello Universe')
+  parser.parseOrThrow("Hello Universe");
 } catch (error) {
-  console.log(error) // Will show what was expected vs. what was found
+  console.log(error); // Will show what was expected vs. what was found
 }
 ```
 
 You can also add custom error messages:
 
 ```typescript
-const parser = string('Hello')
-  .withError(() => 'Expected a greeting')
-  .then(char(' '))
-  .then(string('World'))
-  .withError(() => 'Expected "Hello World"')
+const parser = string("Hello")
+  .withError(() => "Expected a greeting")
+  .then(char(" "))
+  .then(string("World"))
+  .withError(() => 'Expected "Hello World"');
 ```
 
 ## Using Generator Syntax
@@ -174,19 +169,19 @@ const parser = string('Hello')
 For complex parsers, generator syntax can be more readable:
 
 ```typescript
-import { Parser, string, char, many1, digit } from 'parserator'
+import { Parser, string, char, many1, digit } from "parserator";
 
 const dateParser = Parser.gen(function* () {
-  const year = yield* many1(digit).map(d => parseInt(d.join('')))
-  yield* char('-')
-  const month = yield* many1(digit).map(d => parseInt(d.join('')))
-  yield* char('-')
-  const day = yield* many1(digit).map(d => parseInt(d.join('')))
-  
-  return { year, month, day }
-})
+  const year = yield* many1(digit).map(d => parseInt(d.join("")));
+  yield* char("-");
+  const month = yield* many1(digit).map(d => parseInt(d.join("")));
+  yield* char("-");
+  const day = yield* many1(digit).map(d => parseInt(d.join("")));
 
-console.log(dateParser.parseOrThrow('2023-12-25'))
+  return { year, month, day };
+});
+
+console.log(dateParser.parseOrThrow("2023-12-25"));
 // { year: 2023, month: 12, day: 25 }
 ```
 
@@ -195,73 +190,73 @@ console.log(dateParser.parseOrThrow('2023-12-25'))
 Let's build a calculator that can handle addition and multiplication:
 
 ```typescript
-import { Parser, char, digit, many1, or, regex } from 'parserator'
+import { Parser, char, digit, many1, or, regex } from "parserator";
 
 // Basic building blocks
-const ws = regex(/\s*/)
-const number = many1(digit).map(digits => parseInt(digits.join('')))
+const ws = regex(/\s*/);
+const number = many1(digit).map(digits => parseInt(digits.join("")));
 
 // Expression parser using generator syntax
 const expression: Parser<number> = Parser.gen(function* () {
-  let result = yield* term
-  
+  let result = yield* term;
+
   while (true) {
-    yield* ws
-    const op = yield* optional(or(char('+'), char('-')))
-    if (!op) break
-    
-    yield* ws
-    const right = yield* term
-    
-    if (op === '+') {
-      result = result + right
+    yield* ws;
+    const op = yield* optional(or(char("+"), char("-")));
+    if (!op) break;
+
+    yield* ws;
+    const right = yield* term;
+
+    if (op === "+") {
+      result = result + right;
     } else {
-      result = result - right
+      result = result - right;
     }
   }
-  
-  return result
-})
+
+  return result;
+});
 
 const term: Parser<number> = Parser.gen(function* () {
-  let result = yield* factor
-  
+  let result = yield* factor;
+
   while (true) {
-    yield* ws
-    const op = yield* optional(or(char('*'), char('/')))
-    if (!op) break
-    
-    yield* ws
-    const right = yield* factor
-    
-    if (op === '*') {
-      result = result * right
+    yield* ws;
+    const op = yield* optional(or(char("*"), char("/")));
+    if (!op) break;
+
+    yield* ws;
+    const right = yield* factor;
+
+    if (op === "*") {
+      result = result * right;
     } else {
-      result = Math.floor(result / right)
+      result = Math.floor(result / right);
     }
   }
-  
-  return result
-})
+
+  return result;
+});
 
 const factor: Parser<number> = or(
   // Parenthesized expression
   Parser.gen(function* () {
-    yield* char('(')
-    yield* ws
-    const result = yield* expression
-    yield* ws
-    yield* char(')')
-    return result
+    yield* char("(");
+    yield* ws;
+    const result = yield* expression;
+    yield* ws;
+    yield* char(")");
+    return result;
   }),
   // Simple number
   number
-)
+);
 
 // Test the calculator
-console.log(expression.parseOrThrow('2 + 3 * 4'))     // 14
-console.log(expression.parseOrThrow('(2 + 3) * 4'))   // 20
-console.log(expression.parseOrThrow('10 - 2 + 3'))    // 11
+console.log(expression.parseOrThrow("2 + 3 * 4")); // 14
+console.log(expression.parseOrThrow("(2 + 3) * 4")); // 20
+console.log(expression.parseOrThrow("10 - 2 + 3")); // 11
 ```
 
 ## Next Steps
@@ -279,28 +274,28 @@ Now that you've built your first parsers, you can:
 
 ```typescript
 // ❌ Bad - can match empty string
-const bad = many0(regex(/a*/))
+const bad = many0(regex(/a*/));
 
 // ✅ Good - always consumes at least one character
-const good = many0(regex(/a+/))
+const good = many0(regex(/a+/));
 ```
 
 **Order matters in `or`**: The first matching parser wins:
 
 ```typescript
 // ❌ Bad - "function" will never match because "fun" matches first
-const bad = or(string('fun'), string('function'))
+const bad = or(string("fun"), string("function"));
 
 // ✅ Good - longest match first
-const good = or(string('function'), string('fun'))
+const good = or(string("function"), string("fun"));
 ```
 
 **Forgetting to handle whitespace**: Real-world parsers need explicit whitespace handling:
 
 ```typescript
 // ❌ Bad - won't handle "x + y"
-const bad = char('x').then(char('+')).then(char('y'))
+const bad = char("x").then(char("+")).then(char("y"));
 
 // ✅ Good - handles whitespace
-const good = char('x').thenDiscard(ws).then(char('+')).thenDiscard(ws).then(char('y'))
+const good = char("x").thenDiscard(ws).then(char("+")).thenDiscard(ws).then(char("y"));
 ```

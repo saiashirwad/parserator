@@ -1,112 +1,248 @@
-# Todo: Runtime-Level Logical Problems to Fix
+# Error Handling Improvements
 
-Below are the runtime-level (i.e. user-visible) logical problems found in the core combinators and helpers that need to be addressed one by one.
+## 1. Add commit/cut functionality
 
-## Issues to Fix
+[ ] Add `committed` flag to ParserContext
 
-### 1. `regex` never advances the state
-- **Problem**: The match text is returned but `state` is returned unchanged, so the same parser can match the same slice forever (e.g. inside `many0`).
-- **Location**: `src/combinators.ts`, `regex` implementation – the "success" branch returns `Parser.succeed(value, state)`
-- **Fix**: Pass `State.consume(state, value.length)` as the new state.
-- **Status**: ✅ Fixed
+```ts
+interface ParserContext<T = {}> {
+  // ... existing fields
+  committed?: boolean;
+}
+```
 
-### 2. `notFollowedBy` consumes input on failure
-- **Problem**: The combinator says it "should not match", yet it returns `newState` (possibly advanced) both on success and failure. A negative look-ahead must never move the cursor.
-- **Location**: `src/combinators.ts`, `notFollowedBy` – last line returns `Parser.succeed(true, newState)`
-- **Fix**: Always return the original `state` when you succeed.
-- **Status**: ✅ Fixed
+[ ] Add `commit()` method to Parser class
 
-### 3. `optional` can also advance when the inner parser fails
-- **Problem**: It mirrors the same pattern: on `Left` it still returns `newState`, leaking whatever the failing parser consumed.
-- **Location**: `src/combinators.ts`, `optional` – failure branch
-- **Fix**: Return the untouched `state` in the failure branch.
-- **Status**: ✅ Fixed
+```ts
+commit(): Parser<T, Ctx> {
+  return new Parser(state => {
+    const result = this.run(state)
+    if (Either.isRight(result.result)) {
+      return {
+        ...result,
+        state: {
+          ...result.state,
+          context: {
+            ...result.state.context,
+            committed: true
+          }
+        }
+      }
+    }
+    return result
+  })
+}
+```
 
-### 4. Potential infinite loop in `many_` / `skipMany_`
-- **Problem**: Neither loop checks that the inner parser (or the separator) actually moved the cursor. If a parser succeeds without consumption (very easy after bug #1), the `while(true)` loop never breaks.
-- **Location**: `many_` and `skipMany_` helper bodies
-- **Fix**: After each successful parse, verify `newState.pos.offset > currentState.pos.offset`; if not, throw or fail.
-- **Status**: ✅ Fixed
+[ ] Add standalone `commit()` and `cut()` functions
 
-### 5. `sepBy` rejects empty lists
-- **Problem**: Typical `sepBy` returns `[]` when the first element parser fails, but the current version immediately propagates that failure, so `[]` is un-parsable. A `// TODO: fix this` comment is already present.
-- **Location**: `src/combinators.ts`, `sepBy` – early failure on the first element
-- **Fix**: If the first element fails, succeed with `[]` and the original state.
-- **Status**: ✅ Fixed
+```ts
+export function commit<Ctx = {}>(): Parser<void, Ctx> {
+  return new Parser(state => {
+    return Parser.succeed(void 0, { ...state, context: { ...state.context, committed: true } });
+  });
+}
 
-### 6. `sequence` leaks a `@ts-expect-error` and stores results it never uses
-- **Problem**: The generic accumulator is typed incorrectly (`results: Parsers[]`). It also keeps an unused array and contains a `// TODO: fix this` comment.
-- **Location**: `sequence` implementation
-- **Fix**: Change `results` to `unknown[]` or drop it entirely; remove the `@ts-expect-error`.
-- **Status**: ✅ Fixed
+export const cut = commit; // Alias for Prolog-style naming
+```
 
-## Secondary Observations
-- Because of bug #1 the library's own unit tests that exercise `regex` inside `many1`, `takeUntil` etc. pass only thanks to implicit string slicing in those combinators; once `regex` starts consuming, double-check those tests.
-- The same "state leak on failure" pattern appears anywhere a combinator re-runs a child parser and then discards the result (e.g. `lookAhead`). Only `lookAhead` deliberately keeps the original state—double-check all similar helpers.
+## 2. Add atomic parser functionality
 
-## Completion Status
-1. ✅ **COMPLETED**: Fix issues in order of severity (infinite loops first, then state consumption bugs)
-2. ✅ **COMPLETED**: Run tests after each fix to ensure no regressions
-3. ✅ **COMPLETED**: Add additional test cases to prevent future occurrences
-4. ✅ **COMPLETED**: Review similar patterns throughout the codebase
-5. ✅ **COMPLETED**: Ensure TypeScript compilation and build system works
-6. ✅ **COMPLETED**: Create comprehensive documentation
+[ ] Add `atomic()` method to Parser class
 
-## Summary
-All 6 runtime-level logical problems have been successfully fixed and thoroughly tested:
+```ts
+atomic(): Parser<T, Ctx> {
+  return new Parser(state => {
+    const result = this.run(state)
+    if (Either.isLeft(result.result)) {
+      // Reset to original state on failure
+      return {
+        result: result.result,
+        state // Return original state, not updated state
+      }
+    }
+    return result
+  })
+}
+```
 
-### Fixes Applied:
-1. ✅ **`regex` state advancement**: Changed `Parser.succeed(value, state)` to `Parser.succeed(value, State.consume(state, value.length))` in the success branch
-2. ✅ **`notFollowedBy` state preservation**: Changed `Parser.succeed(true, newState)` to `Parser.succeed(true, state)` to never advance on success
-3. ✅ **`optional` state preservation**: Changed failure branch to return `Parser.succeed(undefined, state)` instead of `newState`
-4. ✅ **Infinite loop prevention**: Added state advancement checks in `many_` and `skipMany_` that throw errors if parsers don't advance
-5. ✅ **`sepBy` empty list handling**: Changed to return `Parser.succeed([], state)` when first element fails instead of propagating failure
-6. ✅ **`sequence` cleanup**: Removed unused `results` array, eliminated `@ts-expect-error`, and simplified to track only the last result
+[ ] Add standalone `atomic()` combinator
 
-### Testing Results:
-- ✅ All 141 existing tests continue to pass (no regressions)
-- ✅ Added 23 new comprehensive test cases covering all fixes
-- ✅ Total test suite: 164 tests passing
-- ✅ Verified infinite loop prevention works correctly
-- ✅ Confirmed state preservation in negative lookaheads
-- ✅ Validated proper state advancement in all scenarios
+```ts
+export function atomic<T, Ctx = {}>(parser: Parser<T, Ctx>): Parser<T, Ctx> {
+  return parser.atomic();
+}
+```
 
-### Code Review Findings:
-- ✅ Reviewed all similar patterns in codebase
-- ✅ Confirmed `lookAhead` is correctly implemented (properly preserves state)
-- ✅ No other instances of state leakage patterns found
-- ✅ All combinators now follow correct state management principles
+## 3. Add recovery functionality
 
-### Recommendations:
-1. **Monitor for similar patterns**: When adding new combinators, ensure negative lookaheads and optional parsers don't leak state
-2. **Test with non-advancing parsers**: Always test combinators with parsers that might not consume input
-3. **State advancement validation**: Consider adding runtime checks for infinite loops in other recursive combinators
-4. **Documentation**: Update combinator documentation to clarify state preservation behavior
+[ ] Add `recover()` method to Parser class
 
-## ✅ PROJECT COMPLETED SUCCESSFULLY ✅
+```ts
+recover(defaultValue: T): Parser<T, Ctx> {
+  return new Parser(state => {
+    const result = this.run(state)
+    if (Either.isLeft(result.result)) {
+      // Store error in context for later reporting if needed
+      const recoveredState = {
+        ...state,
+        context: {
+          ...state.context,
+          recoveredErrors: [
+            ...(state.context.recoveredErrors || []),
+            result.result.left
+          ]
+        }
+      }
+      return Parser.succeed(defaultValue, recoveredState)
+    }
+    return result
+  })
+}
+```
 
-The parser library is now robust against all identified runtime issues and has comprehensive test coverage to prevent regressions.
+## 4. Add fatal error functionality
 
-**Final Results:**
-- 🎯 **All 6 critical runtime issues fixed**
-- 🧪 **214 tests passing (100% success rate)**
-- 🔧 **TypeScript compilation successful**
-- 📦 **Build system working correctly**
-- 📋 **73 new comprehensive test cases added (23 runtime fixes + 50 regex parsers)**
-- 📚 **Complete documentation provided**
+[ ] Add "Fatal" error type to ParseErr union
 
-**Quality Assurance:**
-- ✅ No regressions in existing functionality
-- ✅ All edge cases covered with tests
-- ✅ Infinite loop protection implemented and tested
-- ✅ State management issues resolved
-- ✅ Type safety maintained throughout
-- ✅ Backward compatibility preserved
+```ts
+export type ParseErr =
+  | { tag: "Expected"; span: Span; items: string[]; context: string[] }
+  | { tag: "Unexpected"; span: Span; found: string; context: string[]; hints?: string[] }
+  | { tag: "Custom"; span: Span; message: string; hints?: string[]; context: string[] }
+  | { tag: "Fatal"; span: Span; message: string; context: string[] }; // New
+```
 
-**Deliverables:**
-- ✅ `RUNTIME_FIXES_SUMMARY.md` - Comprehensive documentation
-- ✅ `tests/runtime-fixes.test.ts` - Complete runtime fix test coverage (23 tests)
-- ✅ `tests/regex-parsers.test.ts` - Comprehensive regex parser test coverage (50 tests)
-- ✅ Fixed `src/combinators.ts` - All runtime issues resolved
+[ ] Add `fatal()` static method to Parser class
 
-The parserator library is now production-ready with robust error handling, comprehensive test coverage, and extensive regex parser validation covering all patterns, flags, and integration scenarios.
+```ts
+static fatal<Ctx = {}>(message: string): Parser<never, Ctx> {
+  return new Parser(state => {
+    const span = createSpan(state)
+    const fatalError: ParseErr = {
+      tag: "Fatal",
+      span,
+      message,
+      context: state.context?.labelStack ?? []
+    }
+
+    return Parser.failRich({ errors: [fatalError] }, state)
+  })
+}
+```
+
+## 5. Update Parser.gen error handling
+
+[ ] Modify the error handling in `Parser.gen` to respect commit state
+
+```ts
+static gen = <T, Ctx = unknown>(
+  f: () => Generator<Parser<any, Ctx>, T, any>
+): Parser<T, Ctx> =>
+  new Parser<T, Ctx>(state => {
+    const iterator = f()
+    let current = iterator.next()
+    let currentState: ParserState<Ctx> = state
+
+    while (!current.done) {
+      const { result, state: updatedState } = current.value.run(currentState)
+
+      if (Either.isLeft(result)) {
+        const isCommitted = updatedState.context?.committed || state.context?.committed
+        const hasFatalError = result.left.errors.some(e => e.tag === "Fatal")
+
+        // If committed or fatal, return immediately
+        if (isCommitted || hasFatalError) {
+          return {
+            result: result as unknown as Either<T, ParseErrorBundle>,
+            state: updatedState
+          }
+        }
+
+        // Otherwise, for now just return (but this is where we could accumulate)
+        return {
+          result: result as unknown as Either<T, ParseErrorBundle>,
+          state: updatedState
+        }
+      }
+
+      currentState = updatedState
+      current = iterator.next(result.right)
+    }
+
+    return Parser.succeed(current.value, currentState)
+  })
+```
+
+## 6. Update error handling in combinators
+
+[ ] Update `or` combinator to accumulate errors when not committed
+
+```ts
+// In or combinator implementation
+or<B>(other: Parser<B, Ctx>): Parser<T | B, Ctx> {
+  return new Parser(state => {
+    const firstResult = this.run(state)
+
+    // If first succeeded or we're committed, return immediately
+    if (Either.isRight(firstResult.result) || state.context?.committed) {
+      return firstResult
+    }
+
+    // Try second parser
+    const secondResult = other.run(state)
+
+    // If second failed too, merge errors
+    if (Either.isLeft(secondResult.result)) {
+      const mergedErrors = [
+        ...firstResult.result.left.errors,
+        ...secondResult.result.left.errors
+      ]
+      return Parser.failRich({ errors: mergedErrors }, state)
+    }
+
+    return secondResult
+  })
+}
+```
+
+## 7. Add examples and tests
+
+[ ] Create examples showing the new error handling patterns
+
+```ts
+// Example: JSON parser with commit points
+const jsonObject = Parser.gen(function* () {
+  yield* char("{");
+  yield* commit(); // After seeing '{', we're committed to parsing an object
+
+  const pairs = yield* sepBy(
+    keyValue.recover(null), // Recover from individual pair errors
+    char(",")
+  );
+
+  yield* char("}").expect("closing brace for object");
+  return Object.fromEntries(pairs.filter(p => p !== null));
+});
+
+// Example: Statement parser with cut
+const ifStatement = Parser.gen(function* () {
+  yield* keyword("if");
+  yield* cut(); // No backtracking after seeing "if"
+
+  yield* char("(").expect("opening parenthesis after 'if'");
+  const condition = yield* expression;
+  yield* char(")").expect("closing parenthesis after condition");
+
+  const body = yield* block;
+  return { type: "if", condition, body };
+});
+```
+
+[ ] Add unit tests for each new feature
+
+- Test commit() prevents backtracking in choice
+- Test atomic() resets state on failure
+- Test recover() continues parsing with default
+- Test fatal() causes immediate failure even in choice
+- Test error accumulation in or() vs immediate failure after commit()

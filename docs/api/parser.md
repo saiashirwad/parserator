@@ -33,8 +33,9 @@ static succeed<T, Ctx = {}>(
 ```
 
 **Example:**
+
 ```typescript
-return Parser.succeed("hello", newState)
+return Parser.succeed("hello", newState);
 ```
 
 ### `Parser.fail(error, state)`
@@ -49,11 +50,9 @@ static fail<Ctx = {}>(
 ```
 
 **Example:**
+
 ```typescript
-return Parser.fail(
-  { message: "Expected digit", expected: ["0-9"], found: "a" },
-  state
-)
+return Parser.fail({ message: "Expected digit", expected: ["0-9"], found: "a" }, state);
 ```
 
 ### `Parser.error(message, expected?, stateCallback?)`
@@ -69,8 +68,9 @@ static error<Ctx = {}>(
 ```
 
 **Example:**
+
 ```typescript
-const errorParser = Parser.error("This always fails")
+const errorParser = Parser.error("This always fails");
 ```
 
 ### `Parser.pure(value)`
@@ -82,9 +82,10 @@ static pure<A>(a: A): Parser<A>
 ```
 
 **Example:**
+
 ```typescript
-const alwaysHello = Parser.pure("hello")
-console.log(alwaysHello.parseOrThrow("anything")) // "hello"
+const alwaysHello = Parser.pure("hello");
+console.log(alwaysHello.parseOrThrow("anything")); // "hello"
 ```
 
 ### `Parser.lazy(fn)`
@@ -96,11 +97,10 @@ static lazy<T>(fn: () => Parser<T>): Parser<T>
 ```
 
 **Example:**
+
 ```typescript
-let expr: Parser<number>
-const parenExpr = Parser.lazy(() => 
-  char('(').then(expr).thenDiscard(char(')'))
-)
+let expr: Parser<number>;
+const parenExpr = Parser.lazy(() => char("(").then(expr).thenDiscard(char(")")));
 ```
 
 ### `Parser.gen(generator)`
@@ -114,16 +114,17 @@ static gen<T, Ctx = unknown>(
 ```
 
 **Example:**
+
 ```typescript
 const dateParser = Parser.gen(function* () {
-  const year = yield* many1(digit).map(d => parseInt(d.join('')))
-  yield* char('-')
-  const month = yield* many1(digit).map(d => parseInt(d.join('')))
-  yield* char('-')
-  const day = yield* many1(digit).map(d => parseInt(d.join('')))
-  
-  return new Date(year, month - 1, day)
-})
+  const year = yield* many1(digit).map(d => parseInt(d.join("")));
+  yield* char("-");
+  const month = yield* many1(digit).map(d => parseInt(d.join("")));
+  yield* char("-");
+  const day = yield* many1(digit).map(d => parseInt(d.join("")));
+
+  return new Date(year, month - 1, day);
+});
 ```
 
 ### `Parser.Do`
@@ -135,10 +136,9 @@ static Do: Parser<{}>
 ```
 
 **Example:**
+
 ```typescript
-const parser = Parser.Do
-  .bind('name', stringParser)
-  .bind('age', numberParser)
+const parser = Parser.Do.bind("name", stringParser).bind("age", numberParser);
 ```
 
 ## Instance Methods
@@ -157,13 +157,14 @@ parse(
 ```
 
 **Example:**
+
 ```typescript
-const result = parser.parse("hello world")
+const result = parser.parse("hello world");
 if (Either.isRight(result.result)) {
-  console.log("Success:", result.result.right)
-  console.log("Remaining:", result.state.remaining)
+  console.log("Success:", result.result.right);
+  console.log("Remaining:", result.state.remaining);
 } else {
-  console.log("Error:", result.result.left)
+  console.log("Error:", result.result.left);
 }
 ```
 
@@ -179,12 +180,13 @@ parseOrError(
 ```
 
 **Example:**
+
 ```typescript
-const result = parser.parseOrError("hello")
+const result = parser.parseOrError("hello");
 if (result instanceof ParseErrorBundle) {
-  console.log("Parse failed:", result.primary.message)
+  console.log("Parse failed:", result.primary.message);
 } else {
-  console.log("Parse succeeded:", result)
+  console.log("Parse succeeded:", result);
 }
 ```
 
@@ -200,12 +202,13 @@ parseOrThrow(
 ```
 
 **Example:**
+
 ```typescript
 try {
-  const result = parser.parseOrThrow("hello")
-  console.log("Success:", result)
+  const result = parser.parseOrThrow("hello");
+  console.log("Success:", result);
 } catch (error) {
-  console.log("Parse failed:", error)
+  console.log("Parse failed:", error);
 }
 ```
 
@@ -220,9 +223,10 @@ map<B>(f: (a: T) => B): Parser<B, Ctx>
 ```
 
 **Example:**
+
 ```typescript
-const stringNumber = many1(digit).map(digits => digits.join(''))
-const actualNumber = stringNumber.map(str => parseInt(str))
+const stringNumber = many1(digit).map(digits => digits.join(""));
+const actualNumber = stringNumber.map(str => parseInt(str));
 ```
 
 #### `flatMap(fn)`
@@ -234,12 +238,11 @@ flatMap<B>(f: (a: T) => Parser<B, Ctx>): Parser<B, Ctx>
 ```
 
 **Example:**
+
 ```typescript
 const lengthPrefixedString = many1(digit)
-  .map(d => parseInt(d.join('')))
-  .flatMap(length => 
-    manyNExact(anyChar(), length).map(chars => chars.join(''))
-  )
+  .map(d => parseInt(d.join("")))
+  .flatMap(length => manyNExact(anyChar(), length).map(chars => chars.join("")));
 ```
 
 ### Combination Methods
@@ -253,8 +256,9 @@ zip<B>(parserB: Parser<B, Ctx>): Parser<[T, B], Ctx>
 ```
 
 **Example:**
+
 ```typescript
-const nameAge = stringParser.zip(numberParser)
+const nameAge = stringParser.zip(numberParser);
 // Result type: Parser<[string, number], Ctx>
 ```
 
@@ -267,8 +271,9 @@ then<B>(parserB: Parser<B, Ctx>): Parser<B, Ctx>
 ```
 
 **Example:**
+
 ```typescript
-const worldParser = string('Hello').then(char(' ')).then(string('World'))
+const worldParser = string("Hello").then(char(" ")).then(string("World"));
 // Returns: "World"
 ```
 
@@ -281,8 +286,9 @@ thenDiscard<B>(parserB: Parser<B, Ctx>): Parser<T, Ctx>
 ```
 
 **Example:**
+
 ```typescript
-const helloParser = string('Hello').thenDiscard(char(' ')).thenDiscard(string('World'))
+const helloParser = string("Hello").thenDiscard(char(" ")).thenDiscard(string("World"));
 // Returns: "Hello"
 ```
 
@@ -298,10 +304,9 @@ bind<K extends string, B>(
 ```
 
 **Example:**
+
 ```typescript
-const person = Parser.Do
-  .bind('name', stringParser)
-  .bind('age', numberParser)
+const person = Parser.Do.bind("name", stringParser).bind("age", numberParser);
 // Result type: Parser<{ name: string; age: number }>
 ```
 
@@ -316,8 +321,9 @@ trim(parser: Parser<any, Ctx>): Parser<T, Ctx>
 ```
 
 **Example:**
+
 ```typescript
-const trimmedString = stringParser.trim(whitespace)
+const trimmedString = stringParser.trim(whitespace);
 ```
 
 #### `trimLeft(parser)`
@@ -352,8 +358,9 @@ withError(
 ```
 
 **Example:**
+
 ```typescript
-const parser = digit.withError(() => "Expected a single digit")
+const parser = digit.withError(() => "Expected a single digit");
 ```
 
 #### `label(name)`
@@ -365,8 +372,9 @@ label(name: string): Parser<T, Ctx>
 ```
 
 **Example:**
+
 ```typescript
-const identifier = regex(/[a-zA-Z_][a-zA-Z0-9_]*/).label('identifier')
+const identifier = regex(/[a-zA-Z_][a-zA-Z0-9_]*/).label("identifier");
 ```
 
 #### `expect(description)`
@@ -378,8 +386,9 @@ expect(description: string): Parser<T, Ctx>
 ```
 
 **Example:**
+
 ```typescript
-const number = many1(digit).expect('a number')
+const number = many1(digit).expect("a number");
 ```
 
 ### Debug Methods
@@ -398,11 +407,12 @@ tap(
 ```
 
 **Example:**
+
 ```typescript
 const debugParser = parser.tap(({ state, result }) => {
-  console.log('Position:', state.pos)
-  console.log('Result:', result)
-})
+  console.log("Position:", state.pos);
+  console.log("Result:", result);
+});
 ```
 
 #### `withTrace(label)`
@@ -414,8 +424,9 @@ withTrace(label: string): Parser<T, Ctx>
 ```
 
 **Example:**
+
 ```typescript
-const tracedParser = parser.withTrace('my-parser')
+const tracedParser = parser.withTrace("my-parser");
 ```
 
 #### `name(name)`
@@ -427,8 +438,9 @@ name(name: string): Parser<T, Ctx>
 ```
 
 **Example:**
+
 ```typescript
-const namedParser = parser.name('important-parser')
+const namedParser = parser.name("important-parser");
 ```
 
 ## Properties
@@ -446,7 +458,7 @@ options?: ParserOptions
 The internal parsing function. Generally not used directly.
 
 ```typescript
-run: (state: ParserState<Ctx>) => ParserOutput<T, Ctx>
+run: (state: ParserState<Ctx>) => ParserOutput<T, Ctx>;
 ```
 
 ## Generator Interface
@@ -458,13 +470,14 @@ Parsers implement the generator interface, allowing them to be used with `yield*
 ```
 
 **Example:**
+
 ```typescript
 const parser = Parser.gen(function* () {
-  const hello = yield* string('Hello')
-  const space = yield* char(' ')
-  const world = yield* string('World')
-  return `${hello}${space}${world}`
-})
+  const hello = yield* string("Hello");
+  const space = yield* char(" ");
+  const world = yield* string("World");
+  return `${hello}${space}${world}`;
+});
 ```
 
 ## Type Inference
@@ -473,16 +486,16 @@ Parserator provides excellent type inference. You rarely need to specify types e
 
 ```typescript
 // All types are inferred correctly
-const stringParser = string('hello')  // Parser<string>
-const numberParser = many1(digit).map(d => parseInt(d.join('')))  // Parser<number>
-const tupleParser = stringParser.zip(numberParser)  // Parser<[string, number]>
+const stringParser = string("hello"); // Parser<string>
+const numberParser = many1(digit).map(d => parseInt(d.join(""))); // Parser<number>
+const tupleParser = stringParser.zip(numberParser); // Parser<[string, number]>
 
 // Complex nested types work too
 const objectParser = Parser.gen(function* () {
-  const name = yield* stringParser
-  const age = yield* numberParser
-  return { name, age }  // Correctly inferred as { name: string; age: number }
-})
+  const name = yield* stringParser;
+  const age = yield* numberParser;
+  return { name, age }; // Correctly inferred as { name: string; age: number }
+});
 ```
 
 ## Context Usage
@@ -491,27 +504,23 @@ When using custom context types:
 
 ```typescript
 interface MyContext {
-  debug: boolean
-  variables: Map<string, any>
+  debug: boolean;
+  variables: Map<string, any>;
 }
 
 const contextParser = Parser.gen<string, MyContext>(function* () {
   // Access context through parser state
-  const currentState = yield* peekState
+  const currentState = yield* peekState;
   if (currentState.context.debug) {
-    console.log('Debug mode enabled')
+    console.log("Debug mode enabled");
   }
-  
-  const result = yield* someOtherParser
-  return result
-})
+
+  const result = yield* someOtherParser;
+  return result;
+});
 
 // Use with context
-const result = contextParser.parse('input', {
-  debug: true,
-  variables: new Map(),
-  source: 'input'
-})
+const result = contextParser.parse("input", { debug: true, variables: new Map(), source: "input" });
 ```
 
 ## Best Practices

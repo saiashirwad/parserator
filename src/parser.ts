@@ -1,20 +1,16 @@
-import { debug } from "./debug"
-import { Either } from "./either"
-import { type ParseErr, ParseErrorBundle, createSpan } from "./rich-errors"
+import { debug } from "./debug";
+import { Either } from "./either";
+import { type ParseErr, ParseErrorBundle, createSpan } from "./errors";
 import {
   type ParserContext,
   type ParserOptions,
   type ParserOutput,
   type ParserState,
   State
-} from "./state"
-import type { Prettify } from "./types"
+} from "./state";
+import type { Prettify } from "./types";
 
-type BindResult<T, K extends string, B> = Prettify<
-  T & {
-    [k in K]: B
-  }
->
+type BindResult<T, K extends string, B> = Prettify<T & { [k in K]: B }>;
 
 export class Parser<T, Ctx = {}> {
   constructor(
@@ -26,39 +22,29 @@ export class Parser<T, Ctx = {}> {
   ) {}
 
   name(name: string) {
-    this.options = { ...this.options, name }
-    return this
+    this.options = { ...this.options, name };
+    return this;
   }
 
   static succeed<T, Ctx = {}>(value: T, state: ParserState<Ctx>): ParserOutput<T, Ctx> {
-    return {
-      state,
-      result: Either.right(value)
-    }
+    return { state, result: Either.right(value) };
   }
 
-  static lift = <A, Ctx = {}>(a: A): Parser<A, Ctx> => new Parser(state => Parser.succeed(a, state))
+  static lift = <A, Ctx = {}>(a: A): Parser<A, Ctx> =>
+    new Parser(state => Parser.succeed(a, state));
 
   static liftA2 = <A, B, C>(ma: Parser<A>, mb: Parser<B>, f: (a: A, b: B) => C) =>
-    ma.zip(mb).map(args => f(...args))
+    ma.zip(mb).map(args => f(...args));
 
-  static ap = <A, B>(ma: Parser<A>, mf: Parser<(_: A) => B>) => mf.zip(ma).map(([f, a]) => f(a))
+  static ap = <A, B>(ma: Parser<A>, mf: Parser<(_: A) => B>) => mf.zip(ma).map(([f, a]) => f(a));
 
   static fail<Ctx = {}>(
-    error: {
-      message: string
-      expected?: string[]
-      found?: string
-    },
+    error: { message: string; expected?: string[]; found?: string },
     state: ParserState<Ctx>
   ): ParserOutput<never, Ctx> {
     const span = createSpan({
-      pos: {
-        offset: state.pos.offset,
-        line: state.pos.line,
-        column: state.pos.column
-      }
-    })
+      pos: { offset: state.pos.offset, line: state.pos.line, column: state.pos.column }
+    });
 
     const parseErr: ParseErr = {
       tag: "Custom",
@@ -66,14 +52,11 @@ export class Parser<T, Ctx = {}> {
       message: error.message,
       context: state.context?.labelStack ?? [],
       hints: []
-    }
+    };
 
-    const bundle = new ParseErrorBundle([parseErr], state.context?.source ?? state.remaining)
+    const bundle = new ParseErrorBundle([parseErr], state.context?.source ?? state.remaining);
 
-    return {
-      state,
-      result: Either.left(bundle)
-    }
+    return { state, result: Either.left(bundle) };
   }
 
   static error<Ctx = {}>(
@@ -82,16 +65,16 @@ export class Parser<T, Ctx = {}> {
     stateCallback?: (state: ParserState<Ctx>) => ParserState<Ctx>
   ): Parser<never, Ctx> {
     return new Parser(state => {
-      return Parser.fail({ message, expected }, stateCallback ? stateCallback(state) : state)
-    })
+      return Parser.fail({ message, expected }, stateCallback ? stateCallback(state) : state);
+    });
   }
 
   static selectRight<A>(p: Parser<A>): Parser<Either<A, never>, {}> {
-    return p.flatMap(a => Parser.lift(Either.right(a)))
+    return p.flatMap(a => Parser.lift(Either.right(a)));
   }
 
   static selectLeft<A>(p: Parser<A>): Parser<Either<never, A>, {}> {
-    return p.flatMap(a => Parser.lift(Either.left(a)))
+    return p.flatMap(a => Parser.lift(Either.left(a)));
   }
 
   /**
@@ -103,88 +86,87 @@ export class Parser<T, Ctx = {}> {
     makeMessage: (errorCtx: { error: ParseErrorBundle; state: ParserState<Ctx> }) => string
   ): Parser<T, Ctx> {
     return new Parser<T, Ctx>(state => {
-      const output = this.run(state)
+      const output = this.run(state);
       if (Either.isLeft(output.result)) {
         return Parser.fail(
-          {
-            message: makeMessage({
-              error: output.result.left,
-              state: output.state
-            })
-          },
+          { message: makeMessage({ error: output.result.left, state: output.state }) },
           output.state
-        )
+        );
       }
-      return output
-    }, this.options)
+      return output;
+    }, this.options);
   }
 
-  parse(input: string, context = { source: input } as ParserContext<Ctx>): ParserOutput<T, Ctx> {
-    const { result, state } = this.run(State.fromInput(input, context))
-    return { result, state }
+  static fatal<Ctx = {}>(message: string): Parser<never, Ctx> {
+    return new Parser(state => {
+      const span = createSpan(state);
+      const fatalError: ParseErr = {
+        tag: "Fatal",
+        span,
+        message,
+        context: state.context?.labelStack ?? []
+      };
+
+      return Parser.failRich({ errors: [fatalError] }, state);
+    });
+  }
+
+  parse(input: string, context = { source: input }): ParserOutput<T, Ctx> {
+    const st = State.fromInput(input, context);
+    const { result, state } = this.run(State.fromInput(input, context) as any);
+    return { result, state };
   }
 
   withTrace(label: string): Parser<T, Ctx> {
     return new Parser<T, Ctx>(state => {
       if (!state.context?.debug) {
-        return this.run(state)
+        return this.run(state);
       }
-      return debug(this, label).run(state)
-    }, this.options)
+      return debug(this, label).run(state);
+    }, this.options);
   }
 
   parseOrError(input: string, context = { source: input } as ParserContext<Ctx>) {
-    const { result } = this.run(State.fromInput(input, context))
+    const { result } = this.run(State.fromInput(input, context));
     if (Either.isRight(result)) {
-      return result.right
+      return result.right;
     }
-    return result.left
+    return result.left;
   }
 
   parseOrThrow(input: string, context = { source: input } as ParserContext<Ctx>): T {
-    const { result } = this.parse(
-      input,
-      context ?? {
-        source: input
-      }
-    )
+    const { result } = this.parse(input, context ?? { source: input });
 
     if (Either.isLeft(result)) {
-      throw result.left
+      throw result.left;
     }
-    return result.right
+    return result.right;
   }
 
   map<B>(f: (a: T) => B): Parser<B, Ctx> {
     return new Parser<B, Ctx>(state => {
-      const { result, state: newState } = this.run(state)
+      const { result, state: newState } = this.run(state);
       if (Either.isLeft(result)) {
-        return {
-          state,
-          result: result as unknown as Either<B, ParseErrorBundle>
-        }
+        return { state, result: result as unknown as Either<B, ParseErrorBundle> };
       }
-      return Parser.succeed(f(result.right), newState)
-    })
+      return Parser.succeed(f(result.right), newState);
+    });
   }
 
   flatMap<B>(f: (a: T) => Parser<B, Ctx>): Parser<B, Ctx> {
     return new Parser<B, Ctx>(state => {
-      const { result, state: newState } = this.run(state)
+      const { result, state: newState } = this.run(state);
       if (Either.isLeft(result)) {
-        return {
-          state: newState,
-          result: result as unknown as Either<B, ParseErrorBundle>
-        }
+        return { state: newState, result: result as unknown as Either<B, ParseErrorBundle> };
       }
-      const nextParser = f(result.right)
-      return nextParser.run(newState)
-    })
+      const nextParser = f(result.right);
+      return nextParser.run(newState);
+    });
   }
 
-  static pure = <A>(a: A): Parser<A> => new Parser(state => Parser.succeed(a, state))
+  static pure = <A>(a: A): Parser<A> => new Parser(state => Parser.succeed(a, state));
 
-  static Do = Parser.pure({})
+  static Do = Parser.pure({});
 
   /**
    * Creates a new parser that lazily evaluates the given function.
@@ -208,69 +190,66 @@ export class Parser<T, Ctx = {}> {
    */
   static lazy<T>(fn: () => Parser<T>): Parser<T> {
     return new Parser(state => {
-      const parser = fn()
-      return parser.run(state)
-    })
+      const parser = fn();
+      return parser.run(state);
+    });
   }
 
   zip<B>(parserB: Parser<B, Ctx>): Parser<[T, B], Ctx> {
     return new Parser(state => {
-      const { result: a, state: stateA } = this.run(state)
+      const { result: a, state: stateA } = this.run(state);
       if (Either.isLeft(a)) {
-        return {
-          result: a as unknown as Either<[T, B], ParseErrorBundle>,
-          state: stateA
-        }
+        return { result: a as unknown as Either<[T, B], ParseErrorBundle>, state: stateA };
       }
-      const { result: b, state: stateB } = parserB.run(stateA)
+      const { result: b, state: stateB } = parserB.run(stateA);
       if (Either.isLeft(b)) {
-        return {
-          result: b as unknown as Either<[T, B], ParseErrorBundle>,
-          state: stateB
-        }
+        return { result: b as unknown as Either<[T, B], ParseErrorBundle>, state: stateB };
       }
-      return Parser.succeed([a.right, b.right], stateB)
-    })
+      return Parser.succeed([a.right, b.right], stateB);
+    });
   }
 
   then<B>(parserB: Parser<B, Ctx>): Parser<B, Ctx> {
-    return this.zip(parserB).map(([_, b]) => b)
+    return this.zip(parserB).map(([_, b]) => b);
   }
 
-  zipRight = this.then
+  zipRight = this.then;
 
   thenDiscard<B>(parserB: Parser<B, Ctx>): Parser<T, Ctx> {
-    return this.zip(parserB).map(([a, _]) => a)
+    return this.zip(parserB).map(([a, _]) => a);
   }
 
-  zipLeft = this.thenDiscard
+  zipLeft = this.thenDiscard;
 
   bind<K extends string, B>(
     k: K,
     other: Parser<B, Ctx> | ((a: T) => Parser<B, Ctx>)
   ): Parser<BindResult<T, K, B>, Ctx> {
     return new Parser<BindResult<T, K, B>, Ctx>(state => {
-      const { result: resultA, state: stateA } = this.run(state)
+      const { result: resultA, state: stateA } = this.run(state);
       if (Either.isLeft(resultA)) {
         return {
           result: resultA as unknown as Either<BindResult<T, K, B>, ParseErrorBundle>,
           state: stateA
-        }
+        };
       }
-      const nextParser = other instanceof Parser ? other : other(resultA.right)
-      const { result: resultB, state: stateB } = nextParser.run(stateA)
+      const nextParser = other instanceof Parser ? other : other(resultA.right);
+      const { result: resultB, state: stateB } = nextParser.run(stateA);
       if (Either.isLeft(resultB)) {
         return {
           result: resultB as unknown as Either<BindResult<T, K, B>, ParseErrorBundle>,
           state: stateB
-        }
+        };
       }
-      return Parser.succeed({ ...resultA.right, [k]: resultB.right } as BindResult<T, K, B>, stateB)
-    }, this.options)
+      return Parser.succeed(
+        { ...resultA.right, [k]: resultB.right } as BindResult<T, K, B>,
+        stateB
+      );
+    }, this.options);
   }
 
   *[Symbol.iterator](): Generator<Parser<T, Ctx>, T, any> {
-    return yield this
+    return yield this;
   }
 
   /**
@@ -284,41 +263,43 @@ export class Parser<T, Ctx = {}> {
     callback: (args: { state: ParserState<Ctx>; result: ParserOutput<T, Ctx> }) => void
   ): Parser<T, Ctx> {
     return new Parser(state => {
-      const result = this.run(state)
-      callback({ state, result })
-      return result
-    }, this.options)
+      const result = this.run(state);
+      callback({ state, result });
+      return result;
+    }, this.options);
   }
 
   static gen = <T, Ctx = unknown>(f: () => Generator<Parser<any, Ctx>, T, any>): Parser<T, Ctx> =>
     new Parser<T, Ctx>(state => {
-      const iterator = f()
-      let current = iterator.next()
-      let currentState: ParserState<Ctx> = state
+      const iterator = f();
+      let current = iterator.next();
+      let currentState: ParserState<Ctx> = state;
       while (!current.done) {
-        const { result, state: updatedState } = current.value.run(currentState)
+        const { result, state: updatedState } = current.value.run(currentState);
         if (Either.isLeft(result)) {
-          return {
-            result: result as unknown as Either<T, ParseErrorBundle>,
-            state: updatedState
-          }
+          // Check if any error is fatal
+          const hasFatalError = result.left.errors.some(e => e.tag === "Fatal");
+
+          // For now, just return the error regardless of type
+          // We'll add commit handling later
+          return { result: result as unknown as Either<T, ParseErrorBundle>, state: updatedState };
         }
-        currentState = updatedState
-        current = iterator.next(result.right)
+        currentState = updatedState;
+        current = iterator.next(result.right);
       }
-      return Parser.succeed(current.value, currentState)
-    })
+      return Parser.succeed(current.value, currentState);
+    });
 
   trim(parser: Parser<any, Ctx>) {
-    return parser.then(this).thenDiscard(parser)
+    return parser.then(this).thenDiscard(parser);
   }
 
   trimLeft(parser: Parser<any, Ctx>): Parser<T, Ctx> {
-    return parser.then(this)
+    return parser.then(this);
   }
 
   trimRight(parser: Parser<any, Ctx>): Parser<T, Ctx> {
-    return this.thenDiscard(parser)
+    return this.thenDiscard(parser);
   }
 
   /**
@@ -330,13 +311,10 @@ export class Parser<T, Ctx = {}> {
     return new Parser(state => {
       const newState = {
         ...state,
-        context: {
-          ...state.context,
-          labelStack: [name, ...(state.context.labelStack || [])]
-        }
-      }
+        context: { ...state.context, labelStack: [name, ...(state.context.labelStack || [])] }
+      };
 
-      const result = this.run(newState)
+      const result = this.run(newState);
 
       if (Either.isLeft(result.result)) {
         // Convert generic errors to labeled expectations
@@ -345,13 +323,13 @@ export class Parser<T, Ctx = {}> {
           span: createSpan(state),
           items: [name],
           context: newState.context.labelStack || []
-        }
+        };
 
-        return Parser.failRich({ errors: [labeledError] }, result.state)
+        return Parser.failRich({ errors: [labeledError] }, result.state);
       }
 
-      return result
-    }, this.options)
+      return result;
+    }, this.options);
   }
 
   /**
@@ -360,7 +338,7 @@ export class Parser<T, Ctx = {}> {
    * @returns A new parser with both labeling and error message
    */
   expect(description: string): Parser<T, Ctx> {
-    return this.withError(() => `Expected ${description}`).label(description)
+    return this.withError(() => `Expected ${description}`).label(description);
   }
 
   static failRich<Ctx = {}>(
@@ -370,13 +348,10 @@ export class Parser<T, Ctx = {}> {
     const bundle = new ParseErrorBundle(
       errorBundle.errors,
       state.context?.source ?? state.remaining
-    )
+    );
 
-    return {
-      state,
-      result: Either.left(bundle)
-    }
+    return { state, result: Either.left(bundle) };
   }
 }
 
-export const parser = Parser.gen
+export const parser = Parser.gen;

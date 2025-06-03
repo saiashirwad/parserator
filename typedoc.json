@@ -15,8 +15,5 @@
   "sort": ["source-order"],
   "excludePrivate": true,
   "excludeInternal": true,
-  "validation": {
-    "invalidLink": true,
-    "notDocumented": true
-  }
+  "validation": { "invalidLink": true, "notDocumented": true }
 }

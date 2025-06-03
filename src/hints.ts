@@ -1,6 +1,6 @@
-import { Parser } from "./parser"
-import { type ParseErr, createSpan } from "./rich-errors"
-import { State } from "./state"
+import { Parser } from "./parser";
+import { type ParseErr, createSpan } from "./errors";
+import { State } from "./state";
 
 /**
  * Calculate the Levenshtein distance between two strings.
@@ -14,25 +14,25 @@ import { State } from "./state"
 export function levenshteinDistance(a: string, b: string): number {
   const matrix = Array(b.length + 1)
     .fill(null)
-    .map(() => Array(a.length + 1).fill(null))
+    .map(() => Array(a.length + 1).fill(null));
 
   // Initialize first row and column
-  for (let i = 0; i <= a.length; i++) matrix[0][i] = i
-  for (let j = 0; j <= b.length; j++) matrix[j][0] = j
+  for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
+  for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
 
   // Fill the matrix
   for (let j = 1; j <= b.length; j++) {
     for (let i = 1; i <= a.length; i++) {
-      const indicator = a[i - 1] === b[j - 1] ? 0 : 1
+      const indicator = a[i - 1] === b[j - 1] ? 0 : 1;
       matrix[j][i] = Math.min(
         matrix[j][i - 1] + 1, // deletion
         matrix[j - 1][i] + 1, // insertion
         matrix[j - 1][i - 1] + indicator // substitution
-      )
+      );
     }
   }
 
-  return matrix[b.length][a.length]
+  return matrix[b.length][a.length];
 }
 
 /**
@@ -51,19 +51,19 @@ export function generateHints(
   maxDistance: number = 2,
   maxHints: number = 3
 ): string[] {
-  const hints: Array<{ word: string; distance: number }> = []
+  const hints: Array<{ word: string; distance: number }> = [];
 
   for (const candidate of expected) {
-    const distance = levenshteinDistance(found, candidate)
+    const distance = levenshteinDistance(found, candidate);
     if (distance <= maxDistance && distance > 0) {
-      hints.push({ word: candidate, distance })
+      hints.push({ word: candidate, distance });
     }
   }
 
   return hints
     .sort((a, b) => a.distance - b.distance)
     .slice(0, maxHints)
-    .map(h => h.word)
+    .map(h => h.word);
 }
 
 /**
@@ -84,14 +84,14 @@ export function generateHints(
 export const keywordWithHints = (keywords: string[]) => (keyword: string) =>
   new Parser(state => {
     if (state.remaining.startsWith(keyword)) {
-      return Parser.succeed(keyword, State.consume(state, keyword.length))
+      return Parser.succeed(keyword, State.consume(state, keyword.length));
     }
 
     // Try to extract what the user actually typed
-    const match = state.remaining.match(/^[a-zA-Z_][a-zA-Z0-9_]*/)
-    const found = match ? match[0] : state.remaining[0] || "end of input"
+    const match = state.remaining.match(/^[a-zA-Z_][a-zA-Z0-9_]*/);
+    const found = match ? match[0] : state.remaining[0] || "end of input";
 
-    const hints = generateHints(found, keywords)
+    const hints = generateHints(found, keywords);
 
     const error: ParseErr = {
       tag: "Unexpected",
@@ -99,10 +99,10 @@ export const keywordWithHints = (keywords: string[]) => (keyword: string) =>
       found,
       context: state.context.labelStack || [],
       ...(hints.length > 0 && { hints })
-    }
+    };
 
-    return Parser.failRich({ errors: [error] }, state)
-  })
+    return Parser.failRich({ errors: [error] }, state);
+  });
 
 /**
  * Creates a parser that matches any of the provided keywords with hint generation.
@@ -119,22 +119,20 @@ export const keywordWithHints = (keywords: string[]) => (keyword: string) =>
  * const result = keywordParser.parse("functoin")
  * ```
  */
-export function anyKeywordWithHints<Ctx = {}>(
-  keywords: string[]
-): Parser<string, Ctx> {
+export function anyKeywordWithHints<Ctx = {}>(keywords: string[]): Parser<string, Ctx> {
   return new Parser(state => {
     // Try each keyword
     for (const keyword of keywords) {
       if (state.remaining.startsWith(keyword)) {
-        return Parser.succeed(keyword, State.consume(state, keyword.length))
+        return Parser.succeed(keyword, State.consume(state, keyword.length));
       }
     }
 
     // No exact match found, try to extract what was typed and generate hints
-    const match = state.remaining.match(/^[a-zA-Z_][a-zA-Z0-9_]*/)
-    const found = match ? match[0] : state.remaining[0] || "end of input"
+    const match = state.remaining.match(/^[a-zA-Z_][a-zA-Z0-9_]*/);
+    const found = match ? match[0] : state.remaining[0] || "end of input";
 
-    const hints = generateHints(found, keywords)
+    const hints = generateHints(found, keywords);
 
     const error: ParseErr = {
       tag: "Unexpected",
@@ -142,10 +140,10 @@ export function anyKeywordWithHints<Ctx = {}>(
       found,
       context: state.context.labelStack || [],
       ...(hints.length > 0 && { hints })
-    }
+    };
 
-    return Parser.failRich({ errors: [error] }, state)
-  })
+    return Parser.failRich({ errors: [error] }, state);
+  });
 }
 
 /**
@@ -162,9 +160,7 @@ export function anyKeywordWithHints<Ctx = {}>(
  * const result = colorParser.parse('"gren"')
  * ```
  */
-export function stringWithHints<Ctx = {}>(
-  validStrings: string[]
-): Parser<string, Ctx> {
+export function stringWithHints<Ctx = {}>(validStrings: string[]): Parser<string, Ctx> {
   return new Parser(state => {
     // Must start with quote
     if (!state.remaining.startsWith('"')) {
@@ -173,16 +169,16 @@ export function stringWithHints<Ctx = {}>(
         span: createSpan(state, 1),
         items: ["string literal"],
         context: state.context.labelStack || []
-      }
-      return Parser.failRich({ errors: [error] }, state)
+      };
+      return Parser.failRich({ errors: [error] }, state);
     }
 
     // Find the closing quote
-    let i = 1
-    let content = ""
+    let i = 1;
+    let content = "";
     while (i < state.remaining.length && state.remaining[i] !== '"') {
-      content += state.remaining[i]
-      i++
+      content += state.remaining[i];
+      i++;
     }
 
     if (i >= state.remaining.length) {
@@ -191,17 +187,17 @@ export function stringWithHints<Ctx = {}>(
         span: createSpan(state, i),
         items: ["closing quote"],
         context: state.context.labelStack || []
-      }
-      return Parser.failRich({ errors: [error] }, state)
+      };
+      return Parser.failRich({ errors: [error] }, state);
     }
 
     // Check if content is valid
     if (validStrings.includes(content)) {
-      return Parser.succeed(content, State.consume(state, i + 1))
+      return Parser.succeed(content, State.consume(state, i + 1));
     }
 
     // Generate hints for invalid content
-    const hints = generateHints(content, validStrings)
+    const hints = generateHints(content, validStrings);
 
     const error: ParseErr = {
       tag: "Unexpected",
@@ -209,8 +205,8 @@ export function stringWithHints<Ctx = {}>(
       found: `"${content}"`,
       context: state.context.labelStack || [],
       ...(hints.length > 0 && { hints: hints.map(h => `"${h}"`) })
-    }
+    };
 
-    return Parser.failRich({ errors: [error] }, state)
-  })
+    return Parser.failRich({ errors: [error] }, state);
+  });
 }

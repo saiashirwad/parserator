@@ -59,26 +59,26 @@ Parserator is written in TypeScript and provides full type definitions out of th
 
 ```typescript
 // Import specific functions
-import { char, string, many1, digit, or } from 'parserator'
+import { char, string, many1, digit, or } from "parserator";
 
 // Import everything
-import * as P from 'parserator'
+import * as P from "parserator";
 
 // Import the Parser class
-import { Parser } from 'parserator'
+import { Parser } from "parserator";
 ```
 
 ### CommonJS
 
 ```javascript
 // Import specific functions
-const { char, string, many1, digit, or } = require('parserator')
+const { char, string, many1, digit, or } = require("parserator");
 
 // Import everything
-const P = require('parserator')
+const P = require("parserator");
 
 // Import the Parser class
-const { Parser } = require('parserator')
+const { Parser } = require("parserator");
 ```
 
 ## Verification
@@ -86,12 +86,12 @@ const { Parser } = require('parserator')
 To verify your installation is working correctly, try this simple example:
 
 ```typescript
-import { string, char } from 'parserator'
+import { string, char } from "parserator";
 
-const helloParser = string('Hello').then(char(' ')).then(string('World'))
-const result = helloParser.parseOrThrow('Hello World')
+const helloParser = string("Hello").then(char(" ")).then(string("World"));
+const result = helloParser.parseOrThrow("Hello World");
 
-console.log(result) // Output: "World"
+console.log(result); // Output: "World"
 ```
 
 If this runs without errors, you're ready to start building parsers!
@@ -111,10 +111,10 @@ For quick prototyping or simple scripts, you can use a CDN:
 
 ```html
 <script type="module">
-  import { string, char } from 'https://esm.sh/parserator'
-  
-  const parser = string('Hello').then(char(' ')).then(string('World'))
-  console.log(parser.parseOrThrow('Hello World'))
+  import { string, char } from "https://esm.sh/parserator";
+
+  const parser = string("Hello").then(char(" ")).then(string("World"));
+  console.log(parser.parseOrThrow("Hello World"));
 </script>
 ```
 
@@ -155,14 +155,17 @@ Now that you have Parserator installed, you can:
 ### Common Issues
 
 **TypeScript compilation errors:**
+
 - Ensure you're using TypeScript 4.5 or higher
 - Check that your `tsconfig.json` has strict mode enabled
 
 **Module resolution issues:**
+
 - Make sure your bundler supports ES modules
 - Check that `moduleResolution` is set to `"node"` in your tsconfig
 
 **Runtime errors:**
+
 - Verify you're targeting ES2020 or higher
 - Ensure your Node.js version is 16 or higher
 

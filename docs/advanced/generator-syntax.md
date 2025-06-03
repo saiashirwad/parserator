@@ -8,14 +8,14 @@ Generator syntax allows you to write parsers that look like regular imperative c
 
 ```typescript
 const dateParser = Parser.gen(function* () {
-  const year = yield* many1(digit).map(d => parseInt(d.join('')))
-  yield* char('-')
-  const month = yield* many1(digit).map(d => parseInt(d.join('')))
-  yield* char('-')
-  const day = yield* many1(digit).map(d => parseInt(d.join('')))
-  
-  return new Date(year, month - 1, day)
-})
+  const year = yield* many1(digit).map(d => parseInt(d.join("")));
+  yield* char("-");
+  const month = yield* many1(digit).map(d => parseInt(d.join("")));
+  yield* char("-");
+  const day = yield* many1(digit).map(d => parseInt(d.join("")));
+
+  return new Date(year, month - 1, day);
+});
 ```
 
 ## Basic Generator Syntax
@@ -27,8 +27,8 @@ Creates a parser from a generator function:
 ```typescript
 const parser = Parser.gen(function* () {
   // Parser logic here
-  return result
-})
+  return result;
+});
 ```
 
 ### `yield* parser`
@@ -37,12 +37,12 @@ Runs a parser and returns its result:
 
 ```typescript
 const greeting = Parser.gen(function* () {
-  const hello = yield* string('Hello')  // Run parser, get result
-  yield* char(' ')                      // Run parser, ignore result
-  const world = yield* string('World')  // Run parser, get result
-  
-  return `${hello} ${world}`
-})
+  const hello = yield* string("Hello"); // Run parser, get result
+  yield* char(" "); // Run parser, ignore result
+  const world = yield* string("World"); // Run parser, get result
+
+  return `${hello} ${world}`;
+});
 ```
 
 ### Error Handling
@@ -51,10 +51,10 @@ If any parser fails, the entire generator stops and propagates the error:
 
 ```typescript
 const parser = Parser.gen(function* () {
-  const a = yield* char('a')  // If this fails, generator stops
-  const b = yield* char('b')  // This won't run if 'a' fails
-  return a + b
-})
+  const a = yield* char("a"); // If this fails, generator stops
+  const b = yield* char("b"); // This won't run if 'a' fails
+  return a + b;
+});
 ```
 
 ## Conditional Parsing
@@ -63,21 +63,21 @@ Generator syntax makes conditional parsing natural:
 
 ```typescript
 const numberOrString = Parser.gen(function* () {
-  const first = yield* anyChar()
-  
-  if (first >= '0' && first <= '9') {
+  const first = yield* anyChar();
+
+  if (first >= "0" && first <= "9") {
     // Parse as number
-    const rest = yield* many0(digit)
-    return parseInt(first + rest.join(''))
+    const rest = yield* many0(digit);
+    return parseInt(first + rest.join(""));
   } else if (first === '"') {
     // Parse as quoted string
-    const content = yield* takeUntil(char('"'))
-    yield* char('"')
-    return content
+    const content = yield* takeUntil(char('"'));
+    yield* char('"');
+    return content;
   } else {
-    return yield* Parser.error('Expected number or string')
+    return yield* Parser.error("Expected number or string");
   }
-})
+});
 ```
 
 ## Loops and Repetition
@@ -86,45 +86,45 @@ Use regular JavaScript loops for complex repetition patterns:
 
 ```typescript
 const csvRow = Parser.gen(function* () {
-  const fields: string[] = []
-  
+  const fields: string[] = [];
+
   while (true) {
-    const field = yield* takeUntil(or(char(','), char('\n')))
-    fields.push(field)
-    
-    const separator = yield* optional(char(','))
-    if (!separator) break
+    const field = yield* takeUntil(or(char(","), char("\n")));
+    fields.push(field);
+
+    const separator = yield* optional(char(","));
+    if (!separator) break;
   }
-  
-  return fields
-})
+
+  return fields;
+});
 ```
 
 ### Parsing Lists with Custom Logic
 
 ```typescript
 const smartList = Parser.gen(function* () {
-  const items: number[] = []
-  let expectingItem = true
-  
+  const items: number[] = [];
+  let expectingItem = true;
+
   while (true) {
-    yield* skipSpaces
-    
+    yield* skipSpaces;
+
     if (expectingItem) {
-      const num = yield* many1(digit).map(d => parseInt(d.join('')))
-      items.push(num)
-      expectingItem = false
+      const num = yield* many1(digit).map(d => parseInt(d.join("")));
+      items.push(num);
+      expectingItem = false;
     }
-    
-    yield* skipSpaces
-    const separator = yield* optional(or(char(','), char(';')))
-    
-    if (!separator) break
-    expectingItem = true
+
+    yield* skipSpaces;
+    const separator = yield* optional(or(char(","), char(";")));
+
+    if (!separator) break;
+    expectingItem = true;
   }
-  
-  return items
-})
+
+  return items;
+});
 
 // Parses: "1, 2; 3, 4" -> [1, 2, 3, 4]
 ```
@@ -135,46 +135,46 @@ Generators can maintain complex state during parsing:
 
 ```typescript
 interface ParserState {
-  variables: Map<string, number>
-  functions: Map<string, (args: number[]) => number>
+  variables: Map<string, number>;
+  functions: Map<string, (args: number[]) => number>;
 }
 
 const calculator = Parser.gen(function* () {
   const state: ParserState = {
     variables: new Map(),
     functions: new Map([
-      ['add', (args) => args.reduce((a, b) => a + b, 0)],
-      ['mul', (args) => args.reduce((a, b) => a * b, 1)]
+      ["add", args => args.reduce((a, b) => a + b, 0)],
+      ["mul", args => args.reduce((a, b) => a * b, 1)]
     ])
-  }
-  
-  const statements: any[] = []
-  
+  };
+
+  const statements: any[] = [];
+
   while (true) {
-    yield* skipSpaces
-    
-    const lookahead = yield* optional(anyChar())
-    if (!lookahead) break
-    
-    if (lookahead === 'l') {
+    yield* skipSpaces;
+
+    const lookahead = yield* optional(anyChar());
+    if (!lookahead) break;
+
+    if (lookahead === "l") {
       // Parse let statement: let x = 5
-      yield* string('let ')
-      const name = yield* many1(alphabet).map(chars => chars.join(''))
-      yield* string(' = ')
-      const value = yield* parseExpression(state)
-      state.variables.set(name, value)
-      statements.push({ type: 'let', name, value })
+      yield* string("let ");
+      const name = yield* many1(alphabet).map(chars => chars.join(""));
+      yield* string(" = ");
+      const value = yield* parseExpression(state);
+      state.variables.set(name, value);
+      statements.push({ type: "let", name, value });
     } else {
       // Parse expression
-      const result = yield* parseExpression(state)
-      statements.push({ type: 'expression', value: result })
+      const result = yield* parseExpression(state);
+      statements.push({ type: "expression", value: result });
     }
-    
-    yield* optional(char('\n'))
+
+    yield* optional(char("\n"));
   }
-  
-  return statements
-})
+
+  return statements;
+});
 ```
 
 ## Error Recovery
@@ -183,27 +183,27 @@ Generators make error recovery strategies easier to implement:
 
 ```typescript
 const robustParser = Parser.gen(function* () {
-  const results: any[] = []
-  
+  const results: any[] = [];
+
   while (true) {
-    yield* skipSpaces
-    
+    yield* skipSpaces;
+
     try {
-      const statement = yield* parseStatement()
-      results.push({ success: true, value: statement })
+      const statement = yield* parseStatement();
+      results.push({ success: true, value: statement });
     } catch (error) {
       // Skip to next semicolon and continue
-      yield* skipUntil(char(';'))
-      yield* char(';')
-      results.push({ success: false, error: error.message })
+      yield* skipUntil(char(";"));
+      yield* char(";");
+      results.push({ success: false, error: error.message });
     }
-    
-    const hasMore = yield* optional(anyChar())
-    if (!hasMore) break
+
+    const hasMore = yield* optional(anyChar());
+    if (!hasMore) break;
   }
-  
-  return results
-})
+
+  return results;
+});
 ```
 
 ## Recursive Parsers
@@ -212,62 +212,62 @@ Use generators for recursive structures:
 
 ```typescript
 // Forward declaration
-let expression: Parser<any>
+let expression: Parser<any>;
 
 const factor = Parser.gen(function* () {
-  const lookahead = yield* lookAhead(anyChar())
-  
-  if (lookahead === '(') {
-    yield* char('(')
-    const expr = yield* Parser.lazy(() => expression)
-    yield* char(')')
-    return expr
+  const lookahead = yield* lookAhead(anyChar());
+
+  if (lookahead === "(") {
+    yield* char("(");
+    const expr = yield* Parser.lazy(() => expression);
+    yield* char(")");
+    return expr;
   } else {
-    return yield* many1(digit).map(d => parseInt(d.join('')))
+    return yield* many1(digit).map(d => parseInt(d.join("")));
   }
-})
+});
 
 const term = Parser.gen(function* () {
-  let result = yield* factor
-  
+  let result = yield* factor;
+
   while (true) {
-    yield* skipSpaces
-    const op = yield* optional(or(char('*'), char('/')))
-    if (!op) break
-    
-    yield* skipSpaces
-    const right = yield* factor
-    
-    if (op === '*') {
-      result = result * right
+    yield* skipSpaces;
+    const op = yield* optional(or(char("*"), char("/")));
+    if (!op) break;
+
+    yield* skipSpaces;
+    const right = yield* factor;
+
+    if (op === "*") {
+      result = result * right;
     } else {
-      result = Math.floor(result / right)
+      result = Math.floor(result / right);
     }
   }
-  
-  return result
-})
+
+  return result;
+});
 
 expression = Parser.gen(function* () {
-  let result = yield* term
-  
+  let result = yield* term;
+
   while (true) {
-    yield* skipSpaces
-    const op = yield* optional(or(char('+'), char('-')))
-    if (!op) break
-    
-    yield* skipSpaces
-    const right = yield* term
-    
-    if (op === '+') {
-      result = result + right
+    yield* skipSpaces;
+    const op = yield* optional(or(char("+"), char("-")));
+    if (!op) break;
+
+    yield* skipSpaces;
+    const right = yield* term;
+
+    if (op === "+") {
+      result = result + right;
     } else {
-      result = result - right
+      result = result - right;
     }
   }
-  
-  return result
-})
+
+  return result;
+});
 ```
 
 ## Debugging Generators
@@ -276,19 +276,19 @@ Add debug information to generator parsers:
 
 ```typescript
 const debugParser = Parser.gen(function* () {
-  console.log('Starting parser')
-  
-  const a = yield* char('a').tap(() => console.log('Parsed a'))
-  console.log('Got a:', a)
-  
-  const b = yield* char('b').tap(() => console.log('Parsed b'))
-  console.log('Got b:', b)
-  
-  const result = a + b
-  console.log('Final result:', result)
-  
-  return result
-})
+  console.log("Starting parser");
+
+  const a = yield* char("a").tap(() => console.log("Parsed a"));
+  console.log("Got a:", a);
+
+  const b = yield* char("b").tap(() => console.log("Parsed b"));
+  console.log("Got b:", b);
+
+  const result = a + b;
+  console.log("Final result:", result);
+
+  return result;
+});
 ```
 
 ## Performance Considerations
@@ -299,25 +299,27 @@ Generators add some overhead:
 
 ```typescript
 // Faster - direct combinator chain
-const fast = string('hello').then(char(' ')).then(string('world'))
+const fast = string("hello").then(char(" ")).then(string("world"));
 
 // Slower - generator syntax
 const slow = Parser.gen(function* () {
-  yield* string('hello')
-  yield* char(' ')
-  return yield* string('world')
-})
+  yield* string("hello");
+  yield* char(" ");
+  return yield* string("world");
+});
 ```
 
 ### When to Use Generators
 
 Use generators when:
+
 - **Complex logic**: Conditionals, loops, state management
 - **Readability**: Complex combinators become hard to follow
 - **Error recovery**: Need sophisticated error handling
 - **Debugging**: Need to inspect intermediate values
 
 Avoid generators for:
+
 - **Simple parsers**: Basic token recognition
 - **Performance-critical code**: Hot parsing loops
 - **Library APIs**: Combinators are more composable
@@ -331,21 +333,24 @@ Create parser generators that take parameters:
 ```typescript
 function createLanguageParser(config: LanguageConfig) {
   return Parser.gen(function* () {
-    const keywords = new Set(config.keywords)
-    const operators = new Map(config.operators)
-    
+    const keywords = new Set(config.keywords);
+    const operators = new Map(config.operators);
+
     // Parse using configuration
     while (true) {
-      const token = yield* parseToken(keywords, operators)
+      const token = yield* parseToken(keywords, operators);
       // ... rest of parsing logic
     }
-  })
+  });
 }
 
 const jsParser = createLanguageParser({
-  keywords: ['function', 'const', 'let', 'var'],
-  operators: [['+', 'add'], ['-', 'subtract']]
-})
+  keywords: ["function", "const", "let", "var"],
+  operators: [
+    ["+", "add"],
+    ["-", "subtract"]
+  ]
+});
 ```
 
 ### Streaming Parsers
@@ -354,18 +359,18 @@ Process input incrementally:
 
 ```typescript
 function* parseJsonStream(input: string) {
-  let position = 0
-  
+  let position = 0;
+
   while (position < input.length) {
-    const remaining = input.slice(position)
-    const result = yield* jsonValue.parse(remaining)
-    
-    yield result.value
-    position += result.consumed
-    
+    const remaining = input.slice(position);
+    const result = yield* jsonValue.parse(remaining);
+
+    yield result.value;
+    position += result.consumed;
+
     // Skip whitespace and optional comma
     while (position < input.length && /\s|,/.test(input[position])) {
-      position++
+      position++;
     }
   }
 }
@@ -377,39 +382,32 @@ Pass context through the generator:
 
 ```typescript
 interface ParseContext {
-  indentLevel: number
-  inFunction: boolean
-  variables: Set<string>
+  indentLevel: number;
+  inFunction: boolean;
+  variables: Set<string>;
 }
 
 const pythonParser = Parser.gen(function* () {
-  const context: ParseContext = {
-    indentLevel: 0,
-    inFunction: false,
-    variables: new Set()
-  }
-  
-  return yield* parseBlock(context)
-})
+  const context: ParseContext = { indentLevel: 0, inFunction: false, variables: new Set() };
+
+  return yield* parseBlock(context);
+});
 
 function parseBlock(context: ParseContext) {
   return Parser.gen(function* () {
-    const statements = []
-    
+    const statements = [];
+
     while (true) {
-      const indent = yield* parseIndentation()
-      if (indent !== context.indentLevel) break
-      
-      const stmt = yield* parseStatement({
-        ...context,
-        indentLevel: indent
-      })
-      
-      statements.push(stmt)
+      const indent = yield* parseIndentation();
+      if (indent !== context.indentLevel) break;
+
+      const stmt = yield* parseStatement({ ...context, indentLevel: indent });
+
+      statements.push(stmt);
     }
-    
-    return statements
-  })
+
+    return statements;
+  });
 }
 ```
 
@@ -421,26 +419,26 @@ function parseBlock(context: ParseContext) {
 // ❌ Bad - too much in one generator
 const megaParser = Parser.gen(function* () {
   // 100+ lines of parsing logic
-})
+});
 
 // ✅ Good - break into smaller pieces
 const expressionParser = Parser.gen(function* () {
-  return yield* parseExpression()
-})
+  return yield* parseExpression();
+});
 
 const statementParser = Parser.gen(function* () {
-  return yield* parseStatement()
-})
+  return yield* parseStatement();
+});
 
 const programParser = Parser.gen(function* () {
-  const statements = []
+  const statements = [];
   while (true) {
-    const stmt = yield* optional(statementParser)
-    if (!stmt) break
-    statements.push(stmt)
+    const stmt = yield* optional(statementParser);
+    if (!stmt) break;
+    statements.push(stmt);
   }
-  return statements
-})
+  return statements;
+});
 ```
 
 ### 2. Use Type Annotations
@@ -448,9 +446,9 @@ const programParser = Parser.gen(function* () {
 ```typescript
 const typedParser = Parser.gen<MyResultType>(function* () {
   // TypeScript can better infer types with explicit return type
-  const result: MyResultType = yield* someParser
-  return result
-})
+  const result: MyResultType = yield* someParser;
+  return result;
+});
 ```
 
 ### 3. Handle Errors Gracefully
@@ -467,22 +465,22 @@ const safeParser = Parser.gen(function* () {
 ```typescript
 const complexParser = Parser.gen(function* () {
   // Parse function declaration
-  yield* string('function')
-  yield* whitespace
-  
+  yield* string("function");
+  yield* whitespace;
+
   // Function name is optional for anonymous functions
-  const name = yield* optional(identifier)
-  
+  const name = yield* optional(identifier);
+
   // Parameter list
-  yield* char('(')
-  const params = yield* sepBy(char(','), identifier)
-  yield* char(')')
-  
+  yield* char("(");
+  const params = yield* sepBy(char(","), identifier);
+  yield* char(")");
+
   // Function body
-  const body = yield* block
-  
-  return { type: 'function', name, params, body }
-})
+  const body = yield* block;
+
+  return { type: "function", name, params, body };
+});
 ```
 
 ## Common Pitfalls
@@ -492,15 +490,15 @@ const complexParser = Parser.gen(function* () {
 ```typescript
 // ❌ Wrong - missing yield*
 const bad = Parser.gen(function* () {
-  const result = char('a')  // Returns a parser, not the result
-  return result
-})
+  const result = char("a"); // Returns a parser, not the result
+  return result;
+});
 
 // ✅ Correct
 const good = Parser.gen(function* () {
-  const result = yield* char('a')  // Runs parser, returns result
-  return result
-})
+  const result = yield* char("a"); // Runs parser, returns result
+  return result;
+});
 ```
 
 ### 2. Using `yield` Instead of `yield*`
@@ -508,15 +506,15 @@ const good = Parser.gen(function* () {
 ```typescript
 // ❌ Wrong - yield creates a generator
 const bad = Parser.gen(function* () {
-  const result = yield char('a')
-  return result
-})
+  const result = yield char("a");
+  return result;
+});
 
 // ✅ Correct - yield* delegates to the parser
 const good = Parser.gen(function* () {
-  const result = yield* char('a')
-  return result
-})
+  const result = yield* char("a");
+  return result;
+});
 ```
 
 ### 3. Not Handling Parser Failures
@@ -524,17 +522,17 @@ const good = Parser.gen(function* () {
 ```typescript
 // ❌ Risky - any failure stops everything
 const risky = Parser.gen(function* () {
-  const a = yield* char('a')  // If this fails, no recovery
-  const b = yield* char('b')
-  return a + b
-})
+  const a = yield* char("a"); // If this fails, no recovery
+  const b = yield* char("b");
+  return a + b;
+});
 
 // ✅ Better - handle optional parts
 const safe = Parser.gen(function* () {
-  const a = yield* char('a')
-  const b = yield* optional(char('b'))
-  return a + (b || '')
-})
+  const a = yield* char("a");
+  const b = yield* optional(char("b"));
+  return a + (b || "");
+});
 ```
 
 ## See Also

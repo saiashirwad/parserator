@@ -3,133 +3,126 @@ import {
   digit,
   many0,
   many1,
-  parser,
   optional,
   or,
+  parser,
   Parser,
   skipMany0,
   string,
   takeUpto
-} from "../../src"
-import { peekAhead } from "../../src/utils"
-import { LispExpr } from "./ast"
+} from "../../src";
+import { peekAhead } from "../../src/utils";
+import { LispExpr } from "./ast";
 
-const whitespace = skipMany0(or(char(" "), char("\n"), char("\t")))
-const optionalWhitespace = optional(whitespace)
+const whitespace = skipMany0(or(char(" "), char("\n"), char("\t")));
+const optionalWhitespace = optional(whitespace);
 
-export let expr: Parser<LispExpr.LispExpr>
+export let expr: Parser<LispExpr.LispExpr>;
 
 const symbol = parser(function* () {
-  const name = yield* takeUpto(
-    or(char(" "), char("\n"), char("\t"), char(")"), char("("))
-  )
-  if (name === "") return yield* Parser.error("Empty symbol")
-  return LispExpr.symbol(name)
-})
+  const name = yield* takeUpto(or(char(" "), char("\n"), char("\t"), char(")"), char("(")));
+  if (name === "") return yield* Parser.error("Empty symbol");
+  return LispExpr.symbol(name);
+});
 
 const number = parser(function* () {
-  const sign = (yield* optional(char("-"))) ?? ""
-  const digits = yield* many1(digit).withError(() => "Expected digit")
-  const value = parseInt(sign + digits.join(""))
-  return LispExpr.number(value)
-})
+  const sign = (yield* optional(char("-"))) ?? "";
+  const digits = yield* many1(digit).withError(() => "Expected digit");
+  const value = parseInt(sign + digits.join(""));
+  return LispExpr.number(value);
+});
 
 const stringLiteral = parser(function* () {
-  yield* char('"')
-  const value = yield* takeUpto(char('"'))
-  yield* char('"')
-  return LispExpr.string(value)
-})
+  yield* char('"');
+  const value = yield* takeUpto(char('"'));
+  yield* char('"');
+  return LispExpr.string(value);
+});
 
 const boolean = parser(function* () {
-  const val = yield* or(string("#t"), string("#f"))
-  return LispExpr.bool(val === "#t")
-})
+  const val = yield* or(string("#t"), string("#f"));
+  return LispExpr.bool(val === "#t");
+});
 
-const atom = or(boolean, number, stringLiteral, symbol)
+const atom = or(boolean, number, stringLiteral, symbol);
 
 const list = parser(function* () {
-  yield* char("(")
-  yield* optionalWhitespace
+  yield* char("(");
+  yield* optionalWhitespace;
 
   const items = yield* many0(
     parser(function* () {
-      yield* optionalWhitespace
-      const item = yield* expr
-      yield* optionalWhitespace
-      return item
+      yield* optionalWhitespace;
+      const item = yield* expr;
+      yield* optionalWhitespace;
+      return item;
     })
-  )
+  );
 
   if (items.length === 0) {
-    return yield* Parser.error("Empty list not allowed")
+    return yield* Parser.error("Empty list not allowed");
   }
 
-  yield* char(")").withError(() => "Missing closing parenthesis ')'")
-  return items
-})
+  yield* char(")").withError(() => "Missing closing parenthesis ')'");
+  return items;
+});
 
 const listParser = list.flatMap(list =>
   parser(function* () {
     if (list.length === 3) {
-      const [first, paramsExpr, bodyExpr] = list
+      const [first, paramsExpr, bodyExpr] = list;
       if (first.type === "Symbol" && paramsExpr.type === "List") {
         if (first.name === "lambda") {
-          return yield* lambdaParser(paramsExpr, bodyExpr)
+          return yield* lambdaParser(paramsExpr, bodyExpr);
         }
         if (first.name === "let") {
-          return yield* letParser(paramsExpr, bodyExpr)
+          return yield* letParser(paramsExpr, bodyExpr);
         }
       }
     }
-    return LispExpr.list(list)
+    return LispExpr.list(list);
   })
-)
+);
 
 const lambdaParser = (paramsExpr: LispExpr.List, bodyExpr: LispExpr.LispExpr) =>
   parser(function* () {
-    const params: string[] = []
+    const params: string[] = [];
     for (const item of paramsExpr.items) {
       if (item.type !== "Symbol") {
-        return yield* Parser.error(
-          "Invalid param definition for lambda expression"
-        )
+        return yield* Parser.error("Invalid param definition for lambda expression");
       }
-      params.push(item.name)
+      params.push(item.name);
     }
 
-    return LispExpr.lambda(params, bodyExpr)
-  })
+    return LispExpr.lambda(params, bodyExpr);
+  });
 
 const letParser = (bindingsExpr: LispExpr.List, bodyExpr: LispExpr.LispExpr) =>
   parser(function* () {
-    const bindings: LispExpr.Let["bindings"] = []
+    const bindings: LispExpr.Let["bindings"] = [];
     for (const item of bindingsExpr.items) {
       if (!(item.type === "List" && item.items.length === 2)) {
-        return yield* Parser.error("Invalid let expression")
+        return yield* Parser.error("Invalid let expression");
       }
-      const [keyExpr, valExpr] = item.items
+      const [keyExpr, valExpr] = item.items;
       if (keyExpr.type !== "Symbol") {
-        return yield* Parser.error("Invalid let expression")
+        return yield* Parser.error("Invalid let expression");
       }
 
-      bindings.push({
-        name: keyExpr.name,
-        value: valExpr
-      })
+      bindings.push({ name: keyExpr.name, value: valExpr });
     }
 
-    return LispExpr.let(bindings, bodyExpr)
-  })
+    return LispExpr.let(bindings, bodyExpr);
+  });
 
 expr = Parser.lazy(() =>
   parser(function* () {
-    yield* optionalWhitespace
-    const isList = yield* peekAhead(1).map(x => x === "(")
-    const result = yield* isList ? listParser : atom
-    yield* optionalWhitespace
-    return result
+    yield* optionalWhitespace;
+    const isList = yield* peekAhead(1).map(x => x === "(");
+    const result = yield* isList ? listParser : atom;
+    yield* optionalWhitespace;
+    return result;
   })
-)
+);
 
-export const lispParser = expr
+export const lispParser = expr;
