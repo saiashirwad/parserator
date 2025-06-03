@@ -348,6 +348,12 @@ export class Parser<T, Ctx = {}> {
     return this.withError(() => `Expected ${description}`).label(description);
   }
 
+  /**
+   * Helper for creating semantic expectations with both label and error message
+   * @param errorBundle - The error bundle containing the errors to be displayed
+   * @param state - The current parser state
+   * @returns A parser output with the error bundle and the current state
+   */
   static failRich<Ctx = {}>(
     errorBundle: { errors: ParseErr[] },
     state: ParserState<Ctx>
