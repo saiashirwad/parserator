@@ -230,7 +230,7 @@ export function sepBy<S, T, Ctx>(
  * @param parser - The parser for the elements
  * @param sepParser - The parser for the separator
  * @returns A parser that produces a non-empty array of parsed elements
- * 
+ *
  * @example
  * ```ts
  * const numbers = sepBy1(number, char(','))
@@ -260,7 +260,7 @@ export function sepBy1<S, T, Ctx>(
  * ```ts
  * const parser = between(char('('), char(')'), digit)
  * parser.run('(5)') // Right(['5', {...}])
- * parser.run('5') // Left(error) 
+ * parser.run('5') // Left(error)
  * parser.run('(5') // Left(error: Expected closing delimiter)
  * ```
  */
@@ -303,13 +303,16 @@ function many_<S, T, Ctx = {}>(count: number) {
         const itemResult = parser.run(currentState);
         if (Either.isLeft(itemResult.result)) {
           // Check if we're in a committed state
-          const isCommitted = itemResult.state.context?.committed && !currentState.context?.committed;
-          
+          const isCommitted =
+            itemResult.state.context?.committed && !currentState.context?.committed;
+
           // If committed, propagate the error regardless of count
           if (isCommitted) {
-            return itemResult as unknown as typeof itemResult & { result: Either<T[], ParseErrorBundle> };
+            return itemResult as unknown as typeof itemResult & {
+              result: Either<T[], ParseErrorBundle>;
+            };
           }
-          
+
           // If we have enough items, return success
           if (results.length >= count) {
             return Parser.succeed(results, currentState);
@@ -363,7 +366,7 @@ export const many0 = <S, T, Ctx = {}>(parser: Parser<T, Ctx>, separator?: Parser
 
 /**
  * Parses zero or more occurrences of a parser (alias for many0).
- * 
+ *
  * @param parser - The parser to repeat
  * @returns A parser that produces an array of parsed elements
  */
@@ -569,14 +572,14 @@ export const skipSpaces = new Parser(
  */
 /**
  * Creates a parser that tries each of the given parsers in order until one succeeds.
- * 
+ *
  * This combinator is commit-aware: if any parser sets the `committed` flag during
  * parsing, no further alternatives will be tried. This enables better error messages
  * by preventing backtracking once we've identified the intended parse path.
- * 
+ *
  * @param parsers - Array of parsers to try in order
  * @returns A parser that succeeds with the first successful parser's result
- * 
+ *
  * @example
  * ```ts
  * // Basic usage - tries each alternative
@@ -586,7 +589,7 @@ export const skipSpaces = new Parser(
  *   booleanLiteral
  * )
  * ```
- * 
+ *
  * @example
  * ```ts
  * // With commit for better errors
@@ -600,12 +603,12 @@ export const skipSpaces = new Parser(
  *   whileStatement,
  *   assignment
  * )
- * 
+ *
  * // Input: "if x > 5"  (missing parentheses)
  * // Without commit: "Expected if, while, or assignment"
  * // With commit: "Expected opening parenthesis"
  * ```
- * 
+ *
  * @example
  * ```ts
  * // Error accumulation without commit
@@ -622,17 +625,17 @@ export function or<Parsers extends Parser<any, any>[], Ctx = {}>(
 ): Parser<Parsers[number] extends Parser<infer T, Ctx> ? T : never, Ctx> {
   return new Parser(state => {
     const errors: ParseErr[] = [];
-    
+
     for (const parser of parsers) {
       const { result, state: newState } = parser.run(state);
-      
+
       if (Either.isRight(result)) {
         return Parser.succeed(result.right, newState);
       }
-      
+
       // Accumulate errors from this branch
       errors.push(...result.left.errors);
-      
+
       // Check if we're committed - if so, don't try other alternatives
       if (newState.context?.committed && !state.context?.committed) {
         return Parser.failRich({ errors }, newState);
@@ -665,10 +668,10 @@ export function optional<T, Ctx = {}>(parser: Parser<T, Ctx>) {
 /**
  * Creates a parser that tries multiple parsers in order and returns the first success.
  * Convenience function for when you have an array of parsers.
- * 
+ *
  * @param parsers - Array of parsers to try
  * @returns A parser that succeeds with the first successful parser's result
- * 
+ *
  * @example
  * ```ts
  * const keywords = ["let", "const", "var"].map(k => string(k));
@@ -695,7 +698,10 @@ type LastParser<T, Ctx = {}> = T extends [...any[], Parser<infer L, Ctx>] ? L : 
  */
 export function sequence<T extends readonly Parser<any, any>[]>(
   parsers: T
-): Parser<{ [K in keyof T]: T[K] extends Parser<infer U, any> ? U : never }, T[0] extends Parser<any, infer Ctx> ? Ctx : {}> {
+): Parser<
+  { [K in keyof T]: T[K] extends Parser<infer U, any> ? U : never },
+  T[0] extends Parser<any, infer Ctx> ? Ctx : {}
+> {
   return Parser.gen(function* () {
     const results = [];
     for (const parser of parsers) {
@@ -719,7 +725,7 @@ export function sequence<T extends readonly Parser<any, any>[]>(
  * parser.run('hello world') // Right(['world', {...}])
  * ```
  */
-export function sequenceLast<Parsers extends Parser<any>[], Ctx = {}>(
+export function sequenceLast<Parsers extends Parser<any, any>[], Ctx = {}>(
   parsers: [...Parsers]
 ): Parser<LastParser<Parsers, Ctx>, Ctx> {
   return new Parser((state: ParserState<Ctx>) => {
@@ -730,15 +736,18 @@ export function sequenceLast<Parsers extends Parser<any>[], Ctx = {}>(
       const { result, state: newState } = parser.run(currentState);
       if (Either.isLeft(result)) {
         return {
-          result: result as unknown as Either<LastParser<Parsers, Ctx>, ParseErrorBundle>,
-          state: newState
+          result: result as Either<LastParser<Parsers, Ctx>, ParseErrorBundle>,
+          state: newState as ParserState<Ctx>
         };
       }
-      currentState = newState;
+      currentState = newState as ParserState<Ctx>;
       lastResult = result.right;
     }
 
-    return Parser.succeed(lastResult, currentState);
+    return {
+      result: Either.right(lastResult) as Either<LastParser<Parsers, Ctx>, ParseErrorBundle>,
+      state: currentState
+    };
   });
 }
 
@@ -808,13 +817,13 @@ export function takeUpto<T>(parser: Parser<T>): Parser<string> {
 
 /**
  * Creates a parser that commits to the current parsing path, preventing backtracking.
- * 
+ *
  * After calling `commit()`, if parsing fails later in the sequence, the parser won't
  * backtrack to try alternatives in a `choice` or `or` combinator. This results in
  * more specific, helpful error messages instead of generic "expected one of" errors.
- * 
+ *
  * @returns A parser that sets the commit flag in the parsing context
- * 
+ *
  * @example
  * ```ts
  * // Use commit after identifying the type of construct
@@ -828,13 +837,13 @@ export function takeUpto<T>(parser: Parser<T>): Parser<string> {
  *   return { type: "if", condition, body }
  * })
  * ```
- * 
+ *
  * @example
  * ```ts
  * // Commit in different parsing contexts
  * const jsonParser = Parser.gen(function* () {
  *   const firstChar = yield* peekChar
- *   
+ *
  *   if (firstChar === '{') {
  *     yield* char('{')
  *     yield* commit()  // Definitely parsing an object
@@ -847,7 +856,7 @@ export function takeUpto<T>(parser: Parser<T>): Parser<string> {
  *   // ...
  * })
  * ```
- * 
+ *
  * @example
  * ```ts
  * // Commit with error recovery
@@ -857,11 +866,11 @@ export function takeUpto<T>(parser: Parser<T>): Parser<string> {
  *   forStatement,   // Has commit() after "for"
  *   expression      // No commit, can always fall back to this
  * ])
- * 
+ *
  * // Input: "if (x > 5 { }"  (missing closing paren)
  * // Result: "Expected closing parenthesis" (not "Expected if, while, for, or expression")
  * ```
- * 
+ *
  * @see {@link cut} - Alias with Prolog-style naming
  * @see {@link Parser.commit} - Instance method version
  */
@@ -876,10 +885,10 @@ export function commit<Ctx extends { source: string }>(): Parser<void, Ctx> {
 
 /**
  * Alias for {@link commit} using Prolog-style naming.
- * 
+ *
  * The cut operator (!) in Prolog prevents backtracking, similar to how
  * this prevents the parser from trying other alternatives after this point.
- * 
+ *
  * @example
  * ```ts
  * const prologStyleIf = Parser.gen(function* () {
@@ -894,14 +903,14 @@ export const cut = commit;
 
 /**
  * Creates an atomic parser that either fully succeeds or resets to the original state.
- * 
+ *
  * This combinator wraps a parser in a transaction-like behavior. If the parser fails
  * at any point, the input position is reset to where it was before the atomic parser
  * started, as if no input was consumed.
- * 
+ *
  * @param parser - The parser to make atomic
  * @returns A new parser with atomic (all-or-nothing) behavior
- * 
+ *
  * @example
  * ```ts
  * // Try to parse a complex structure without consuming input on failure
@@ -915,7 +924,7 @@ export const cut = commit;
  *   })
  * )
  * ```
- * 
+ *
  * @example
  * ```ts
  * // Use atomic for lookahead without consumption
@@ -928,7 +937,7 @@ export const cut = commit;
  *   )
  * ).map(() => true).or(Parser.succeed(false))
  * ```
- * 
+ *
  * @example
  * ```ts
  * // Combine with 'or' for clean alternatives
@@ -937,11 +946,11 @@ export const cut = commit;
  *   atomic(simpleExpression),   // Then simpler
  *   literal                     // Finally, just a literal
  * )
- * 
+ *
  * // If complexExpression fails after consuming "foo + ",
  * // atomic ensures we backtrack completely
  * ```
- * 
+ *
  * @see {@link Parser.atomic} - Instance method version
  */
 export function atomic<T, Ctx = {}>(parser: Parser<T, Ctx>): Parser<T, Ctx> {
@@ -950,10 +959,10 @@ export function atomic<T, Ctx = {}>(parser: Parser<T, Ctx>): Parser<T, Ctx> {
 
 /**
  * Parses any character except the specified one.
- * 
+ *
  * @param ch - The character to exclude
  * @returns A parser that matches any character except the specified one
- * 
+ *
  * @example
  * ```ts
  * const notQuote = notChar('"')
@@ -964,27 +973,33 @@ export function atomic<T, Ctx = {}>(parser: Parser<T, Ctx>): Parser<T, Ctx> {
 export function notChar<Ctx = {}>(ch: string): Parser<string, Ctx> {
   return new Parser(state => {
     if (ch.length !== 1) {
-      return Parser.fail({ 
-        message: "notChar expects a single character",
-        expected: [] 
-      }, state);
+      return Parser.fail(
+        {
+          message: "notChar expects a single character",
+          expected: []
+        },
+        state
+      );
     }
-    
+
     if (state.remaining[0] && state.remaining[0] !== ch) {
       return Parser.succeed(state.remaining[0], State.consume(state, 1));
     }
-    
-    return Parser.fail({
-      message: `Expected any character except '${ch}'`,
-      expected: [`not '${ch}'`],
-      found: state.remaining[0]
-    }, state);
+
+    return Parser.fail(
+      {
+        message: `Expected any character except '${ch}'`,
+        expected: [`not '${ch}'`],
+        found: state.remaining[0]
+      },
+      state
+    );
   });
 }
 
 /**
  * Parser that succeeds only at the end of input.
- * 
+ *
  * @example
  * ```ts
  * const parser = string("hello").then(eof)
@@ -996,11 +1011,14 @@ export const eof = new Parser<void, any>(state => {
   if (state.remaining.length === 0) {
     return Parser.succeed(undefined, state);
   }
-  return Parser.fail({
-    message: "Expected end of input",
-    expected: ["end of input"],
-    found: state.remaining.slice(0, 20) + (state.remaining.length > 20 ? "..." : "")
-  }, state);
+  return Parser.fail(
+    {
+      message: "Expected end of input",
+      expected: ["end of input"],
+      found: state.remaining.slice(0, 20) + (state.remaining.length > 20 ? "..." : "")
+    },
+    state
+  );
 });
 
 /**
@@ -1011,11 +1029,11 @@ export const lookAhead = lookahead;
 
 /**
  * Parses exactly n occurrences of a parser.
- * 
+ *
  * @param n - The exact number of occurrences
  * @param parser - The parser to repeat
  * @returns A parser that produces an array of exactly n elements
- * 
+ *
  * @example
  * ```ts
  * const threeDigits = count(3, digit)
@@ -1036,11 +1054,11 @@ export function count<T, Ctx = {}>(n: number, parser: Parser<T, Ctx>): Parser<T[
 
 /**
  * Parses a list with optional trailing separator.
- * 
+ *
  * @param parser - The parser for list elements
  * @param sep - The parser for separators
  * @returns A parser that allows optional trailing separator
- * 
+ *
  * @example
  * ```ts
  * const list = sepEndBy(number, char(','))
@@ -1053,11 +1071,11 @@ export function sepEndBy<S, T, Ctx = {}>(
   sep: Parser<S, Ctx>
 ): Parser<T[], Ctx> {
   return or(
-    Parser.gen(function* () {
+    Parser.gen<T[], Ctx>(function* () {
       const elements = yield* sepBy(parser, sep);
       yield* optional(sep); // Allow trailing separator
       return elements;
     }),
-    Parser.succeed([])
+    Parser.pure<T[], Ctx>([])
   );
 }

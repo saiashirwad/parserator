@@ -164,7 +164,8 @@ export class Parser<T, Ctx = {}> {
     });
   }
 
-  static pure = <A>(a: A): Parser<A> => new Parser(state => Parser.succeed(a, state));
+  static pure = <A, Ctx = {}>(a: A): Parser<A, Ctx> =>
+    new Parser(state => Parser.succeed(a, state));
 
   static Do = Parser.pure({});
 
