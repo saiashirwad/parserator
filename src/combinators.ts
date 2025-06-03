@@ -676,3 +676,89 @@ export function takeUpto<T>(parser: Parser<T>): Parser<string> {
     return Parser.succeed(collected, currentState);
   });
 }
+
+/**
+ * Creates a parser that commits to the current parsing path, preventing backtracking.
+ * 
+ * After calling `commit()`, if parsing fails later in the sequence, the parser won't
+ * backtrack to try alternatives in a `choice` or `or` combinator. This results in
+ * more specific, helpful error messages instead of generic "expected one of" errors.
+ * 
+ * @returns A parser that sets the commit flag in the parsing context
+ * 
+ * @example
+ * ```ts
+ * // Use commit after identifying the type of construct
+ * const ifStatement = Parser.gen(function* () {
+ *   yield* keyword("if")
+ *   yield* commit()  // No backtracking after this point
+ *   yield* char('(').expect("opening parenthesis after 'if'")
+ *   const condition = yield* expression
+ *   yield* char(')').expect("closing parenthesis")
+ *   const body = yield* block
+ *   return { type: "if", condition, body }
+ * })
+ * ```
+ * 
+ * @example
+ * ```ts
+ * // Commit in different parsing contexts
+ * const jsonParser = Parser.gen(function* () {
+ *   const firstChar = yield* peekChar
+ *   
+ *   if (firstChar === '{') {
+ *     yield* char('{')
+ *     yield* commit()  // Definitely parsing an object
+ *     return yield* jsonObject
+ *   } else if (firstChar === '[') {
+ *     yield* char('[')
+ *     yield* commit()  // Definitely parsing an array
+ *     return yield* jsonArray
+ *   }
+ *   // ...
+ * })
+ * ```
+ * 
+ * @example
+ * ```ts
+ * // Commit with error recovery
+ * const statement = choice([
+ *   ifStatement,    // Has commit() after "if"
+ *   whileStatement, // Has commit() after "while"
+ *   forStatement,   // Has commit() after "for"
+ *   expression      // No commit, can always fall back to this
+ * ])
+ * 
+ * // Input: "if (x > 5 { }"  (missing closing paren)
+ * // Result: "Expected closing parenthesis" (not "Expected if, while, for, or expression")
+ * ```
+ * 
+ * @see {@link cut} - Alias with Prolog-style naming
+ * @see {@link Parser.commit} - Instance method version
+ */
+export function commit<Ctx extends { source: string }>(): Parser<void, Ctx> {
+  return new Parser(state => {
+    return Parser.succeed(void 0, {
+      ...state,
+      context: { ...state.context, committed: true }
+    }) as any;
+  });
+}
+
+/**
+ * Alias for {@link commit} using Prolog-style naming.
+ * 
+ * The cut operator (!) in Prolog prevents backtracking, similar to how
+ * this prevents the parser from trying other alternatives after this point.
+ * 
+ * @example
+ * ```ts
+ * const prologStyleIf = Parser.gen(function* () {
+ *   yield* keyword("if")
+ *   yield* cut()  // Using Prolog-style naming
+ *   yield* char('(')
+ *   // ...
+ * })
+ * ```
+ */
+export const cut = commit;

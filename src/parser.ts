@@ -352,6 +352,69 @@ export class Parser<T, Ctx = {}> {
 
     return { state, result: Either.left(bundle) };
   }
+
+  /**
+   * Commits to the current parsing path, preventing backtracking beyond this point.
+   * 
+   * Once a parser is committed, if it fails later in the sequence, the error won't
+   * backtrack to try other alternatives in a `choice` or `or` combinator. This leads
+   * to more specific error messages instead of generic "expected one of" errors.
+   * 
+   * @returns A new parser that sets the commit flag after successful parsing
+   * 
+   * @example
+   * ```ts
+   * // Use commit after matching a keyword to ensure specific error messages
+   * const ifStatement = Parser.gen(function* () {
+   *   yield* keyword("if")
+   *   yield* commit()  // After seeing "if", we know it's an if statement
+   *   yield* char('(').expect("opening parenthesis after 'if'")
+   *   const condition = yield* expression
+   *   yield* char(')').expect("closing parenthesis")
+   *   const body = yield* block
+   *   return { type: "if", condition, body }
+   * })
+   * 
+   * // In a choice, commit prevents backtracking
+   * const statement = choice([
+   *   ifStatement,
+   *   whileStatement,
+   *   assignment
+   * ])
+   * 
+   * // Input: "if x > 5 {}"  (missing parentheses)
+   * // Without commit: "Expected if, while, or assignment"
+   * // With commit: "Expected opening parenthesis after 'if'"
+   * ```
+   * 
+   * @example
+   * ```ts
+   * // Commit can be chained with other methods
+   * const jsonObject = char('{')
+   *   .commit()  // Once we see '{', it must be an object
+   *   .then(whitespace)
+   *   .then(objectContent)
+   *   .expect("valid JSON object")
+   * ```
+   * 
+   * @see {@link commit} - Standalone function version
+   * @see {@link cut} - Alias with Prolog-style naming
+   */
+  commit(): Parser<T, Ctx> {
+    return new Parser(state => {
+      const result = this.run(state);
+      if (Either.isRight(result.result)) {
+        return {
+          ...result,
+          state: {
+            ...result.state,
+            context: { ...result.state.context, committed: true }
+          }
+        };
+      }
+      return result;
+    }, this.options);
+  }
 }
 
 export const parser = Parser.gen;

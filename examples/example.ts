@@ -1,4 +1,4 @@
-import { Either, ErrorFormatter, many1, Parser, regex, string } from "../src";
+import { commit, Either, ErrorFormatter, many1, Parser, regex, string } from "../src";
 
 const number = regex(/[0-9]+/);
 const spaces = regex(/\s+/);
@@ -28,7 +28,7 @@ const spaces = regex(/\s+/);
 const exampleParser = Parser.gen(function* () {
   const header = yield* string("BEGIN");
   yield* many1(spaces);
-  // yield* commit()
+  yield* commit();
 
   const version = yield* number.map(Number);
   if (version > 2) {
