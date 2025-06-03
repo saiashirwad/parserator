@@ -21,7 +21,6 @@ import {
 // =============================================================================
 
 const whitespace = regex(/\s+/).label("whitespace");
-const ws = optional(whitespace);
 const lineComment = regex(/\/\/[^\n]*/).label("line comment");
 const blockComment = regex(/\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\//).label("block comment");
 const space = or(whitespace, lineComment, blockComment);
@@ -41,7 +40,9 @@ const identifier = token(
   regex(/[a-zA-Z_][a-zA-Z0-9_]*/)
     .label("identifier")
     .flatMap(name =>
-      keywords.includes(name) ? Parser.error(`'${name}' is a reserved keyword`) : Parser.lift(name)
+      keywords.includes(name) ?
+        Parser.error(`'${name}' is a reserved keyword and cannot be used as an identifier`)
+      : Parser.lift(name)
     )
 );
 
@@ -124,13 +125,13 @@ let expression: Parser<Expression>;
 // Primary expressions
 const primaryExpression: Parser<Expression> = or(
   // Literals
-  numberLiteral.map(value => ({ type: "literal", value })),
-  stringLiteral.map(value => ({ type: "literal", value })),
-  booleanLiteral.map(value => ({ type: "literal", value })),
-  nullLiteral.map(value => ({ type: "literal", value })),
+  numberLiteral.map(value => ({ type: "literal" as const, value })),
+  stringLiteral.map(value => ({ type: "literal" as const, value })),
+  booleanLiteral.map(value => ({ type: "literal" as const, value })),
+  nullLiteral.map(value => ({ type: "literal" as const, value })),
 
   // Identifier
-  identifier.map(name => ({ type: "identifier", name })),
+  identifier.map(name => ({ type: "identifier" as const, name })),
 
   // Function expression
   atomic(
@@ -141,7 +142,11 @@ const primaryExpression: Parser<Expression> = or(
       const params = yield* sepBy(identifier, token(char(",")));
       yield* token(char(")")).expect("closing parenthesis");
       const body = yield* blockStatement.expect("function body");
-      return { type: "function" as const, params, body: body.body };
+      return {
+        type: "function" as const,
+        params,
+        body: (body as { type: "block"; body: Statement[] }).body
+      };
     })
   ),
 
@@ -153,8 +158,20 @@ const primaryExpression: Parser<Expression> = or(
       const properties = yield* sepBy(
         Parser.gen(function* () {
           const key = yield* or(identifier, stringLiteral).expect("property key");
-          yield* token(char(":")).expect("':' after property key");
-          const value = yield* Parser.lazy(() => expression).expect("property value");
+          // Check if we have a colon (for key: value syntax)
+          const hasColon = yield* optional(token(char(":")));
+          
+          let value: Expression;
+          if (hasColon) {
+            value = yield* Parser.lazy(() => expression).expect("property value");
+          } else {
+            // Shorthand property - key must be an identifier
+            if (typeof key !== 'string') {
+              return yield* Parser.error("Shorthand properties must use identifiers");
+            }
+            value = { type: "identifier" as const, name: key };
+          }
+          
           return { key, value };
         }),
         token(char(","))
@@ -284,18 +301,16 @@ expression = Parser.gen(function* () {
 
 let statement: Parser<Statement>;
 
-// Block statement
 const blockStatement: Parser<Statement> = atomic(
   Parser.gen(function* () {
     yield* token(char("{"));
-    yield* commit();
+    // Don't commit immediately - this could be an object literal
     const body = yield* many(Parser.lazy(() => statement));
     yield* token(char("}")).expect("closing brace for block");
     return { type: "block" as const, body };
   })
 );
 
-// Variable declaration
 const variableStatement: Parser<Statement> = Parser.gen(function* () {
   const kind = yield* or(keyword("let"), keyword("const")) as Parser<"let" | "const">;
   yield* commit();
@@ -309,7 +324,6 @@ const variableStatement: Parser<Statement> = Parser.gen(function* () {
     })
   );
 
-  // const requires initializer
   if (kind === "const" && !init) {
     return yield* Parser.fatal("Missing initializer in const declaration");
   }
@@ -319,7 +333,6 @@ const variableStatement: Parser<Statement> = Parser.gen(function* () {
   return { type: "variable" as const, kind, name, init };
 });
 
-// Function declaration
 const functionStatement: Parser<Statement> = Parser.gen(function* () {
   yield* keyword("function");
   yield* commit();
@@ -330,7 +343,12 @@ const functionStatement: Parser<Statement> = Parser.gen(function* () {
   yield* token(char(")")).expect("closing parenthesis");
   const body = yield* blockStatement.expect("function body");
 
-  return { type: "function" as const, name, params, body: body.body };
+  return {
+    type: "function" as const,
+    name,
+    params,
+    body: (body as { type: "block"; body: Statement[] }).body
+  };
 });
 
 const ifStatement: Parser<Statement> = Parser.gen(function* () {
@@ -354,7 +372,6 @@ const ifStatement: Parser<Statement> = Parser.gen(function* () {
   return { type: "if" as const, test, consequent, alternate };
 });
 
-// Return statement
 const returnStatement: Parser<Statement> = Parser.gen(function* () {
   yield* keyword("return");
   yield* commit();
@@ -411,16 +428,32 @@ const testCases = [
   `const obj = { name: "Alice", age: 30 };`,
   `const arr = [1, 2, 3];`,
   `result = fn(x, y) + z;`,
+  
+  // Object literal test cases
+  `const obj = { name: "Alice", age };`, // Shorthand property
+  `const obj2 = { x };`, // Single shorthand property
+  `const mixed = { a: 1, b, c: 3, d };`, // Mixed regular and shorthand
+  `const nested = { a: { b: 1 }, c };`, // Nested object with shorthand
+  `const empty = {};`, // Empty object
+  
+  // Array literal test cases
+  `const empty = [];`, // Empty array
+  `const nested = [1, [2, 3], 4];`, // Nested array
+  
+  // Complex expressions
+  `const result = { x: fn(a, b), y };`, // Function call in object
+  `const val = obj.prop.method();`, // Chained member access
+  `const sum = a + b * c - d;`, // Multiple operators (no precedence yet)
 
   // Error cases that demonstrate our error handling
   `let = 5;`, // Missing variable name
   `const x;`, // const without initializer (fatal error)
   `if x > 0 { }`, // Missing parentheses (commit error)
   `function { }`, // Missing function name (commit error)
-  `const obj = { name: "Alice", age };`, // Missing colon
   `let if = 10;`, // Reserved keyword as identifier
   `return 42`, // Missing semicolon
-  `{ let x = 1; let y = 2 }` // Missing semicolon in block
+  `{ let x = 1; let y = 2; }`, // Block statement
+  `const obj = { "str": value };`, // String key with colon
 ];
 
 console.log("=== Simple JavaScript Parser ===\n");
