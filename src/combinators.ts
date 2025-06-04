@@ -1,7 +1,11 @@
-import { Either } from "./either";
+/**
+ * @fileoverview
+ */
+
 import { Parser } from "./parser";
 import type { ParseErr, ParseErrorBundle } from "./errors";
 import { type ParserState, State } from "./state";
+import { Either } from "./either";
 
 /**
  * Creates a parser that looks ahead in the input stream without consuming any input.
