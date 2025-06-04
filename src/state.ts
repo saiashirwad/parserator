@@ -8,14 +8,6 @@ export type ParserContext<Ctx = {}> = Prettify<
 
 export type ParserOptions = { name?: string };
 
-export class ParserError {
-  constructor(
-    public message: string,
-    public expected: string[],
-    public found?: string
-  ) {}
-}
-
 export type ParserOutput<T, Ctx = {}> = {
   state: ParserState<Ctx>;
   result: Either<T, ParseErrorBundle>;
