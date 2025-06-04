@@ -1,7 +1,7 @@
 import { TSDocParser } from "@microsoft/tsdoc";
-import * as ts from "typescript";
 import * as fs from "fs";
 import * as path from "path";
+import ts from "typescript";
 
 const tsdocParser = new TSDocParser();
 
@@ -52,28 +52,28 @@ function getNodeKind(node: ts.Node): string {
 function extractFileHeaderDoc(sourceFile: ts.SourceFile): string | undefined {
   const fullText = sourceFile.getFullText();
   const firstStatement = sourceFile.statements[0];
-  
+
   if (!firstStatement) return undefined;
-  
+
   // Look for comments before the first statement
   const commentRanges = ts.getLeadingCommentRanges(fullText, 0);
-  
+
   if (commentRanges) {
     for (const range of commentRanges) {
       const commentText = fullText.slice(range.pos, range.end);
-      
+
       // Check if it's a JSDoc comment (starts with /**)
       if (commentText.startsWith("/**")) {
         const parserContext = tsdocParser.parseString(commentText);
         const docComment = parserContext.docComment;
-        
+
         if (docComment.summarySection) {
           return renderDocSection(docComment.summarySection);
         }
       }
     }
   }
-  
+
   return undefined;
 }
 
@@ -96,12 +96,12 @@ function extractTSDoc(sourceFile: ts.SourceFile, filePath: string): FileDocument
     if (commentRanges) {
       for (const range of commentRanges) {
         const commentText = fullText.slice(range.pos, range.end);
-        
+
         // Check if it's a JSDoc comment (starts with /**)
         if (commentText.startsWith("/**")) {
           const parserContext = tsdocParser.parseString(commentText);
           const docComment = parserContext.docComment;
-          
+
           if (docComment.summarySection) {
             const item: DocumentedItem = {
               name: getNodeName(node),
@@ -157,7 +157,7 @@ function extractTSDoc(sourceFile: ts.SourceFile, filePath: string): FileDocument
 function renderDocSection(section: any): string {
   // Simple text extraction - you might want to enhance this
   let text = "";
-  
+
   function extractText(node: any) {
     if (node.kind === "PlainText") {
       text += node.text;
@@ -173,7 +173,7 @@ function renderDocSection(section: any): string {
       }
     }
   }
-  
+
   extractText(section);
   return text.trim();
 }
@@ -182,39 +182,39 @@ function extractExamples(commentText: string): string[] {
   const examples: string[] = [];
   const codeBlockRegex = /```(?:ts|typescript)?\n([\s\S]*?)```/g;
   let match;
-  
+
   while ((match = codeBlockRegex.exec(commentText)) !== null) {
     // Remove leading asterisks and spaces from each line
     const cleanedCode = match[1]
-      .split('\n')
-      .map(line => line.replace(/^\s*\*\s?/, ''))
-      .join('\n')
+      .split("\n")
+      .map(line => line.replace(/^\s*\*\s?/, ""))
+      .join("\n")
       .trim();
     examples.push(cleanedCode);
   }
-  
+
   return examples;
 }
 
 function generateFileMarkdown(fileDoc: FileDocumentation): string {
-  const fileName = path.basename(fileDoc.filePath, '.ts');
+  const fileName = path.basename(fileDoc.filePath, ".ts");
   let markdown = `# ${fileName}\n\n`;
-  
+
   if (fileDoc.description) {
     markdown += `${fileDoc.description}\n\n`;
     markdown += "---\n\n";
   }
-  
+
   if (fileDoc.items.length === 0) {
     markdown += "*No documented exports in this file.*\n";
     return markdown;
   }
-  
+
   for (const item of fileDoc.items) {
     markdown += `## ${item.name}\n\n`;
     markdown += `**Type:** ${item.kind}\n\n`;
     markdown += `${item.description}\n\n`;
-    
+
     if (item.params && item.params.length > 0) {
       markdown += "**Parameters:**\n\n";
       for (const param of item.params) {
@@ -222,11 +222,11 @@ function generateFileMarkdown(fileDoc: FileDocumentation): string {
       }
       markdown += "\n";
     }
-    
+
     if (item.returns) {
       markdown += `**Returns:** ${item.returns.description}\n\n`;
     }
-    
+
     if (item.examples && item.examples.length > 0) {
       markdown += "**Examples:**\n\n";
       for (const example of item.examples) {
@@ -235,29 +235,29 @@ function generateFileMarkdown(fileDoc: FileDocumentation): string {
         markdown += "```\n\n";
       }
     }
-    
+
     markdown += `*Line ${item.lineNumber}*\n\n`;
     markdown += "---\n\n";
   }
-  
+
   return markdown;
 }
 
 function generateIndexMarkdown(fileDocs: FileDocumentation[]): string {
   let markdown = "# API Documentation\n\n";
-  
+
   markdown += "## Files\n\n";
-  
+
   for (const fileDoc of fileDocs) {
-    const fileName = path.basename(fileDoc.filePath, '.ts');
+    const fileName = path.basename(fileDoc.filePath, ".ts");
     const mdFileName = `${fileName}.md`;
     markdown += `- [${fileName}](./${mdFileName})`;
     if (fileDoc.description) {
-      markdown += ` - ${fileDoc.description.split('\n')[0]}`; // First line only
+      markdown += ` - ${fileDoc.description.split("\n")[0]}`; // First line only
     }
     markdown += "\n";
   }
-  
+
   return markdown;
 }
 
@@ -265,12 +265,12 @@ async function generateDocs() {
   const srcDir = path.join(process.cwd(), "src");
   const outputDir = path.join(process.cwd(), "gen-docs");
   const fileDocs: FileDocumentation[] = [];
-  
+
   // Create output directory if it doesn't exist
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
-  
+
   // Create TypeScript compiler host
   const compilerOptions: ts.CompilerOptions = {
     target: ts.ScriptTarget.ES2020,
@@ -279,12 +279,12 @@ async function generateDocs() {
     allowJs: false,
     strict: true
   };
-  
+
   // Get all TypeScript files
   function getAllTsFiles(dir: string): string[] {
     const files: string[] = [];
     const entries = fs.readdirSync(dir, { withFileTypes: true });
-    
+
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
@@ -293,37 +293,32 @@ async function generateDocs() {
         files.push(fullPath);
       }
     }
-    
+
     return files;
   }
-  
+
   const tsFiles = getAllTsFiles(srcDir);
-  
+
   // Process each file
   for (const filePath of tsFiles) {
     const sourceText = fs.readFileSync(filePath, "utf-8");
-    const sourceFile = ts.createSourceFile(
-      filePath,
-      sourceText,
-      ts.ScriptTarget.ES2020,
-      true
-    );
-    
+    const sourceFile = ts.createSourceFile(filePath, sourceText, ts.ScriptTarget.ES2020, true);
+
     const fileDoc = extractTSDoc(sourceFile, filePath);
     fileDocs.push(fileDoc);
-    
+
     // Generate individual file documentation
-    const fileName = path.basename(filePath, '.ts');
+    const fileName = path.basename(filePath, ".ts");
     const markdown = generateFileMarkdown(fileDoc);
     const outputPath = path.join(outputDir, `${fileName}.md`);
     fs.writeFileSync(outputPath, markdown);
   }
-  
+
   // Generate index file
   const indexMarkdown = generateIndexMarkdown(fileDocs);
   const indexPath = path.join(outputDir, "index.md");
   fs.writeFileSync(indexPath, indexMarkdown);
-  
+
   const totalItems = fileDocs.reduce((sum, doc) => sum + doc.items.length, 0);
   console.log(`✅ Documentation generated in: ${outputDir}`);
   console.log(`📝 Documented ${totalItems} items from ${tsFiles.length} files`);
