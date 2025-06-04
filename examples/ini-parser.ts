@@ -1,6 +1,5 @@
 import {
   atomic,
-  between,
   char,
   commit,
   Either,
@@ -34,12 +33,6 @@ type IniValue = {
 };
 
 type IniFile = IniValue[];
-
-const sectionName = between(
-  char("["),
-  char("]"),
-  regex(/[^\]]+/).map(s => s.trim())
-).label("section name");
 
 const key = token(regex(/[a-zA-Z0-9_\-\.]+/).label("property key"));
 

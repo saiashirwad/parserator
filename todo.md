@@ -1,248 +1,218 @@
-# Error Handling Improvements
+# Parser Combinator Library - TODO List
 
-## 1. Add commit/cut functionality
+## 🧹 Code Cleanup & Removal
 
-[x] Add `committed` flag to ParserContext
+### High Priority
+- [ ] **Remove commented code in `src/chain.ts`**
+  - Either implement the chain functionality properly or delete the entire file
+  - If keeping, add proper implementation and tests
+  - If removing, update `src/index.ts` to remove the export
 
-```ts
-interface ParserContext<T = {}> {
-  // ... existing fields
-  committed?: boolean;
-}
-```
+- [ ] **Remove redundant/unused functions**
+  - Remove `lookAhead` alias in `src/combinators.ts` (line ~645) - use `lookahead` consistently
+  - Evaluate and potentially remove `Parser.selectRight` and `Parser.selectLeft` in `src/parser.ts`
+  - Consider removing `sequenceLast` if `sequence` covers the use case adequately
+  - Remove any other unused utility functions after dependency analysis
 
-[x] Add `commit()` method to Parser class
+- [ ] **Clean up type definitions**
+  - Replace `any` types with more specific types throughout the codebase
+  - Create `type AnyParser<Ctx = {}> = Parser<unknown, Ctx>` for better type safety
+  - Update function signatures to use the new type
 
-```ts
-commit(): Parser<T, Ctx> {
-  return new Parser(state => {
-    const result = this.run(state);
-    if (Either.isRight(result.result)) {
-      return {
-        ...result,
-        state: {
-          ...result.state,
-          context: { ...result.state.context, committed: true }
-        }
-      };
-    }
-    return result;
-  }, this.options);
-}
-```
+### Medium Priority
+- [ ] **Standardize error creation patterns**
+  - Create a unified `createError` helper function in `src/errors.ts`
+  - Replace all ad-hoc error creation with the standardized function
+  - Ensure consistent error structure across all parsers
 
-[x] Add standalone `commit()` and `cut()` functions
+## 📚 Documentation Improvements
 
-```ts
-export function commit<Ctx extends { source: string }>(): Parser<void, Ctx> {
-  return new Parser(state => {
-    return Parser.succeed(void 0, {
-      ...state,
-      context: { ...state.context, committed: true }
-    }) as any;
-  });
-}
+### Root Level Documentation
+- [ ] **Create comprehensive README.md**
+  - Add installation instructions
+  - Include quick start guide with practical examples
+  - Document key features (commit/cut, error hints, debugging)
+  - Add API overview with links to detailed docs
+  - Include performance considerations
+  - Add contributing guidelines
 
-export const cut = commit; // Alias for Prolog-style naming
-```
+- [ ] **Create CHANGELOG.md**
+  - Document version history
+  - Breaking changes
+  - New features and improvements
 
-## 2. Add atomic parser functionality
+### Documentation Structure
+- [ ] **Create `docs/` directory with:**
+  - [ ] `docs/architecture.md` - Internal library architecture
+  - [ ] `docs/error-handling.md` - Comprehensive error system guide
+  - [ ] `docs/debugging.md` - Debugging strategies and tools
+  - [ ] `docs/recipes.md` - Common parsing patterns and examples
+  - [ ] `docs/api/` - Detailed API documentation for each module
+  - [ ] `docs/migration.md` - Migration guide between versions
 
-[x] Add `atomic()` method to Parser class
+### Code Documentation
+- [ ] **Enhance JSDoc comments**
+  - Add practical examples to all major combinators in `src/combinators.ts`
+  - Document the `Parser` class methods with usage examples
+  - Add `@example` blocks to complex functions like `or`, `many0`, `sepBy`
+  - Document error handling behavior in each combinator
 
-```ts
-atomic(): Parser<T, Ctx> {
-  return new Parser(state => {
-    const result = this.run(state);
-    if (Either.isLeft(result.result)) {
-      // On failure, return the error but with the original state
-      return {
-        result: result.result,
-        state // Reset to original state
-      };
-    }
-    return result;
-  }, this.options);
-}
-```
+- [ ] **Add type documentation**
+  - Document generic type parameters with `@template`
+  - Add inline comments for complex type definitions
+  - Document the relationship between `Ctx` and `ParserContext`
 
-[x] Add standalone `atomic()` combinator
+## 🔧 Code Quality Improvements
 
-```ts
-export function atomic<T, Ctx = {}>(parser: Parser<T, Ctx>): Parser<T, Ctx> {
-  return parser.atomic();
-}
-```
+### Type Safety
+- [ ] **Improve type definitions**
+  - Replace remaining `any` types with proper generics
+  - Add stricter typing to error handling functions
+  - Improve inference for parser combinators
+  - Add proper typing for the `gen` function's generator
 
-## 3. Add recovery functionality
+- [ ] **Add input validation**
+  - Validate single character input in `char()` function
+  - Add runtime checks for invalid parser configurations
+  - Validate regex patterns in `regex()` combinator
+  - Add bounds checking for repetition combinators (`count`, `manyN`)
 
-[ ] Add `recover()` method to Parser class
+### Error Handling
+- [ ] **Simplify error type hierarchy**
+  - Consider consolidating the 4 error types into a more unified structure
+  - Ensure all error paths provide consistent information
+  - Add error recovery mechanisms where appropriate
 
-```ts
-recover(defaultValue: T): Parser<T, Ctx> {
-  return new Parser(state => {
-    const result = this.run(state)
-    if (Either.isLeft(result.result)) {
-      // Store error in context for later reporting if needed
-      const recoveredState = {
-        ...state,
-        context: {
-          ...state.context,
-          recoveredErrors: [
-            ...(state.context.recoveredErrors || []),
-            result.result.left
-          ]
-        }
-      }
-      return Parser.succeed(defaultValue, recoveredState)
-    }
-    return result
-  })
-}
-```
+- [ ] **Improve error messages**
+  - Add context-aware error messages
+  - Improve hint generation algorithm
+  - Add support for custom error formatters
+  - Ensure error positions are always accurate
 
-## 4. Add fatal error functionality
+### Performance
+- [ ] **Optimize hot paths**
+  - Rewrite `many0`/`many1` to use iterative approach instead of recursion
+  - Optimize string consumption in `State.consume`
+  - Add memoization support for recursive parsers
+  - Profile and optimize the `or` combinator for many alternatives
 
-[x] Add "Fatal" error type to ParseErr union
+- [ ] **Memory optimization**
+  - Reduce object allocations in parser state management
+  - Optimize string slicing operations
+  - Consider using object pooling for frequently created objects
 
-```ts
-export type ParseErr =
-  | { tag: "Expected"; span: Span; items: string[]; context: string[] }
-  | { tag: "Unexpected"; span: Span; found: string; context: string[]; hints?: string[] }
-  | { tag: "Custom"; span: Span; message: string; hints?: string[]; context: string[] }
-  | { tag: "Fatal"; span: Span; message: string; context: string[] }; // New
-```
+## 🧪 Testing & Quality Assurance
 
-[x] Add `fatal()` static method to Parser class
+### Test Infrastructure
+- [ ] **Set up comprehensive test suite**
+  - Create `tests/` directory structure
+  - Add unit tests for all combinators
+  - Add integration tests for complex parsing scenarios
+  - Add performance benchmarks
+  - Set up continuous integration
 
-```ts
-static fatal<Ctx = {}>(message: string): Parser<never, Ctx> {
-  return new Parser(state => {
-    const span = createSpan(state);
-    const fatalError: ParseErr = {
-      tag: "Fatal",
-      span,
-      message,
-      context: state.context?.labelStack ?? []
-    };
+### Test Coverage
+- [ ] **Add specific test cases for:**
+  - Error handling and recovery
+  - Commit/cut behavior
+  - Hint generation accuracy
+  - All combinator edge cases
+  - Memory usage and performance
+  - Different error output formats
 
-    return Parser.failRich({ errors: [fatalError] }, state);
-  });
-}
-```
+## 🏗️ Build & Development Setup
 
-## 5. Update Parser.gen error handling
+### Build Configuration
+- [ ] **Set up proper build pipeline**
+  - Configure TypeScript compilation
+  - Set up bundling for different environments (Node.js, browser)
+  - Add source map generation
+  - Configure tree-shaking optimization
 
-[x] Modify the error handling in `Parser.gen` to respect commit state
+### Development Tools
+- [ ] **Add development tooling**
+  - Set up ESLint with TypeScript rules
+  - Configure Prettier for code formatting
+  - Add pre-commit hooks
+  - Set up automated testing on commit
 
-```ts
-static gen = <T, Ctx = unknown>(
-  f: () => Generator<Parser<any, Ctx>, T, any>
-): Parser<T, Ctx> =>
-  new Parser<T, Ctx>(state => {
-    const iterator = f()
-    let current = iterator.next()
-    let currentState: ParserState<Ctx> = state
+### Package Configuration
+- [ ] **Update package.json**
+  - Add proper entry points for different environments
+  - Include all necessary metadata
+  - Set up proper peer dependencies
+  - Configure publishing settings
 
-    while (!current.done) {
-      const { result, state: updatedState } = current.value.run(currentState)
+## 🚀 Feature Enhancements
 
-      if (Either.isLeft(result)) {
-        const isCommitted = updatedState.context?.committed || state.context?.committed
-        const hasFatalError = result.left.errors.some(e => e.tag === "Fatal")
+### Core Features
+- [ ] **Implement missing combinators**
+  - Add `chainl1`/`chainr1` for operator precedence parsing
+  - Add `endBy`/`endBy1` combinators
+  - Implement `manyTill` combinator
+  - Add `skipManyTill` for efficient skipping
 
-        // If committed or fatal, return immediately
-        if (isCommitted || hasFatalError) {
-          return {
-            result: result as unknown as Either<T, ParseErrorBundle>,
-            state: updatedState
-          }
-        }
+### Advanced Features
+- [ ] **Add parser state management**
+  - Implement user state threading
+  - Add position tracking improvements
+  - Support for custom position types
+  - Add parser state snapshots/restoration
 
-        // Otherwise, for now just return (but this is where we could accumulate)
-        return {
-          result: result as unknown as Either<T, ParseErrorBundle>,
-          state: updatedState
-        }
-      }
+- [ ] **Enhance debugging capabilities**
+  - Add parser execution tracing
+  - Implement step-by-step debugging
+  - Add performance profiling tools
+  - Create visual parser tree representation
 
-      currentState = updatedState
-      current = iterator.next(result.right)
-    }
+## 📦 Distribution & Publishing
 
-    return Parser.succeed(current.value, currentState)
-  })
-```
+### Package Preparation
+- [ ] **Prepare for publishing**
+  - Set up proper TypeScript declaration files
+  - Create multiple build targets (ES5, ES2015, ESM, CommonJS)
+  - Add browser compatibility testing
+  - Set up automated publishing pipeline
 
-## 6. Update error handling in combinators
+### Documentation Site
+- [ ] **Create documentation website**
+  - Set up static site generator (e.g., VitePress, Docusaurus)
+  - Add interactive examples
+  - Create tutorial series
+  - Add search functionality
 
-[x] Update `or` combinator to accumulate errors when not committed
+## 🔍 Code Analysis & Refactoring
 
-```ts
-// In or combinator implementation
-or<B>(other: Parser<B, Ctx>): Parser<T | B, Ctx> {
-  return new Parser(state => {
-    const firstResult = this.run(state)
+### Static Analysis
+- [ ] **Run comprehensive code analysis**
+  - Use TypeScript strict mode
+  - Run dependency analysis to find unused code
+  - Check for circular dependencies
+  - Analyze bundle size and optimization opportunities
 
-    // If first succeeded or we're committed, return immediately
-    if (Either.isRight(firstResult.result) || state.context?.committed) {
-      return firstResult
-    }
+### Refactoring Opportunities
+- [ ] **Consider architectural improvements**
+  - Evaluate if the current state management is optimal
+  - Consider separating concerns better (parsing vs error handling)
+  - Look for opportunities to reduce coupling between modules
+  - Evaluate if the current API surface is intuitive
 
-    // Try second parser
-    const secondResult = other.run(state)
+## 📋 Priority Order
 
-    // If second failed too, merge errors
-    if (Either.isLeft(secondResult.result)) {
-      const mergedErrors = [
-        ...firstResult.result.left.errors,
-        ...secondResult.result.left.errors
-      ]
-      return Parser.failRich({ errors: mergedErrors }, state)
-    }
+1. **Phase 1 (Immediate)**: Code cleanup, remove unused code, basic documentation
+2. **Phase 2 (Short-term)**: Type safety improvements, comprehensive testing
+3. **Phase 3 (Medium-term)**: Performance optimization, advanced features
+4. **Phase 4 (Long-term)**: Documentation site, publishing preparation
 
-    return secondResult
-  })
-}
-```
+## 🎯 Success Criteria
 
-## 7. Add examples and tests
+- [ ] All TypeScript strict mode errors resolved
+- [ ] 100% test coverage on core functionality
+- [ ] Comprehensive documentation with examples
+- [ ] Performance benchmarks showing acceptable performance
+- [ ] Clean, maintainable codebase with no unused code
+- [ ] Ready for npm publishing with proper build pipeline
 
-[ ] Create examples showing the new error handling patterns
+---
 
-```ts
-// Example: JSON parser with commit points
-const jsonObject = Parser.gen(function* () {
-  yield* char("{");
-  yield* commit(); // After seeing '{', we're committed to parsing an object
-
-  const pairs = yield* sepBy(
-    keyValue.recover(null), // Recover from individual pair errors
-    char(",")
-  );
-
-  yield* char("}").expect("closing brace for object");
-  return Object.fromEntries(pairs.filter(p => p !== null));
-});
-
-// Example: Statement parser with cut
-const ifStatement = Parser.gen(function* () {
-  yield* keyword("if");
-  yield* cut(); // No backtracking after seeing "if"
-
-  yield* char("(").expect("opening parenthesis after 'if'");
-  const condition = yield* expression;
-  yield* char(")").expect("closing parenthesis after condition");
-
-  const body = yield* block;
-  return { type: "if", condition, body };
-});
-```
-
-[ ] Add unit tests for each new feature
-
-- Test commit() prevents backtracking in choice
-- Test atomic() resets state on failure
-- Test recover() continues parsing with default
-- Test fatal() causes immediate failure even in choice
-- Test error accumulation in or() vs immediate failure after commit()
+**Note**: This TODO list assumes there are additional files in the codebase beyond the `src/` folder. Please review and adjust priorities based on the complete project structure and your specific goals.

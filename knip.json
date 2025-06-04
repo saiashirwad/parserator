@@ -1,0 +1,55 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "index.ts",
+    "src/index.ts"
+  ],
+  "project": [
+    "src/**/*.ts",
+    "examples/**/*.ts",
+    "tests/**/*.ts",
+    "scripts/**/*.ts"
+  ],
+  "ignore": [
+    "dist/**",
+    "node_modules/**",
+    "gen-docs/**",
+    "playground/**"
+  ],
+  "ignoreBinaries": [
+    "prettier",
+    "tsup"
+  ],
+  "ignoreDependencies": [
+    "@types/bun",
+    "typescript",
+    "prettier"
+  ],
+  "rules": {
+    "files": "error",
+    "dependencies": "error",
+    "unlisted": "error",
+    "binaries": "warn",
+    "unresolved": "error",
+    "exports": "error",
+    "nsExports": "error",
+    "nsTypes": "error",
+    "duplicates": "error"
+  },
+  "workspaces": {
+    ".": {
+      "entry": [
+        "index.ts",
+        "examples/**/*.ts",
+        "tests/**/*.ts",
+        "scripts/**/*.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "examples/**/*.ts",
+        "tests/**/*.ts",
+        "scripts/**/*.ts"
+      ]
+    }
+  }
+}
