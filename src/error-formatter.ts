@@ -129,7 +129,7 @@ export class ErrorFormatter {
     }
 
     // Add pointer (accounting for line prefix)
-    const linePrefix = `  >   ${primary.span.line.toString().padStart(3, " ")} | `;
+    const linePrefix = `  >   ${primary.span.line.toString()} | `;
     const adjustedColumn = primary.span.column + linePrefix.length - 2; // -2 for the "  " we add
     const pointer = this.createPointer(adjustedColumn, primary.span.length, false);
     parts.push(`  ${pointer}`);

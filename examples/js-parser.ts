@@ -417,7 +417,7 @@ const program = Parser.gen(function* () {
 // Test the parser
 // =============================================================================
 
-const formatter = new ErrorFormatter("ansi");
+const formatter = new ErrorFormatter("html");
 
 const testCases = [
   // Valid programs
