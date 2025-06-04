@@ -5,7 +5,9 @@ type ExpectedParseErr = {
   span: Span;
   items: string[];
   context: string[];
+  found?: string; // ADD: What was actually found
 };
+
 type UnexpectedParseErr = {
   tag: "Unexpected";
   span: Span;
@@ -13,6 +15,7 @@ type UnexpectedParseErr = {
   context: string[];
   hints?: string[];
 };
+
 type CustomParseErr = {
   tag: "Custom";
   span: Span;
@@ -20,6 +23,7 @@ type CustomParseErr = {
   hints?: string[];
   context: string[];
 };
+
 type FatalParseErr = {
   tag: "Fatal";
   span: Span;
@@ -35,21 +39,37 @@ export class ParseErrorBundle {
     public source: string
   ) {}
 
-  // Get the primary error (furthest right)
   get primary(): ParseErr {
     return this.errors.reduce((furthest, current) =>
       current.span.offset > furthest.span.offset ? current : furthest
     );
   }
 
-  // Get all errors at the same furthest offset
   get primaryErrors(): ParseErr[] {
     const maxOffset = this.primary.span.offset;
     return this.errors.filter(err => err.span.offset === maxOffset);
   }
+
+  toString(): string {
+    const err = this.primary;
+    switch (err.tag) {
+      case "Expected":
+        return `Expected ${err.items.join(" or ")}${err.found ? `, found ${err.found}` : ""}`;
+      case "Unexpected":
+        return `Unexpected ${err.found}`;
+      case "Custom":
+        return err.message;
+      case "Fatal":
+        return `Fatal: ${err.message}`;
+    }
+  }
+
+  format(format: "plain" | "ansi" | "html" | "json" = "plain"): string {
+    const { ErrorFormatter } = require("./error-formatter");
+    return new ErrorFormatter(format).format(this);
+  }
 }
 
-// Helper function to create a span from parser state
 export function createSpan(
   state: { pos: { offset: number; line: number; column: number } },
   length: number = 0

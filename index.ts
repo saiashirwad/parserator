@@ -1,4 +1,3 @@
-export * from "./src/chain";
 export * from "./src/combinators";
 export * from "./src/debug";
 export * from "./src/either";

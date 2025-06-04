@@ -14,7 +14,6 @@ import {
   regex,
   sepBy,
   skipMany0,
-  skipMany1,
   string
 } from "../src";
 
@@ -457,15 +456,9 @@ const testCases = [
 console.log("=== Simple JavaScript Parser ===\n");
 
 for (const code of testCases) {
-  console.log(`Input: ${code}`);
   const result = program.parse(code);
 
   if (Either.isLeft(result.result)) {
-    console.log("❌ Error:");
-    console.log(formatter.format(result.result.left));
-  } else {
-    console.log("✅ Parsed successfully!");
-    console.log("AST:", JSON.stringify(result.result.right, null, 2));
+    console.log(result.result.left.format("ansi"));
   }
-  console.log("\n" + "=".repeat(60) + "\n");
 }

@@ -257,9 +257,10 @@ export class ErrorFormatter {
             length: err.span.length
           },
           context: err.context || [],
-          ...(err.tag === "Expected" && { items: err.items }),
+          ...(err.tag === "Expected" && { items: err.items, found: err.found }),
           ...(err.tag === "Unexpected" && { found: err.found }),
-          ...(err.tag === "Custom" && { message: err.message, hints: err.hints })
+          ...(err.tag === "Custom" && { message: err.message, hints: err.hints }),
+          ...(err.tag === "Fatal" && { message: err.message })
         }))
       },
       null,
@@ -277,7 +278,8 @@ export class ErrorFormatter {
 
     switch (error.tag) {
       case "Expected":
-        return `  ${yellow}Expected:${reset} ${error.items.join(" or ")}`;
+        const foundText = error.found ? `, found ${error.found}` : "";
+        return `  ${yellow}Expected:${reset} ${error.items.join(" or ")}${foundText}`;
       case "Unexpected":
         return `  ${red}Unexpected:${reset} ${error.found}`;
       case "Custom":
@@ -293,7 +295,8 @@ export class ErrorFormatter {
   private getPlainErrorMessage(error: ParseErr): string {
     switch (error.tag) {
       case "Expected":
-        return `Expected: ${error.items.join(" or ")}`;
+        const foundText = error.found ? `, found ${error.found}` : "";
+        return `Expected: ${error.items.join(" or ")}${foundText}`;
       case "Unexpected":
         return `Unexpected: ${error.found}`;
       case "Custom":

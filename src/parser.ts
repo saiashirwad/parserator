@@ -61,11 +61,18 @@ export class Parser<T, Ctx = {}> {
 
   static error<Ctx = {}>(
     message: string,
-    expected: string[] = [],
+    hints?: string[],
     stateCallback?: (state: ParserState<Ctx>) => ParserState<Ctx>
   ): Parser<never, Ctx> {
     return new Parser(state => {
-      return Parser.fail({ message, expected }, stateCallback ? stateCallback(state) : state);
+      const error: ParseErr = {
+        tag: "Custom",
+        span: createSpan(state),
+        message,
+        hints,
+        context: state.context?.labelStack ?? []
+      };
+      return Parser.failRich({ errors: [error] }, stateCallback ? stateCallback(state) : state);
     });
   }
 
@@ -108,6 +115,136 @@ export class Parser<T, Ctx = {}> {
       };
 
       return Parser.failRich({ errors: [fatalError] }, state);
+    });
+  }
+
+  /**
+   * Creates a parser that fails with an Expected error.
+   * Used when specific tokens or patterns were expected.
+   *
+   * @param items - Array of expected items (tokens, patterns, etc.)
+   * @param found - What was actually found (optional)
+   * @returns A parser that always fails with an Expected error
+   *
+   * @example
+   * ```ts
+   * Parser.expected([")", "]"], "{")  // Expected ) or ], found {
+   * Parser.expected(["identifier"])   // Expected identifier
+   * ```
+   */
+  static expected<Ctx = {}>(items: string[], found?: string): Parser<never, Ctx> {
+    return new Parser(state => {
+      const error: ParseErr = {
+        tag: "Expected",
+        span: createSpan(state),
+        items,
+        found,
+        context: state.context?.labelStack ?? []
+      };
+      return Parser.failRich({ errors: [error] }, state);
+    });
+  }
+
+  /**
+   * Creates a parser that fails with an Unexpected error.
+   * Used when unexpected input was encountered.
+   *
+   * @param found - What was found that wasn't expected
+   * @param hints - Optional hints for the user
+   * @returns A parser that always fails with an Unexpected error
+   *
+   * @example
+   * ```ts
+   * Parser.unexpected("}", ["Expected closing paren"])
+   * Parser.unexpected("123", ["Identifiers cannot start with numbers"])
+   * ```
+   */
+  static unexpected<Ctx = {}>(found: string, hints?: string[]): Parser<never, Ctx> {
+    return new Parser(state => {
+      const error: ParseErr = {
+        tag: "Unexpected", 
+        span: createSpan(state),
+        found,
+        hints,
+        context: state.context?.labelStack ?? []
+      };
+      return Parser.failRich({ errors: [error] }, state);
+    });
+  }
+
+  /**
+   * Creates a parser that fails with a specific error type and options.
+   * This is the most powerful error creation method for complex cases.
+   *
+   * @param options - Configuration object for the error
+   * @returns A parser that always fails with the specified error
+   *
+   * @example
+   * ```ts
+   * Parser.failWith({
+   *   type: "expected",
+   *   items: ["identifier", "number"],
+   *   found: "string literal",
+   *   hints: ["Variables must start with letters"]
+   * })
+   * 
+   * Parser.failWith({
+   *   type: "fatal",
+   *   message: "Cannot recover from this syntax error"
+   * })
+   * ```
+   */
+  static failWith<Ctx = {}>(options: {
+    type: "expected" | "unexpected" | "custom" | "fatal";
+    message?: string;
+    items?: string[];
+    found?: string; 
+    hints?: string[];
+  }): Parser<never, Ctx> {
+    return new Parser(state => {
+      const span = createSpan(state);
+      const context = state.context?.labelStack ?? [];
+      
+      let error: ParseErr;
+      switch (options.type) {
+        case "expected":
+          error = {
+            tag: "Expected",
+            span,
+            items: options.items ?? [],
+            found: options.found,
+            context
+          };
+          break;
+        case "unexpected":
+          error = {
+            tag: "Unexpected", 
+            span,
+            found: options.found ?? "",
+            hints: options.hints,
+            context
+          };
+          break;
+        case "custom":
+          error = {
+            tag: "Custom",
+            span, 
+            message: options.message ?? "",
+            hints: options.hints,
+            context
+          };
+          break;
+        case "fatal":
+          error = {
+            tag: "Fatal",
+            span,
+            message: options.message ?? "",
+            context
+          };
+          break;
+      }
+      
+      return Parser.failRich({ errors: [error] }, state);
     });
   }
 
