@@ -283,9 +283,6 @@ export class Parser<T, Ctx = {}> {
 
           // Check if we're in a committed state
           const isCommitted = updatedState.context?.committed || state.context?.committed;
-
-          // For Parser.gen, we always fail immediately since it's sequential
-          // But we preserve the commit flag for parent combinators
           return {
             result: result as unknown as Either<T, ParseErrorBundle>,
             state: updatedState

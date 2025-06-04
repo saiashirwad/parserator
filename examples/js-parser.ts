@@ -14,6 +14,7 @@ import {
   regex,
   sepBy,
   skipMany0,
+  skipMany1,
   string
 } from "../src";
 
@@ -27,16 +28,13 @@ const blockComment = regex(/\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\//).label("block comm
 const space = or(whitespace, lineComment, blockComment);
 const spaces = skipMany0(space);
 
-// Token helper - automatically handles whitespace after tokens
 function token<T>(parser: Parser<T>): Parser<T> {
   return parser.trimLeft(spaces);
 }
 
-// Keywords
 const keywords = ["let", "const", "function", "if", "else", "return", "true", "false", "null"];
-const keyword = (k: string) => token(string(k).thenDiscard(regex(/(?![a-zA-Z0-9_])/)));
+const keyword = (k: string) => token(string(k).thenDiscard(regex(/(?![a-zA-Z0-9_])/))).commit();
 
-// Identifiers (excluding keywords)
 const identifier = token(
   regex(/[a-zA-Z_][a-zA-Z0-9_]*/)
     .label("identifier")
@@ -353,8 +351,8 @@ const functionStatement: Parser<Statement> = Parser.gen(function* () {
 });
 
 const ifStatement: Parser<Statement> = parser(function* () {
-  yield* keyword("if");
-  yield* commit();
+  yield* keyword("if").commit();
+  // yield* commit();
 
   yield* token(char("(")).expect("opening parenthesis after 'if'");
   const test = yield* expression.expect("condition expression");
@@ -364,8 +362,8 @@ const ifStatement: Parser<Statement> = parser(function* () {
 
   const alternate = yield* optional(
     parser(function* () {
-      yield* keyword("else");
-      yield* commit();
+      yield* keyword("else").commit();
+      // yield* commit();
       return yield* statement.expect("else body");
     })
   );
