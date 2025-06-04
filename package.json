@@ -24,6 +24,7 @@
   "scripts": {
     "build": "tsup && bun build.ts",
     "test": "bun test",
+    "docs": "bun scripts/generate-docs.ts",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "bun run build && bun test",
     "publish:patch": "bun run build && npm version patch && npm publish --access public",
@@ -44,6 +45,7 @@
   "license": "MIT",
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@microsoft/tsdoc": "^0.15.1",
     "@types/bun": "^1.1.10",
     "prettier": "^3.5.3",
     "tsup": "^8.3.5",
