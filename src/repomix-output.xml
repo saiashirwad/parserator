@@ -1,0 +1,2764 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+chain.ts
+combinators.ts
+debug.ts
+either.ts
+error-formatter.ts
+errors.ts
+hints.ts
+index.ts
+parser.ts
+state.ts
+types.ts
+utils.ts
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="chain.ts">
+// import { Either } from "./either";
+// import { Parser } from "./parser";
+// import type { ParseErrorBundle } from "./errors";
+
+// export type Chain<Ctx = {}> = {
+//   <T, U>(parser: Parser<T, Ctx>, fn1: (value: T) => Parser<U>): Parser<U>;
+//   <T1, T2, T3>(
+//     parser: Parser<T1, Ctx>,
+//     fn1: (value: T1) => Parser<T2, Ctx>,
+//     fn2: (value: T2) => Parser<T3, Ctx>
+//   ): Parser<T3>;
+//   <T1, T2, T3, T4>(
+//     parser: Parser<T1, Ctx>,
+//     fn1: (value: T1) => Parser<T2, Ctx>,
+//     fn2: (value: T2) => Parser<T3, Ctx>,
+//     fn3: (value: T3) => Parser<T4, Ctx>
+//   ): Parser<T4>;
+//   <T1, T2, T3, T4, T5>(
+//     parser: Parser<T1, Ctx>,
+//     fn1: (value: T1) => Parser<T2, Ctx>,
+//     fn2: (value: T2) => Parser<T3, Ctx>,
+//     fn3: (value: T3) => Parser<T4, Ctx>,
+//     fn4: (value: T4) => Parser<T5, Ctx>
+//   ): Parser<T5>;
+//   <T1, T2, T3, T4, T5, T6>(
+//     parser: Parser<T1, Ctx>,
+//     fn1: (value: T1) => Parser<T2, Ctx>,
+//     fn2: (value: T2) => Parser<T3, Ctx>,
+//     fn3: (value: T3) => Parser<T4, Ctx>,
+//     fn4: (value: T4) => Parser<T5, Ctx>,
+//     fn5: (value: T5) => Parser<T6, Ctx>
+//   ): Parser<T6>;
+//   <T1, T2, T3, T4, T5, T6, T7>(
+//     parser: Parser<T1, Ctx>,
+//     fn1: (value: T1) => Parser<T2, Ctx>,
+//     fn2: (value: T2) => Parser<T3, Ctx>,
+//     fn3: (value: T3) => Parser<T4, Ctx>,
+//     fn4: (value: T4) => Parser<T5, Ctx>,
+//     fn5: (value: T5) => Parser<T6, Ctx>,
+//     fn6: (value: T6) => Parser<T7, Ctx>
+//   ): Parser<T7>;
+//   <T1, T2, T3, T4, T5, T6, T7, T8>(
+//     parser: Parser<T1, Ctx>,
+//     fn1: (value: T1) => Parser<T2, Ctx>,
+//     fn2: (value: T2) => Parser<T3, Ctx>,
+//     fn3: (value: T3) => Parser<T4, Ctx>,
+//     fn4: (value: T4) => Parser<T5, Ctx>,
+//     fn5: (value: T5) => Parser<T6, Ctx>,
+//     fn6: (value: T6) => Parser<T7, Ctx>,
+//     fn7: (value: T7) => Parser<T8, Ctx>
+//   ): Parser<T8>;
+//   <T1, T2, T3, T4, T5, T6, T7, T8, T9>(
+//     parser: Parser<T1, Ctx>,
+//     fn1: (value: T1) => Parser<T2, Ctx>,
+//     fn2: (value: T2) => Parser<T3, Ctx>,
+//     fn3: (value: T3) => Parser<T4, Ctx>,
+//     fn4: (value: T4) => Parser<T5, Ctx>,
+//     fn5: (value: T5) => Parser<T6, Ctx>,
+//     fn6: (value: T6) => Parser<T7, Ctx>,
+//     fn7: (value: T7) => Parser<T8, Ctx>,
+//     fn8: (value: T8) => Parser<T9, Ctx>
+//   ): Parser<T9>;
+//   <T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(
+//     parser: Parser<T1, Ctx>,
+//     fn1: (value: T1) => Parser<T2, Ctx>,
+//     fn2: (value: T2) => Parser<T3, Ctx>,
+//     fn3: (value: T3) => Parser<T4, Ctx>,
+//     fn4: (value: T4) => Parser<T5, Ctx>,
+//     fn5: (value: T5) => Parser<T6, Ctx>,
+//     fn6: (value: T6) => Parser<T7, Ctx>,
+//     fn7: (value: T7) => Parser<T8, Ctx>,
+//     fn8: (value: T8) => Parser<T9, Ctx>,
+//     fn9: (value: T9) => Parser<T10, Ctx>
+//   ): Parser<T10>;
+// };
+
+// export const chain = <Ctx = {}>(
+//   parser: Parser<any, Ctx>,
+//   ...fns: Array<(value: any) => Parser<any, Ctx>>
+// ): Chain<Ctx> => {
+//   return new Parser<any, Ctx>(state => {
+//     let result = parser.run(state);
+//     for (const fn of fns) {
+//       const { result: parserResult, state: newState } = result;
+//       if (Either.isLeft(parserResult)) {
+//         return {
+//           result: parserResult as unknown as Either<any, ParseErrorBundle>,
+//           state: newState
+//         };
+//       }
+//       const value = parserResult.right;
+//       result = fn(value).run(newState);
+//     }
+//     return result;
+//   }) as any;
+// };
+</file>
+
+<file path="combinators.ts">
+import { Either } from "./either";
+import { Parser } from "./parser";
+import type { ParseErr, ParseErrorBundle } from "./errors";
+import { type ParserState, State } from "./state";
+
+/**
+ * Creates a parser that looks ahead in the input stream without consuming any input.
+ * The parser will succeed with the result of the given parser but won't advance the input position.
+ *
+ * @param parser - The parser to look ahead with
+ * @returns A new parser that peeks at the input without consuming it
+ * ```ts
+ * const parser = lookahead(char('a'))
+ * parser.run('abc') // Right(['a', {...}])
+ * // Input position remains at 'abc', 'a' is not consumed
+ * ```
+ */
+export function lookahead<T, Ctx = {}>(parser: Parser<T, Ctx>): Parser<T | undefined, Ctx> {
+  return new Parser(state => {
+    const { result } = parser.run(state);
+    if (Either.isRight(result)) {
+      return Parser.succeed(result.right, state);
+    }
+    return Parser.succeed(undefined, state);
+  });
+}
+
+/**
+ * Creates a parser that succeeds only if the given parser fails to match.
+ * If the parser succeeds, this parser fails with an error message.
+ *
+ * @param parser - The parser that should not match
+ * @returns A new parser that succeeds only if the input parser fails
+ * ```ts
+ * const notA = notFollowedBy(char('a'))
+ * notA.run('bcd') // Right([true, {...}]) - Succeeds because 'a' is not found
+ * notA.run('abc') // Left(error) - Fails because 'a' is found
+ * ```
+ */
+export function notFollowedBy<T, Ctx = {}>(parser: Parser<T, Ctx>): Parser<boolean, Ctx> {
+  return new Parser(state => {
+    const { result, state: newState } = parser.run(state);
+    if (Either.isRight(result)) {
+      if (parser.options?.name) {
+        const message = `Found ${parser.options.name} when it should not appear here`;
+        return Parser.fail({ message, expected: [] }, newState);
+      }
+      return Parser.fail(
+        { message: "Expected not to follow", expected: [], found: state.remaining.at(0) },
+        newState
+      );
+    }
+    return Parser.succeed(true, state);
+  });
+}
+
+/**
+ * Creates a parser that matches an exact string in the input.
+ *
+ * @param str - The string to match
+ * @returns A parser that matches and consumes the exact string
+ * ```ts
+ * const parser = string("hello")
+ * parser.run("hello world") // Right(["hello", {...}])
+ * parser.run("goodbye") // Left(error)
+ * ```
+ */
+export const string = <Ctx = {}>(str: string): Parser<string, Ctx> =>
+  new Parser(
+    state => {
+      if (state.remaining.startsWith(str)) {
+        return Parser.succeed(str, State.consume(state, str.length));
+      }
+
+      const message = `Expected '${str}', ` + `but found '${state.remaining.slice(0, str.length)}'`;
+
+      return Parser.fail(
+        { message, expected: [str], found: state.remaining.slice(0, str.length) },
+        state
+      );
+    },
+    { name: str }
+  );
+
+/**
+ * Creates a parser that matches an exact string literal type.
+ * Similar to string parser but preserves the literal type information.
+ *
+ * @param str - The string literal to match
+ * @returns A parser that matches and consumes the exact string with preserved type
+ * ```ts
+ * const parser = narrowedString("hello") // Parser<"hello">
+ * parser.run("hello world") // Right(["hello", {...}])
+ * parser.run("goodbye") // Left(error)
+ * ```
+ */
+export function narrowedString<const T extends string, Ctx>(str: T): Parser<T, Ctx> {
+  return string(str) as any;
+}
+
+/**
+ * Creates a parser that matches a single character.
+ *
+ * @param ch - The character to match
+ * @returns A parser that matches and consumes a single character
+ * ```ts
+ * const parser = char("a")
+ * parser.run("abc") // Right(["a", {...}])
+ * parser.run("xyz") // Left(error)
+ * ```
+ */
+export const char = <T extends string, Ctx = {}>(ch: T): Parser<T, Ctx> => {
+  return new Parser(
+    state => {
+      if (ch.length !== 1) {
+        return Parser.fail({ message: "Incorrect usage of char parser.", expected: [ch] }, state);
+      }
+      if (state.remaining[0] === ch) {
+        return Parser.succeed(ch, State.consume(state, 1));
+      }
+
+      const message = `Expected ${ch} but found ${state.remaining.at(0)}.`;
+      return Parser.fail({ message, expected: [ch], found: state.remaining.at(0) }, state);
+    },
+    { name: ch }
+  );
+};
+
+/**
+ * A parser that matches any single alphabetic character (a-z, A-Z).
+ *
+ * ```ts
+ * const parser = alphabet
+ * parser.run("abc") // Right(["a", {...}])
+ * parser.run("123") // Left(error)
+ * ```
+ */
+export const alphabet = new Parser(
+  state => {
+    if (State.isAtEnd(state)) {
+      return Parser.fail({ message: "Unexpected end of input", expected: [] }, state);
+    }
+    const first = state.remaining[0];
+    if (first && /^[a-zA-Z]$/.test(first)) {
+      return Parser.succeed(first, State.consume(state, 1));
+    }
+    const message = `Expected alphabetic character, but got '${first}'`;
+    return Parser.fail({ message, expected: [], found: state.remaining[0] }, state);
+  },
+  { name: "alphabet" }
+);
+
+/**
+ * A parser that matches any single digit character (0-9).
+ *
+ * ```ts
+ * const parser = digit
+ * parser.run("123") // Right(["1", {...}])
+ * parser.run("abc") // Left(error)
+ * ```
+ */
+export const digit = new Parser(
+  state => {
+    if (State.isAtEnd(state)) {
+      return Parser.fail({ message: "Unexpected end of input", expected: [] }, state);
+    }
+    const first = state.remaining[0];
+    if (first && /^[0-9]$/.test(first)) {
+      return Parser.succeed(first, State.consume(state, 1));
+    }
+    const message = `Expected digit, but got '${first}'`;
+    return Parser.fail({ message, expected: [], found: state.remaining[0] }, state);
+  },
+  { name: "digit" }
+);
+
+/**
+ * Creates a parser that matches zero or more occurrences of elements separated by a separator.
+ *
+ * @param sepParser - Parser for the separator between elements
+ * @param parser - Parser for the elements
+ * @returns A parser that produces an array of matched elements
+ *
+ * ```ts
+ * const parser = sepBy(char(','), digit)
+ * parser.run("1,2,3") // Right([["1", "2", "3"], {...}])
+ * parser.run("") // Right([[], {...}])
+ * ```
+ */
+// TODO: fix this
+export function sepBy<S, T, Ctx>(
+  parser: Parser<T, Ctx>,
+  sepParser: Parser<S, Ctx>
+): Parser<T[], Ctx> {
+  return new Parser(state => {
+    const results: T[] = [];
+    let currentState = state;
+
+    const { result: firstResult, state: firstState } = parser.run(currentState);
+    if (Either.isLeft(firstResult)) {
+      return Parser.succeed([], state);
+    }
+
+    results.push(firstResult.right);
+    currentState = firstState;
+
+    while (true) {
+      const { result: sepResult, state: sepState } = sepParser.run(currentState);
+      if (Either.isLeft(sepResult)) {
+        break;
+      }
+
+      const { result: itemResult, state: itemState } = parser.run(sepState);
+      if (Either.isLeft(itemResult)) {
+        break;
+      }
+
+      results.push(itemResult.right);
+      currentState = itemState;
+    }
+
+    return Parser.succeed(results, currentState);
+  });
+}
+
+/**
+ * Parses one or more occurrences of a parser separated by another parser.
+ * Requires at least one match of the main parser.
+ *
+ * @param parser - The parser for the elements
+ * @param sepParser - The parser for the separator
+ * @returns A parser that produces a non-empty array of parsed elements
+ *
+ * @example
+ * ```ts
+ * const numbers = sepBy1(number, char(','))
+ * numbers.parse("1,2,3") // Success: [1, 2, 3]
+ * numbers.parse("") // Error: Expected at least one element
+ * ```
+ */
+export function sepBy1<S, T, Ctx>(
+  parser: Parser<T, Ctx>,
+  sepParser: Parser<S, Ctx>
+): Parser<T[], Ctx> {
+  return Parser.gen(function* () {
+    const first = yield* parser;
+    const rest = yield* many0(sepParser.then(parser));
+    return [first, ...rest];
+  });
+}
+
+/**
+ * Creates a parser that matches content between two string delimiters.
+ *
+ * @param start - The opening delimiter string
+ * @param end - The closing delimiter string
+ * @param parser - The parser for the content between delimiters
+ * @returns A parser that matches content between delimiters
+ *
+ * ```ts
+ * const parser = between(char('('), char(')'), digit)
+ * parser.run('(5)') // Right(['5', {...}])
+ * parser.run('5') // Left(error)
+ * parser.run('(5') // Left(error: Expected closing delimiter)
+ * ```
+ */
+export function between<T, Ctx = {}>(
+  start: Parser<any, Ctx>,
+  end: Parser<any, Ctx>,
+  parser: Parser<T, Ctx>
+): Parser<T, Ctx> {
+  return Parser.gen(function* () {
+    yield* start;
+    const content = yield* parser;
+    yield* end.expect(`closing delimiter`);
+    return content;
+  });
+}
+
+export function anyChar<Ctx = {}>() {
+  return new Parser<string, Ctx>(state => {
+    if (State.isAtEnd(state)) {
+      return Parser.fail({ message: "Unexpected end of input", expected: [] }, state);
+    }
+    return Parser.succeed(state.remaining[0], State.consume(state, 1));
+  });
+}
+
+/**
+ * Internal helper function for creating repetition parsers.
+ *
+ * @param count - Minimum number of repetitions required
+ * @returns A function that creates a parser matching multiple occurrences
+ */
+function many_<S, T, Ctx = {}>(count: number) {
+  return (parser: Parser<T, Ctx>, separator?: Parser<S, Ctx>): Parser<T[], Ctx> => {
+    return new Parser(state => {
+      const results: T[] = [];
+      let currentState = state;
+
+      while (true) {
+        // Try to parse the next item
+        const itemResult = parser.run(currentState);
+        if (Either.isLeft(itemResult.result)) {
+          // Check if we're in a committed state
+          const isCommitted =
+            itemResult.state.context?.committed && !currentState.context?.committed;
+
+          // If committed, propagate the error regardless of count
+          if (isCommitted) {
+            return itemResult as unknown as typeof itemResult & {
+              result: Either<T[], ParseErrorBundle>;
+            };
+          }
+
+          // If we have enough items, return success
+          if (results.length >= count) {
+            return Parser.succeed(results, currentState);
+          }
+          const message = `Expected at least ${count} occurrences, but only found ${results.length}`;
+          return Parser.fail({ message, expected: [] }, itemResult.state);
+        }
+
+        // Add the item and update state
+        const { result: value, state: newState } = itemResult;
+        results.push(value.right);
+
+        // Check that parser advanced - prevent infinite loops
+        if (newState.pos.offset <= currentState.pos.offset) {
+          throw new Error("Parser did not advance - infinite loop prevented");
+        }
+        currentState = newState as ParserState<Ctx>;
+
+        // If we have a separator, try to parse it
+        if (separator) {
+          const { result: sepResult, state } = separator.run(currentState);
+          if (Either.isLeft(sepResult)) {
+            break;
+          }
+          // Check that separator advanced too
+          if (state.pos.offset <= currentState.pos.offset) {
+            throw new Error("Separator parser did not advance - infinite loop prevented");
+          }
+          currentState = state as ParserState<Ctx>;
+        }
+      }
+
+      if (results.length >= count) {
+        return Parser.succeed(results, currentState);
+      }
+
+      const message = `Expected at least ${count} occurrences, but only found ${results.length}`;
+      return Parser.fail({ message, expected: [] }, currentState);
+    });
+  };
+}
+
+/**
+ * Creates a parser that matches zero or more occurrences of the input parser.
+ *
+ * @param parser - The parser to repeat
+ * @returns A parser that produces an array of all matches
+ */
+export const many0 = <S, T, Ctx = {}>(parser: Parser<T, Ctx>, separator?: Parser<S, Ctx>) =>
+  many_<S, T, Ctx>(0)(parser, separator);
+
+/**
+ * Parses zero or more occurrences of a parser (alias for many0).
+ *
+ * @param parser - The parser to repeat
+ * @returns A parser that produces an array of parsed elements
+ */
+export const many = <T, Ctx = {}>(parser: Parser<T, Ctx>) => many0(parser);
+
+/**
+ * Creates a parser that matches one or more occurrences of the input parser.
+ *
+ * @param parser - The parser to repeat
+ * @returns A parser that produces an array of all matches (at least one)
+ */
+export const many1 = <S, T, Ctx>(parser: Parser<T, Ctx>, separator?: Parser<S, Ctx>) =>
+  many_<S, T, Ctx>(1)(parser, separator);
+
+/**
+ * Creates a parser that matches at least n occurrences of the input parser.
+ *
+ * @param parser - The parser to repeat
+ * @param n - Number of required repetitions
+ * @returns A parser that produces an array of at least n matches
+ */
+export const manyN = <S, T, Ctx>(parser: Parser<T, Ctx>, n: number, separator?: Parser<S, Ctx>) =>
+  many_<S, T, Ctx>(n)(parser, separator);
+
+/**
+ * Creates a parser that matches exactly n occurrences of the input parser.
+ *
+ * @param parser - The parser to repeat
+ * @param n - Number of required repetitions
+ * @param separator - Optional parser to match between occurrences
+ * @returns A parser that produces an array of exactly n matches
+ */
+
+export const manyNExact = <S, T, Ctx>(
+  parser: Parser<T, Ctx>,
+  n: number,
+  separator?: Parser<S, Ctx>
+) =>
+  Parser.gen(function* () {
+    const results = yield* manyN(parser, n, separator);
+    if (results.length !== n) {
+      const message = `Expected exactly ${n} occurrences, but found ${results.length}`;
+      return yield* Parser.error<Ctx>(message);
+    }
+    return results;
+  });
+
+/**
+ * Internal helper function for creating skipping repetition parsers.
+ *
+ * @param count - Minimum number of repetitions required
+ * @returns A function that creates a parser skipping multiple occurrences
+ */
+function skipMany_<T, Ctx>(count: number) {
+  return (parser: Parser<T, Ctx>): Parser<undefined, Ctx> => {
+    return new Parser(state => {
+      let currentState = state;
+      let successes = 0;
+
+      while (true) {
+        const { result, state: newState } = parser.run(currentState);
+        if (Either.isLeft(result)) {
+          break;
+        }
+
+        // Check that parser advanced - prevent infinite loops
+        if (newState.pos.offset <= currentState.pos.offset) {
+          throw new Error("Parser did not advance - infinite loop prevented");
+        }
+
+        successes++;
+        currentState = newState as ParserState<Ctx>;
+      }
+
+      if (successes >= count) {
+        return Parser.succeed(undefined, currentState);
+      }
+      const message = `Expected at least ${count} occurrences, but only found ${successes}`;
+      return Parser.fail({ message, expected: [] }, state);
+    });
+  };
+}
+
+/**
+ * Creates a parser that skips zero or more occurrences of the input parser.
+ *
+ * @param parser - The parser to skip
+ * @returns A parser that skips all matches
+ */
+export const skipMany0 = <T, Ctx = {}>(parser: Parser<T, Ctx>) => skipMany_<T, Ctx>(0)(parser);
+
+/**
+ * Creates a parser that skips one or more occurrences of the input parser.
+ *
+ * @param parser - The parser to skip
+ * @returns A parser that skips all matches (requires at least one)
+ */
+export const skipMany1 = <T, Ctx>(parser: Parser<T, Ctx>) => skipMany_<T, Ctx>(1)(parser);
+
+/**
+ * Creates a parser that skips exactly n occurrences of the input parser.
+ *
+ * @param parser - The parser to skip
+ * @param n - Number of required repetitions to skip
+ * @returns A parser that skips exactly n matches
+ */
+export const skipManyN = <T, Ctx>(parser: Parser<T, Ctx>, n: number) =>
+  skipMany_<T, Ctx>(n)(parser);
+
+/**
+ * Creates a parser that skips input until the given parser succeeds.
+ *
+ * @param parser - The parser to look for
+ * @returns A parser that skips input until a match is found
+ */
+export function skipUntil<T, Ctx = {}>(parser: Parser<T, Ctx>): Parser<undefined, Ctx> {
+  return new Parser(state => {
+    let currentState = state;
+
+    while (!State.isAtEnd(currentState)) {
+      const { result, state: newState } = parser.run(currentState);
+      if (Either.isRight(result)) {
+        return Parser.succeed(undefined, newState);
+      }
+      currentState = State.consume(currentState, 1);
+    }
+
+    return Parser.succeed(undefined, currentState);
+  });
+}
+
+/**
+ * Creates a parser that takes input until the given parser succeeds.
+ *
+ * @param parser - The parser to look for
+ * @returns A parser that takes input until a match is found
+ */
+export function takeUntil<T, Ctx = {}>(parser: Parser<T, Ctx>): Parser<string, Ctx> {
+  return new Parser(state => {
+    let currentState = state;
+    let collected = "";
+
+    while (!State.isAtEnd(currentState)) {
+      const { result, state: newState } = parser.run(currentState);
+      if (Either.isRight(result)) {
+        return Parser.succeed(collected, newState);
+      }
+      collected += currentState.remaining[0];
+      currentState = State.consume(currentState, 1);
+    }
+
+    return Parser.succeed(collected, currentState);
+  });
+}
+
+/**
+ * Creates a parser that takes input until the given character is found.
+ *
+ * @param char - The character to look for
+ * @returns A parser that takes input until the character is found
+ */
+export function parseUntilChar<Ctx = {}>(char: string): Parser<string, Ctx> {
+  return new Parser(state => {
+    if (char.length !== 1) {
+      return Parser.fail(
+        { message: "Incorrect usage of parseUntilChar parser.", expected: [char] },
+        state
+      );
+    }
+    let currentState = state;
+    let collected = "";
+
+    while (!State.isAtEnd(currentState)) {
+      if (currentState.remaining[0] === char) {
+        return Parser.succeed(collected, currentState);
+      }
+      collected += currentState.remaining[0];
+      currentState = State.consume(currentState, 1);
+    }
+
+    const message = `Expected character ${char} but found ${collected}`;
+    return Parser.fail({ message, expected: [char] }, currentState);
+  });
+}
+
+/**
+ * A parser that skips any number of space characters.
+ */
+export const skipSpaces = new Parser(
+  state =>
+    Parser.succeed(
+      undefined,
+      State.consumeWhile(state, char => char === " ")
+    ),
+  { name: "skipSpaces" }
+);
+
+/**
+ * Creates a parser that tries multiple parsers in order until one succeeds.
+ *
+ * @param parsers - Array of parsers to try
+ * @returns A parser that succeeds if any of the input parsers succeed
+ */
+/**
+ * Creates a parser that tries each of the given parsers in order until one succeeds.
+ *
+ * This combinator is commit-aware: if any parser sets the `committed` flag during
+ * parsing, no further alternatives will be tried. This enables better error messages
+ * by preventing backtracking once we've identified the intended parse path.
+ *
+ * @param parsers - Array of parsers to try in order
+ * @returns A parser that succeeds with the first successful parser's result
+ *
+ * @example
+ * ```ts
+ * // Basic usage - tries each alternative
+ * const value = or(
+ *   numberLiteral,
+ *   stringLiteral,
+ *   booleanLiteral
+ * )
+ * ```
+ *
+ * @example
+ * ```ts
+ * // With commit for better errors
+ * const statement = or(
+ *   Parser.gen(function* () {
+ *     yield* keyword("if")
+ *     yield* commit()  // No backtracking after this
+ *     yield* char('(').expect("opening parenthesis")
+ *     // ...
+ *   }),
+ *   whileStatement,
+ *   assignment
+ * )
+ *
+ * // Input: "if x > 5"  (missing parentheses)
+ * // Without commit: "Expected if, while, or assignment"
+ * // With commit: "Expected opening parenthesis"
+ * ```
+ *
+ * @example
+ * ```ts
+ * // Error accumulation without commit
+ * const config = or(
+ *   jsonParser.label("JSON format"),
+ *   yamlParser.label("YAML format"),
+ *   tomlParser.label("TOML format")
+ * )
+ * // Errors from all three parsers are accumulated
+ * ```
+ */
+export function or<Parsers extends Parser<any, any>[], Ctx = {}>(
+  ...parsers: Parsers
+): Parser<Parsers[number] extends Parser<infer T, Ctx> ? T : never, Ctx> {
+  return new Parser(state => {
+    const errors: ParseErr[] = [];
+
+    for (const parser of parsers) {
+      const { result, state: newState } = parser.run(state);
+
+      if (Either.isRight(result)) {
+        return Parser.succeed(result.right, newState);
+      }
+
+      // Accumulate errors from this branch
+      errors.push(...result.left.errors);
+
+      // Check if we're committed - if so, don't try other alternatives
+      if (newState.context?.committed && !state.context?.committed) {
+        return Parser.failRich({ errors }, newState);
+      }
+    }
+
+    // All alternatives failed, return accumulated errors
+    return Parser.failRich({ errors }, state);
+  });
+}
+
+/**
+ * Creates a parser that optionally matches the input parser.
+ * If the parser fails, returns undefined without consuming input.
+ *
+ * @param parser - The parser to make optional
+ * @returns A parser that either succeeds with a value or undefined
+ */
+export function optional<T, Ctx = {}>(parser: Parser<T, Ctx>) {
+  return new Parser((state: ParserState<Ctx>) => {
+    const { result, state: newState } = parser.run(state);
+    if (Either.isLeft(result)) {
+      return Parser.succeed(undefined, state);
+    }
+    // return result
+    return Parser.succeed(result.right, newState);
+  });
+}
+
+/**
+ * Creates a parser that tries multiple parsers in order and returns the first success.
+ * Convenience function for when you have an array of parsers.
+ *
+ * @param parsers - Array of parsers to try
+ * @returns A parser that succeeds with the first successful parser's result
+ *
+ * @example
+ * ```ts
+ * const keywords = ["let", "const", "var"].map(k => string(k));
+ * const anyKeyword = choice(keywords);
+ * ```
+ */
+export function choice<T, Ctx = {}>(parsers: Parser<T, Ctx>[]): Parser<T, Ctx> {
+  return or(...parsers);
+}
+
+type LastParser<T, Ctx = {}> = T extends [...any[], Parser<infer L, Ctx>] ? L : never;
+
+/**
+ * Creates a parser that runs multiple parsers in sequence and returns all results.
+ *
+ * @param parsers - Array of parsers to run in sequence
+ * @returns A parser that succeeds if all parsers succeed in order, returning a tuple of all results
+ *
+ * @example
+ * ```ts
+ * const parser = sequence([digit, char('-'), digit])
+ * parser.run('1-2') // Right([['1', '-', '2'], {...}])
+ * ```
+ */
+export function sequence<T extends readonly Parser<any, any>[]>(
+  parsers: T
+): Parser<
+  { [K in keyof T]: T[K] extends Parser<infer U, any> ? U : never },
+  T[0] extends Parser<any, infer Ctx> ? Ctx : {}
+> {
+  return Parser.gen(function* () {
+    const results = [];
+    for (const parser of parsers) {
+      const result = yield* parser;
+      results.push(result);
+    }
+    return results as any;
+  });
+}
+
+/**
+ * Creates a parser that runs multiple parsers in sequence and returns only the last result.
+ * This is the original behavior of sequence for backward compatibility.
+ *
+ * @param parsers - Array of parsers to run in sequence
+ * @returns A parser that succeeds if all parsers succeed, returning only the last result
+ *
+ * @example
+ * ```ts
+ * const parser = sequenceLast([string('hello'), char(' '), string('world')])
+ * parser.run('hello world') // Right(['world', {...}])
+ * ```
+ */
+export function sequenceLast<Parsers extends Parser<any, any>[], Ctx = {}>(
+  parsers: [...Parsers]
+): Parser<LastParser<Parsers, Ctx>, Ctx> {
+  return new Parser((state: ParserState<Ctx>) => {
+    let currentState = state;
+    let lastResult: any;
+
+    for (const parser of parsers) {
+      const { result, state: newState } = parser.run(currentState);
+      if (Either.isLeft(result)) {
+        return {
+          result: result as Either<LastParser<Parsers, Ctx>, ParseErrorBundle>,
+          state: newState as ParserState<Ctx>
+        };
+      }
+      currentState = newState as ParserState<Ctx>;
+      lastResult = result.right;
+    }
+
+    return {
+      result: Either.right(lastResult) as Either<LastParser<Parsers, Ctx>, ParseErrorBundle>,
+      state: currentState
+    };
+  });
+}
+
+/**
+ * Creates a parser that matches input against a regular expression.
+ * The regex must match at the start of the input.
+ *
+ * @param re - The regular expression to match against
+ * @returns A parser that matches the regex pattern
+ */
+export const regex = <Ctx = {}>(re: RegExp): Parser<string, Ctx> => {
+  // Create a new RegExp without global flag to ensure consistent behavior
+  const nonGlobalRe = new RegExp(re.source, re.flags.replace("g", ""));
+
+  return new Parser(
+    state => {
+      const match = nonGlobalRe.exec(state.remaining);
+      if (match && match.index === 0) {
+        const value = match[0];
+        return Parser.succeed(value, State.consume<Ctx>(state, value.length));
+      }
+      const message = `Expected ${re} but found ${state.remaining.slice(0, 10)}...`;
+      return Parser.fail({ message, expected: [re.toString()] }, state);
+    },
+    { name: re.toString() }
+  );
+};
+
+export function zip<A, B>(parserA: Parser<A>, parserB: Parser<B>): Parser<[A, B]> {
+  return parserA.zip(parserB);
+}
+
+export function then<A, B>(parserA: Parser<A>, parserB: Parser<B>): Parser<B> {
+  return parserA.then(parserB);
+}
+
+export const zipRight = then;
+
+export function thenDiscard<A, B>(parserA: Parser<A>, parserB: Parser<B>): Parser<A> {
+  return parserA.thenDiscard(parserB);
+}
+export const zipLeft = thenDiscard;
+
+/**
+ * Creates a parser that takes input until the given parser would succeed, without consuming the parser.
+ *
+ * @param parser - The parser to look for
+ * @returns A parser that takes input until before a match would be found
+ */
+export function takeUpto<T>(parser: Parser<T>): Parser<string> {
+  return new Parser(state => {
+    let currentState = state;
+    let collected = "";
+
+    while (!State.isAtEnd(currentState)) {
+      const { result } = parser.run(currentState);
+      if (Either.isRight(result)) {
+        return Parser.succeed(collected, currentState);
+      }
+      collected += currentState.remaining[0];
+      currentState = State.consume(currentState, 1);
+    }
+
+    return Parser.succeed(collected, currentState);
+  });
+}
+
+/**
+ * Creates a parser that commits to the current parsing path, preventing backtracking.
+ *
+ * After calling `commit()`, if parsing fails later in the sequence, the parser won't
+ * backtrack to try alternatives in a `choice` or `or` combinator. This results in
+ * more specific, helpful error messages instead of generic "expected one of" errors.
+ *
+ * @returns A parser that sets the commit flag in the parsing context
+ *
+ * @example
+ * ```ts
+ * // Use commit after identifying the type of construct
+ * const ifStatement = Parser.gen(function* () {
+ *   yield* keyword("if")
+ *   yield* commit()  // No backtracking after this point
+ *   yield* char('(').expect("opening parenthesis after 'if'")
+ *   const condition = yield* expression
+ *   yield* char(')').expect("closing parenthesis")
+ *   const body = yield* block
+ *   return { type: "if", condition, body }
+ * })
+ * ```
+ *
+ * @example
+ * ```ts
+ * // Commit in different parsing contexts
+ * const jsonParser = Parser.gen(function* () {
+ *   const firstChar = yield* peekChar
+ *
+ *   if (firstChar === '{') {
+ *     yield* char('{')
+ *     yield* commit()  // Definitely parsing an object
+ *     return yield* jsonObject
+ *   } else if (firstChar === '[') {
+ *     yield* char('[')
+ *     yield* commit()  // Definitely parsing an array
+ *     return yield* jsonArray
+ *   }
+ *   // ...
+ * })
+ * ```
+ *
+ * @example
+ * ```ts
+ * // Commit with error recovery
+ * const statement = choice([
+ *   ifStatement,    // Has commit() after "if"
+ *   whileStatement, // Has commit() after "while"
+ *   forStatement,   // Has commit() after "for"
+ *   expression      // No commit, can always fall back to this
+ * ])
+ *
+ * // Input: "if (x > 5 { }"  (missing closing paren)
+ * // Result: "Expected closing parenthesis" (not "Expected if, while, for, or expression")
+ * ```
+ *
+ * @see {@link cut} - Alias with Prolog-style naming
+ * @see {@link Parser.commit} - Instance method version
+ */
+export function commit<Ctx extends { source: string }>(): Parser<void, Ctx> {
+  return new Parser(state => {
+    return Parser.succeed(void 0, {
+      ...state,
+      context: { ...state.context, committed: true }
+    }) as any;
+  });
+}
+
+/**
+ * Alias for {@link commit} using Prolog-style naming.
+ *
+ * The cut operator (!) in Prolog prevents backtracking, similar to how
+ * this prevents the parser from trying other alternatives after this point.
+ *
+ * @example
+ * ```ts
+ * const prologStyleIf = Parser.gen(function* () {
+ *   yield* keyword("if")
+ *   yield* cut()  // Using Prolog-style naming
+ *   yield* char('(')
+ *   // ...
+ * })
+ * ```
+ */
+export const cut = commit;
+
+/**
+ * Creates an atomic parser that either fully succeeds or resets to the original state.
+ *
+ * This combinator wraps a parser in a transaction-like behavior. If the parser fails
+ * at any point, the input position is reset to where it was before the atomic parser
+ * started, as if no input was consumed.
+ *
+ * @param parser - The parser to make atomic
+ * @returns A new parser with atomic (all-or-nothing) behavior
+ *
+ * @example
+ * ```ts
+ * // Try to parse a complex structure without consuming input on failure
+ * const functionCall = atomic(
+ *   Parser.gen(function* () {
+ *     const name = yield* identifier
+ *     yield* char('(')
+ *     const args = yield* sepBy(expression, char(','))
+ *     yield* char(')')
+ *     return { name, args }
+ *   })
+ * )
+ * ```
+ *
+ * @example
+ * ```ts
+ * // Use atomic for lookahead without consumption
+ * const nextIsOperator = atomic(
+ *   or(
+ *     string("++"),
+ *     string("--"),
+ *     string("+="),
+ *     string("-=")
+ *   )
+ * ).map(() => true).or(Parser.succeed(false))
+ * ```
+ *
+ * @example
+ * ```ts
+ * // Combine with 'or' for clean alternatives
+ * const value = or(
+ *   atomic(complexExpression),  // Try complex first
+ *   atomic(simpleExpression),   // Then simpler
+ *   literal                     // Finally, just a literal
+ * )
+ *
+ * // If complexExpression fails after consuming "foo + ",
+ * // atomic ensures we backtrack completely
+ * ```
+ *
+ * @see {@link Parser.atomic} - Instance method version
+ */
+export function atomic<T, Ctx = {}>(parser: Parser<T, Ctx>): Parser<T, Ctx> {
+  return parser.atomic();
+}
+
+/**
+ * Parses any character except the specified one.
+ *
+ * @param ch - The character to exclude
+ * @returns A parser that matches any character except the specified one
+ *
+ * @example
+ * ```ts
+ * const notQuote = notChar('"')
+ * notQuote.parse('a') // Success: 'a'
+ * notQuote.parse('"') // Error: Expected any character except '"'
+ * ```
+ */
+export function notChar<Ctx = {}>(ch: string): Parser<string, Ctx> {
+  return new Parser(state => {
+    if (ch.length !== 1) {
+      return Parser.fail(
+        {
+          message: "notChar expects a single character",
+          expected: []
+        },
+        state
+      );
+    }
+
+    if (state.remaining[0] && state.remaining[0] !== ch) {
+      return Parser.succeed(state.remaining[0], State.consume(state, 1));
+    }
+
+    return Parser.fail(
+      {
+        message: `Expected any character except '${ch}'`,
+        expected: [`not '${ch}'`],
+        found: state.remaining[0]
+      },
+      state
+    );
+  });
+}
+
+/**
+ * Parser that succeeds only at the end of input.
+ *
+ * @example
+ * ```ts
+ * const parser = string("hello").then(eof)
+ * parser.parse("hello") // Success
+ * parser.parse("hello world") // Error: Expected end of input
+ * ```
+ */
+export const eof = new Parser<void, any>(state => {
+  if (state.remaining.length === 0) {
+    return Parser.succeed(undefined, state);
+  }
+  return Parser.fail(
+    {
+      message: "Expected end of input",
+      expected: ["end of input"],
+      found: state.remaining.slice(0, 20) + (state.remaining.length > 20 ? "..." : "")
+    },
+    state
+  );
+});
+
+/**
+ * Backward-compatible alias for lookahead.
+ * @deprecated Use {@link lookahead} instead
+ */
+export const lookAhead = lookahead;
+
+/**
+ * Parses exactly n occurrences of a parser.
+ *
+ * @param n - The exact number of occurrences
+ * @param parser - The parser to repeat
+ * @returns A parser that produces an array of exactly n elements
+ *
+ * @example
+ * ```ts
+ * const threeDigits = count(3, digit)
+ * threeDigits.parse("123") // Success: ['1', '2', '3']
+ * threeDigits.parse("12") // Error: not enough matches
+ * ```
+ */
+export function count<T, Ctx = {}>(n: number, parser: Parser<T, Ctx>): Parser<T[], Ctx> {
+  return Parser.gen(function* () {
+    const results: T[] = [];
+    for (let i = 0; i < n; i++) {
+      const result = yield* parser;
+      results.push(result);
+    }
+    return results;
+  });
+}
+
+/**
+ * Parses a list with optional trailing separator.
+ *
+ * @param parser - The parser for list elements
+ * @param sep - The parser for separators
+ * @returns A parser that allows optional trailing separator
+ *
+ * @example
+ * ```ts
+ * const list = sepEndBy(number, char(','))
+ * list.parse("1,2,3") // Success: [1, 2, 3]
+ * list.parse("1,2,3,") // Success: [1, 2, 3] (trailing comma OK)
+ * ```
+ */
+export function sepEndBy<S, T, Ctx = {}>(
+  parser: Parser<T, Ctx>,
+  sep: Parser<S, Ctx>
+): Parser<T[], Ctx> {
+  return or(
+    Parser.gen<T[], Ctx>(function* () {
+      const elements = yield* sepBy(parser, sep);
+      yield* optional(sep); // Allow trailing separator
+      return elements;
+    }),
+    Parser.pure<T[], Ctx>([])
+  );
+}
+</file>
+
+<file path="debug.ts">
+import { Either } from "./either";
+import { Parser } from "./parser";
+import { type ParserOutput, type ParserState, State } from "./state";
+/**
+ * Creates a debug output for a parser's current state and result
+ */
+export function debugState<Ctx = {}>(
+  label: string,
+  state: ParserState<Ctx>,
+  result: ParserOutput<any, Ctx>,
+  options: { inputPreviewLength?: number; separator?: string } = {}
+) {
+  const { inputPreviewLength = 20, separator = "=".repeat(40) } = options;
+
+  console.log(`\n=== ${label} ===`);
+  console.log("Position:", State.printPosition(state));
+  console.log(
+    "Input:",
+    JSON.stringify(
+      state.remaining.slice(0, inputPreviewLength) +
+        (state.remaining.length > inputPreviewLength ? "..." : "")
+    )
+  );
+  console.log(
+    "Result:",
+    Either.isRight(result.result) ?
+      `Success: ${JSON.stringify(result.result.right.value)}`
+    : `Error: ${
+        result.result.left.primary.tag === "Custom" ?
+          result.result.left.primary.message
+        : `${result.result.left.primary.tag}: ${JSON.stringify(result.result.left.primary)}`
+      }`
+  );
+  console.log(separator);
+}
+
+/**
+ * Adds debug output to a parser
+ */
+export function debug<T, Ctx = {}>(parser: Parser<T, Ctx>, label: string): Parser<T, Ctx> {
+  return parser.tap(({ state, result }) => debugState(label, state, result));
+}
+
+/**
+ * Creates a parser that logs its input state and continues
+ */
+export function trace<Ctx = {}>(label: string): Parser<void, Ctx> {
+  return new Parser(state => {
+    console.log(`\n[TRACE] ${label}`);
+    console.log("Position:", State.printPosition(state));
+    console.log("Remaining:", JSON.stringify(state.remaining));
+    return Parser.succeed(undefined, state);
+  });
+}
+
+/**
+ * Adds breakpoints to a parser for step-by-step debugging
+ */
+export function breakpoint<T, Ctx = {}>(parser: Parser<T, Ctx>, label: string): Parser<T, Ctx> {
+  return parser.tap(({ state, result }) => {
+    debugState(label, state, result);
+    // eslint-disable-next-line no-debugger
+    debugger;
+  });
+}
+
+/**
+ * Times how long a parser takes to run
+ */
+export function benchmark<T, Ctx = {}>(parser: Parser<T, Ctx>, label: string): Parser<T, Ctx> {
+  return new Parser(state => {
+    const start = performance.now();
+    const result = parser.run(state);
+    const end = performance.now();
+    console.log(`\n[BENCHMARK] ${label}: ${(end - start).toFixed(2)}ms`);
+    return result;
+  });
+}
+</file>
+
+<file path="either.ts">
+export type Either<R, L> = Left<L, R> | Right<R, L>;
+
+export class Left<L, R = never> {
+  readonly _tag = "Left";
+  constructor(public readonly left: L) {}
+  *[Symbol.iterator](): Generator<Either<R, L>, R, any> {
+    return yield this;
+  }
+}
+
+export class Right<R, L = any> {
+  readonly _tag = "Right";
+  constructor(public readonly right: R) {}
+  *[Symbol.iterator](): Generator<Either<R, L>, R, any> {
+    return yield this;
+  }
+}
+
+export const Either = {
+  left<L, R = never>(l: L): Either<R, L> {
+    return new Left(l);
+  },
+
+  right<R, L = never>(r: R): Either<R, L> {
+    return new Right(r);
+  },
+
+  isLeft<R, L>(either: Either<R, L>): either is Left<L, R> {
+    return either._tag === "Left";
+  },
+
+  isRight<R, L>(either: Either<R, L>): either is Right<R, L> {
+    return either._tag === "Right";
+  },
+
+  match<R, L, T>(onLeft: (left: L) => T, onRight: (right: R) => T) {
+    return (either: Either<R, L>): T => {
+      if (Either.isLeft(either)) {
+        return onLeft(either.left);
+      }
+      return onRight(either.right);
+    };
+  },
+
+  gen<R, L>(f: () => Generator<Either<any, L>, R, any>): Either<R, L> {
+    const iterator = f();
+    let current = iterator.next();
+
+    while (!current.done) {
+      const either = current.value;
+      if (Either.isLeft(either)) {
+        return either;
+      }
+      current = iterator.next(either.right);
+    }
+
+    return Either.right(current.value);
+  }
+};
+</file>
+
+<file path="error-formatter.ts">
+import type { ParseErr, ParseErrorBundle } from "./errors";
+
+export type ErrorFormat = "plain" | "ansi" | "html" | "json";
+
+export type ErrorFormatterOptions = {
+  maxContextLines?: number;
+  showHints?: boolean;
+  colorize?: boolean;
+  showContext?: boolean;
+  tabSize?: number;
+};
+
+/**
+ * Formats ParseErrorBundle into human-readable error messages with multiple output formats.
+ * Supports plain text, ANSI colors, HTML, and JSON formats.
+ */
+export class ErrorFormatter {
+  private _format: ErrorFormat;
+  private options: ErrorFormatterOptions;
+
+  constructor(format: ErrorFormat = "plain", options: ErrorFormatterOptions = {}) {
+    this._format = format;
+    // Set default options
+    this.options = {
+      maxContextLines: 3,
+      showHints: true,
+      colorize: true,
+      showContext: true,
+      tabSize: 2,
+      ...options
+    };
+  }
+
+  /**
+   * Format a ParseErrorBundle into a string based on the configured format.
+   *
+   * @param bundle - The error bundle to format
+   * @returns Formatted error message string
+   */
+  format(bundle: ParseErrorBundle): string {
+    switch (this._format) {
+      case "ansi":
+        return this.formatAnsi(bundle);
+      case "html":
+        return this.formatHtml(bundle);
+      case "json":
+        return this.formatJson(bundle);
+      default:
+        return this.formatPlain(bundle);
+    }
+  }
+
+  /**
+   * Format error with ANSI color codes for terminal output.
+   */
+  private formatAnsi(bundle: ParseErrorBundle): string {
+    const primary = bundle.primary;
+    const lines = bundle.source.split("\n");
+    const errorLine = lines[primary.span.line - 1] || "";
+
+    const parts: string[] = [];
+
+    // Error header with location
+    parts.push(`\x1b[31mError\x1b[0m at line ${primary.span.line}, column ${primary.span.column}:`);
+
+    // Show context lines if enabled
+    if (this.options.showContext && this.options.maxContextLines! > 0) {
+      const contextLines = this.getContextLines(
+        lines,
+        primary.span.line - 1,
+        this.options.maxContextLines!
+      );
+      parts.push(...contextLines.map(line => `  ${line}`));
+    } else {
+      // Just show the error line
+      parts.push(`  ${errorLine}`);
+    }
+
+    // Add pointer arrow (accounting for line prefix)
+    const linePrefix = `  >   ${primary.span.line.toString().padStart(0, " ")} | `;
+    const adjustedColumn = primary.span.column + linePrefix.length - 2; // -2 for the "  " we add
+    const pointer = this.createPointer(adjustedColumn, primary.span.length);
+    parts.push(`  ${pointer}`);
+
+    // Error message
+    parts.push(this.formatErrorMessage(primary));
+
+    // Add hints if available
+    const hints = this.getHints(primary);
+    if (this.options.showHints && hints.length > 0) {
+      parts.push("");
+      for (const hint of hints) {
+        parts.push(`  \x1b[36mDid you mean: ${hint}?\x1b[0m`);
+      }
+    }
+
+    // Add context stack if available
+    if (this.options.showContext && primary.context && primary.context.length > 0) {
+      parts.push("");
+      parts.push(`  \x1b[90mContext: ${primary.context.join(" > ")}\x1b[0m`);
+    }
+
+    return parts.join("\n");
+  }
+
+  /**
+   * Format error as plain text without colors.
+   */
+  private formatPlain(bundle: ParseErrorBundle): string {
+    const primary = bundle.primary;
+    const lines = bundle.source.split("\n");
+    const errorLine = lines[primary.span.line - 1] || "";
+
+    const parts: string[] = [];
+
+    // Error header
+    parts.push(`Error at line ${primary.span.line}, column ${primary.span.column}:`);
+
+    // Show context lines
+    if (this.options.showContext && this.options.maxContextLines! > 0) {
+      const contextLines = this.getContextLines(
+        lines,
+        primary.span.line - 1,
+        this.options.maxContextLines!
+      );
+      parts.push(...contextLines.map(line => `  ${line}`));
+    } else {
+      parts.push(`  ${errorLine}`);
+    }
+
+    // Add pointer (accounting for line prefix)
+    const linePrefix = `  >   ${primary.span.line.toString()} | `;
+    const adjustedColumn = primary.span.column + linePrefix.length - 2; // -2 for the "  " we add
+    const pointer = this.createPointer(adjustedColumn, primary.span.length, false);
+    parts.push(`  ${pointer}`);
+
+    // Error message
+    parts.push(this.formatErrorMessage(primary, false));
+
+    // Add hints
+    const hints = this.getHints(primary);
+    if (this.options.showHints && hints.length > 0) {
+      parts.push("");
+      for (const hint of hints) {
+        parts.push(`  Did you mean: ${hint}?`);
+      }
+    }
+
+    // Add context
+    if (this.options.showContext && primary.context && primary.context.length > 0) {
+      parts.push("");
+      parts.push(`  Context: ${primary.context.join(" > ")}`);
+    }
+
+    return parts.join("\n");
+  }
+
+  /**
+   * Format error as HTML with styling.
+   */
+  private formatHtml(bundle: ParseErrorBundle): string {
+    const primary = bundle.primary;
+    const lines = bundle.source.split("\n");
+    const errorLine = lines[primary.span.line - 1] || "";
+
+    const parts: string[] = [];
+
+    parts.push('<div class="parse-error">');
+
+    // Error header
+    parts.push(
+      `  <div class="error-header">Error at line ${primary.span.line}, column ${primary.span.column}:</div>`
+    );
+
+    // Code context
+    parts.push('  <div class="error-context">');
+    if (this.options.showContext && this.options.maxContextLines! > 0) {
+      const contextLines = this.getContextLines(
+        lines,
+        primary.span.line - 1,
+        this.options.maxContextLines!
+      );
+      for (const line of contextLines) {
+        parts.push(`    <div class="context-line">${this.escapeHtml(line)}</div>`);
+      }
+    } else {
+      parts.push(`    <div class="error-line">${this.escapeHtml(errorLine)}</div>`);
+    }
+
+    // Pointer (accounting for line prefix in plain text representation)
+    const pointer = this.createPointer(primary.span.column, primary.span.length, false);
+    parts.push(`    <div class="error-pointer">${pointer}</div>`);
+    parts.push("  </div>");
+
+    // Error message
+    parts.push(
+      `  <div class="error-message">${this.escapeHtml(this.formatErrorMessage(primary, false))}</div>`
+    );
+
+    // Hints
+    const hints = this.getHints(primary);
+    if (this.options.showHints && hints.length > 0) {
+      parts.push('  <div class="error-hints">');
+      for (const hint of hints) {
+        parts.push(
+          `    <div class="hint">Did you mean: <span class="suggestion">${this.escapeHtml(hint)}</span>?</div>`
+        );
+      }
+      parts.push("  </div>");
+    }
+
+    // Context
+    if (this.options.showContext && primary.context && primary.context.length > 0) {
+      parts.push(
+        `  <div class="error-context-stack">Context: ${primary.context.map(c => `<span class="context-item">${this.escapeHtml(c)}</span>`).join(" &gt; ")}</div>`
+      );
+    }
+
+    parts.push("</div>");
+
+    return parts.join("\n");
+  }
+
+  /**
+   * Format error as JSON for programmatic consumption.
+   */
+  private formatJson(bundle: ParseErrorBundle): string {
+    const primary = bundle.primary;
+    const lines = bundle.source.split("\n");
+
+    const contextLines =
+      this.options.showContext ?
+        this.getContextLines(lines, primary.span.line - 1, this.options.maxContextLines!)
+      : [lines[primary.span.line - 1] || ""];
+
+    return JSON.stringify(
+      {
+        error: {
+          type: primary.tag,
+          message: this.getPlainErrorMessage(primary),
+          location: {
+            line: primary.span.line,
+            column: primary.span.column,
+            offset: primary.span.offset,
+            length: primary.span.length
+          },
+          context: { lines: contextLines, stack: primary.context || [] },
+          hints: this.getHints(primary),
+          source: bundle.source
+        },
+        allErrors: bundle.errors.map(err => ({
+          type: err.tag,
+          location: {
+            line: err.span.line,
+            column: err.span.column,
+            offset: err.span.offset,
+            length: err.span.length
+          },
+          context: err.context || [],
+          ...(err.tag === "Expected" && { items: err.items }),
+          ...(err.tag === "Unexpected" && { found: err.found }),
+          ...(err.tag === "Custom" && { message: err.message, hints: err.hints })
+        }))
+      },
+      null,
+      this.options.tabSize
+    );
+  }
+
+  /**
+   * Format the error message based on error type.
+   */
+  private formatErrorMessage(error: ParseErr, useColors: boolean = true): string {
+    const red = useColors ? "\x1b[31m" : "";
+    const yellow = useColors ? "\x1b[33m" : "";
+    const reset = useColors ? "\x1b[0m" : "";
+
+    switch (error.tag) {
+      case "Expected":
+        return `  ${yellow}Expected:${reset} ${error.items.join(" or ")}`;
+      case "Unexpected":
+        return `  ${red}Unexpected:${reset} ${error.found}`;
+      case "Custom":
+        return `  ${error.message}`;
+      case "Fatal":
+        return `  ${red}Fatal:${reset} ${error.message}`;
+    }
+  }
+
+  /**
+   * Get plain error message without formatting.
+   */
+  private getPlainErrorMessage(error: ParseErr): string {
+    switch (error.tag) {
+      case "Expected":
+        return `Expected: ${error.items.join(" or ")}`;
+      case "Unexpected":
+        return `Unexpected: ${error.found}`;
+      case "Custom":
+        return error.message;
+      case "Fatal":
+        return `Fatal: ${error.message}`;
+    }
+  }
+
+  /**
+   * Create a pointer/caret pointing to the error location.
+   */
+  private createPointer(column: number, length: number = 1, useColors: boolean = true): string {
+    const spaces = " ".repeat(Math.max(0, column - 1));
+    const carets = "^".repeat(Math.max(1, length));
+    const red = useColors ? "\x1b[31m" : "";
+    const reset = useColors ? "\x1b[0m" : "";
+    return `${spaces}${red}${carets}${reset}`;
+  }
+
+  /**
+   * Get context lines around the error location.
+   */
+  private getContextLines(allLines: string[], errorLineIndex: number, maxLines: number): string[] {
+    const contextRadius = Math.floor(maxLines / 2);
+    const startLine = Math.max(0, errorLineIndex - contextRadius);
+    const endLine = Math.min(allLines.length - 1, errorLineIndex + contextRadius);
+
+    const contextLines: string[] = [];
+    for (let i = startLine; i <= endLine; i++) {
+      const lineNum = i + 1;
+      const lineContent = allLines[i] || "";
+      const isErrorLine = i === errorLineIndex;
+      const prefix = isErrorLine ? ">" : " ";
+      const paddedLineNum = lineNum.toString().padStart(3, " ");
+      contextLines.push(`${prefix} ${paddedLineNum} | ${lineContent}`);
+    }
+
+    return contextLines;
+  }
+
+  /**
+   * Escape HTML entities.
+   */
+  private escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  /**
+   * Create a new formatter with different options.
+   */
+  withOptions(options: Partial<ErrorFormatterOptions>): ErrorFormatter {
+    return new ErrorFormatter(this._format, { ...this.options, ...options });
+  }
+
+  /**
+   * Create a new formatter with a different format.
+   */
+  withFormat(format: ErrorFormat): ErrorFormatter {
+    return new ErrorFormatter(format, this.options);
+  }
+
+  /**
+   * Get hints from an error, handling the union type safely.
+   */
+  private getHints(error: ParseErr): string[] {
+    if (error.tag === "Custom" && error.hints) {
+      return error.hints;
+    }
+    if (error.tag === "Unexpected" && error.hints) {
+      return error.hints;
+    }
+    return [];
+  }
+}
+
+/**
+ * Convenience functions for quick formatting.
+ */
+export const formatError = {
+  plain: (bundle: ParseErrorBundle, options?: ErrorFormatterOptions) =>
+    new ErrorFormatter("plain", options).format(bundle),
+  ansi: (bundle: ParseErrorBundle, options?: ErrorFormatterOptions) =>
+    new ErrorFormatter("ansi", options).format(bundle),
+  html: (bundle: ParseErrorBundle, options?: ErrorFormatterOptions) =>
+    new ErrorFormatter("html", options).format(bundle),
+  json: (bundle: ParseErrorBundle, options?: ErrorFormatterOptions) =>
+    new ErrorFormatter("json", options).format(bundle)
+};
+</file>
+
+<file path="errors.ts">
+export type Span = { offset: number; length: number; line: number; column: number };
+
+type ExpectedParseErr = {
+  tag: "Expected";
+  span: Span;
+  items: string[];
+  context: string[];
+};
+type UnexpectedParseErr = {
+  tag: "Unexpected";
+  span: Span;
+  found: string;
+  context: string[];
+  hints?: string[];
+};
+type CustomParseErr = {
+  tag: "Custom";
+  span: Span;
+  message: string;
+  hints?: string[];
+  context: string[];
+};
+type FatalParseErr = {
+  tag: "Fatal";
+  span: Span;
+  message: string;
+  context: string[];
+};
+
+export type ParseErr = ExpectedParseErr | UnexpectedParseErr | CustomParseErr | FatalParseErr;
+
+export class ParseErrorBundle {
+  constructor(
+    public errors: ParseErr[],
+    public source: string
+  ) {}
+
+  // Get the primary error (furthest right)
+  get primary(): ParseErr {
+    return this.errors.reduce((furthest, current) =>
+      current.span.offset > furthest.span.offset ? current : furthest
+    );
+  }
+
+  // Get all errors at the same furthest offset
+  get primaryErrors(): ParseErr[] {
+    const maxOffset = this.primary.span.offset;
+    return this.errors.filter(err => err.span.offset === maxOffset);
+  }
+}
+
+// Helper function to create a span from parser state
+export function createSpan(
+  state: { pos: { offset: number; line: number; column: number } },
+  length: number = 0
+): Span {
+  return { offset: state.pos.offset, length, line: state.pos.line, column: state.pos.column };
+}
+
+// // Adapter to maintain backwards compatibility with existing ParserError
+// import { ParserError } from "./state"
+
+// export function legacyError(bundle: ParseErrorBundle): ParserError {
+//   const primary = bundle.primary
+//   return new ParserError(
+//     primary.tag === "Custom" ?
+//       primary.message
+//     : `${primary.tag}: ${JSON.stringify(primary)}`,
+//     primary.tag === "Expected" ? primary.items : [],
+//     primary.tag === "Unexpected" ? primary.found : undefined
+//   )
+// }
+</file>
+
+<file path="hints.ts">
+import { Parser } from "./parser";
+import { type ParseErr, createSpan } from "./errors";
+import { State } from "./state";
+
+/**
+ * Calculate the Levenshtein distance between two strings.
+ * This measures the minimum number of single-character edits (insertions, deletions, or substitutions)
+ * required to change one string into another.
+ *
+ * @param a - The first string
+ * @param b - The second string
+ * @returns The edit distance between the strings
+ */
+export function levenshteinDistance(a: string, b: string): number {
+  const matrix = Array(b.length + 1)
+    .fill(null)
+    .map(() => Array(a.length + 1).fill(null));
+
+  // Initialize first row and column
+  for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
+  for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
+
+  // Fill the matrix
+  for (let j = 1; j <= b.length; j++) {
+    for (let i = 1; i <= a.length; i++) {
+      const indicator = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[j][i] = Math.min(
+        matrix[j][i - 1] + 1, // deletion
+        matrix[j - 1][i] + 1, // insertion
+        matrix[j - 1][i - 1] + indicator // substitution
+      );
+    }
+  }
+
+  return matrix[b.length][a.length];
+}
+
+/**
+ * Generate helpful hints for a user's input based on a list of expected values.
+ * Uses edit distance to find the closest matches and suggests them as "Did you mean..." options.
+ *
+ * @param found - The string the user actually typed
+ * @param expected - Array of valid/expected strings
+ * @param maxDistance - Maximum edit distance to consider (default: 2)
+ * @param maxHints - Maximum number of hints to return (default: 3)
+ * @returns Array of suggested strings, sorted by edit distance
+ */
+export function generateHints(
+  found: string,
+  expected: string[],
+  maxDistance: number = 2,
+  maxHints: number = 3
+): string[] {
+  const hints: Array<{ word: string; distance: number }> = [];
+
+  for (const candidate of expected) {
+    const distance = levenshteinDistance(found, candidate);
+    if (distance <= maxDistance && distance > 0) {
+      hints.push({ word: candidate, distance });
+    }
+  }
+
+  return hints
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, maxHints)
+    .map(h => h.word);
+}
+
+/**
+ * Enhanced keyword parser that provides intelligent hints when the user types something similar.
+ *
+ * @param keywords - Array of valid keywords to match against
+ * @returns A function that creates a parser for a specific keyword with hint generation
+ *
+ * @example
+ * ```ts
+ * const schemeKeywords = ["lambda", "let", "if", "cond", "define", "quote"]
+ * const lambdaParser = keywordWithHints(schemeKeywords)("lambda")
+ *
+ * // Parsing "lamdba" will suggest "lambda" as a hint
+ * const result = lambdaParser.parse("lamdba")
+ * ```
+ */
+export const keywordWithHints = (keywords: string[]) => (keyword: string) =>
+  new Parser(state => {
+    if (state.remaining.startsWith(keyword)) {
+      return Parser.succeed(keyword, State.consume(state, keyword.length));
+    }
+
+    // Try to extract what the user actually typed
+    const match = state.remaining.match(/^[a-zA-Z_][a-zA-Z0-9_]*/);
+    const found = match ? match[0] : state.remaining[0] || "end of input";
+
+    const hints = generateHints(found, keywords);
+
+    const error: ParseErr = {
+      tag: "Unexpected",
+      span: createSpan(state, found.length),
+      found,
+      context: state.context.labelStack || [],
+      ...(hints.length > 0 && { hints })
+    };
+
+    return Parser.failRich({ errors: [error] }, state);
+  });
+
+/**
+ * Creates a parser that matches any of the provided keywords with hint generation.
+ *
+ * @param keywords - Array of valid keywords
+ * @returns A parser that matches any keyword and provides hints for typos
+ *
+ * @example
+ * ```ts
+ * const jsKeywords = ["function", "const", "let", "var", "class", "if", "else"]
+ * const keywordParser = anyKeywordWithHints(jsKeywords)
+ *
+ * // Parsing "functoin" will suggest "function"
+ * const result = keywordParser.parse("functoin")
+ * ```
+ */
+export function anyKeywordWithHints<Ctx = {}>(keywords: string[]): Parser<string, Ctx> {
+  return new Parser(state => {
+    // Try each keyword
+    for (const keyword of keywords) {
+      if (state.remaining.startsWith(keyword)) {
+        return Parser.succeed(keyword, State.consume(state, keyword.length));
+      }
+    }
+
+    // No exact match found, try to extract what was typed and generate hints
+    const match = state.remaining.match(/^[a-zA-Z_][a-zA-Z0-9_]*/);
+    const found = match ? match[0] : state.remaining[0] || "end of input";
+
+    const hints = generateHints(found, keywords);
+
+    const error: ParseErr = {
+      tag: "Unexpected",
+      span: createSpan(state, found.length),
+      found,
+      context: state.context.labelStack || [],
+      ...(hints.length > 0 && { hints })
+    };
+
+    return Parser.failRich({ errors: [error] }, state);
+  });
+}
+
+/**
+ * Creates a parser for string literals with hint generation for common mistakes.
+ *
+ * @param validStrings - Array of valid string values
+ * @returns A parser that matches quoted strings and provides hints for typos
+ *
+ * @example
+ * ```ts
+ * const colorParser = stringWithHints(["red", "green", "blue", "yellow"])
+ *
+ * // Parsing '"gren"' will suggest "green"
+ * const result = colorParser.parse('"gren"')
+ * ```
+ */
+export function stringWithHints<Ctx = {}>(validStrings: string[]): Parser<string, Ctx> {
+  return new Parser(state => {
+    // Must start with quote
+    if (!state.remaining.startsWith('"')) {
+      const error: ParseErr = {
+        tag: "Expected",
+        span: createSpan(state, 1),
+        items: ["string literal"],
+        context: state.context.labelStack || []
+      };
+      return Parser.failRich({ errors: [error] }, state);
+    }
+
+    // Find the closing quote
+    let i = 1;
+    let content = "";
+    while (i < state.remaining.length && state.remaining[i] !== '"') {
+      content += state.remaining[i];
+      i++;
+    }
+
+    if (i >= state.remaining.length) {
+      const error: ParseErr = {
+        tag: "Expected",
+        span: createSpan(state, i),
+        items: ["closing quote"],
+        context: state.context.labelStack || []
+      };
+      return Parser.failRich({ errors: [error] }, state);
+    }
+
+    // Check if content is valid
+    if (validStrings.includes(content)) {
+      return Parser.succeed(content, State.consume(state, i + 1));
+    }
+
+    // Generate hints for invalid content
+    const hints = generateHints(content, validStrings);
+
+    const error: ParseErr = {
+      tag: "Unexpected",
+      span: createSpan(state, i + 1),
+      found: `"${content}"`,
+      context: state.context.labelStack || [],
+      ...(hints.length > 0 && { hints: hints.map(h => `"${h}"`) })
+    };
+
+    return Parser.failRich({ errors: [error] }, state);
+  });
+}
+</file>
+
+<file path="index.ts">
+export * from "./chain";
+export * from "./combinators";
+export * from "./debug";
+export * from "./either";
+export * from "./error-formatter";
+export * from "./hints";
+export * from "./parser";
+export * from "./errors";
+export * from "./state";
+export * from "./types";
+export * from "./utils";
+</file>
+
+<file path="parser.ts">
+import { debug } from "./debug";
+import { Either } from "./either";
+import { type ParseErr, ParseErrorBundle, createSpan } from "./errors";
+import {
+  type ParserContext,
+  type ParserOptions,
+  type ParserOutput,
+  type ParserState,
+  State
+} from "./state";
+import type { Prettify } from "./types";
+
+type BindResult<T, K extends string, B> = Prettify<T & { [k in K]: B }>;
+
+export class Parser<T, Ctx = {}> {
+  constructor(
+    /**
+     * @internal
+     */
+    public run: (state: ParserState<Ctx>) => ParserOutput<T, Ctx>,
+    public options?: ParserOptions
+  ) {}
+
+  name(name: string) {
+    this.options = { ...this.options, name };
+    return this;
+  }
+
+  static succeed<T, Ctx = {}>(value: T, state: ParserState<Ctx>): ParserOutput<T, Ctx> {
+    return { state, result: Either.right(value) };
+  }
+
+  static lift = <A, Ctx = {}>(a: A): Parser<A, Ctx> =>
+    new Parser(state => Parser.succeed(a, state));
+
+  static liftA2 = <A, B, C>(ma: Parser<A>, mb: Parser<B>, f: (a: A, b: B) => C) =>
+    ma.zip(mb).map(args => f(...args));
+
+  static ap = <A, B>(ma: Parser<A>, mf: Parser<(_: A) => B>) => mf.zip(ma).map(([f, a]) => f(a));
+
+  static fail<Ctx = {}>(
+    error: { message: string; expected?: string[]; found?: string },
+    state: ParserState<Ctx>
+  ): ParserOutput<never, Ctx> {
+    const span = createSpan({
+      pos: { offset: state.pos.offset, line: state.pos.line, column: state.pos.column }
+    });
+
+    const parseErr: ParseErr = {
+      tag: "Custom",
+      span,
+      message: error.message,
+      context: state.context?.labelStack ?? [],
+      hints: []
+    };
+
+    const bundle = new ParseErrorBundle([parseErr], state.context?.source ?? state.remaining);
+
+    return { state, result: Either.left(bundle) };
+  }
+
+  static error<Ctx = {}>(
+    message: string,
+    expected: string[] = [],
+    stateCallback?: (state: ParserState<Ctx>) => ParserState<Ctx>
+  ): Parser<never, Ctx> {
+    return new Parser(state => {
+      return Parser.fail({ message, expected }, stateCallback ? stateCallback(state) : state);
+    });
+  }
+
+  static selectRight<A>(p: Parser<A>): Parser<Either<A, never>, {}> {
+    return p.flatMap(a => Parser.lift(Either.right(a)));
+  }
+
+  static selectLeft<A>(p: Parser<A>): Parser<Either<never, A>, {}> {
+    return p.flatMap(a => Parser.lift(Either.left(a)));
+  }
+
+  /**
+   * Adds an error message to the parser
+   * @param makeMessage - A function that returns an error message
+   * @returns A new parser with the error message added
+   */
+  withError(
+    makeMessage: (errorCtx: { error: ParseErrorBundle; state: ParserState<Ctx> }) => string
+  ): Parser<T, Ctx> {
+    return new Parser<T, Ctx>(state => {
+      const output = this.run(state);
+      if (Either.isLeft(output.result)) {
+        return Parser.fail(
+          { message: makeMessage({ error: output.result.left, state: output.state }) },
+          output.state
+        );
+      }
+      return output;
+    }, this.options);
+  }
+
+  static fatal<Ctx = {}>(message: string): Parser<never, Ctx> {
+    return new Parser(state => {
+      const span = createSpan(state);
+      const fatalError: ParseErr = {
+        tag: "Fatal",
+        span,
+        message,
+        context: state.context?.labelStack ?? []
+      };
+
+      return Parser.failRich({ errors: [fatalError] }, state);
+    });
+  }
+
+  parse(input: string, context = { source: input }): ParserOutput<T, Ctx> {
+    const st = State.fromInput(input, context);
+    const { result, state } = this.run(State.fromInput(input, context) as any);
+    return { result, state };
+  }
+
+  withTrace(label: string): Parser<T, Ctx> {
+    return new Parser<T, Ctx>(state => {
+      if (!state.context?.debug) {
+        return this.run(state);
+      }
+      return debug(this, label).run(state);
+    }, this.options);
+  }
+
+  parseOrError(input: string, context = { source: input } as ParserContext<Ctx>) {
+    const { result } = this.run(State.fromInput(input, context));
+    if (Either.isRight(result)) {
+      return result.right;
+    }
+    return result.left;
+  }
+
+  parseOrThrow(input: string, context = { source: input } as ParserContext<Ctx>): T {
+    const { result } = this.parse(input, context ?? { source: input });
+
+    if (Either.isLeft(result)) {
+      throw result.left;
+    }
+    return result.right;
+  }
+
+  map<B>(f: (a: T) => B): Parser<B, Ctx> {
+    return new Parser<B, Ctx>(state => {
+      const { result, state: newState } = this.run(state);
+      if (Either.isLeft(result)) {
+        return { state, result: result as unknown as Either<B, ParseErrorBundle> };
+      }
+      return Parser.succeed(f(result.right), newState);
+    });
+  }
+
+  flatMap<B>(f: (a: T) => Parser<B, Ctx>): Parser<B, Ctx> {
+    return new Parser<B, Ctx>(state => {
+      const { result, state: newState } = this.run(state);
+      if (Either.isLeft(result)) {
+        return { state: newState, result: result as unknown as Either<B, ParseErrorBundle> };
+      }
+      const nextParser = f(result.right);
+      return nextParser.run(newState);
+    });
+  }
+
+  static pure = <A, Ctx = {}>(a: A): Parser<A, Ctx> =>
+    new Parser(state => Parser.succeed(a, state));
+
+  static Do = Parser.pure({});
+
+  /**
+   * Creates a new parser that lazily evaluates the given function.
+   * This is useful for creating recursive parsers.
+   *
+   * @param fn - A function that returns a parser
+   * @returns A new parser that evaluates the function when parsing
+   * @template T The type of value produced by the parser
+   *
+   * @example
+   * ```ts
+   * // Create a recursive parser for nested parentheses
+   * const parens: Parser<string> = Parser.lazy(() =>
+   *   between(
+   *     char('('),
+   *     char(')'),
+   *     parens
+   *   )
+   * )
+   * ```
+   */
+  static lazy<T>(fn: () => Parser<T>): Parser<T> {
+    return new Parser(state => {
+      const parser = fn();
+      return parser.run(state);
+    });
+  }
+
+  zip<B>(parserB: Parser<B, Ctx>): Parser<[T, B], Ctx> {
+    return new Parser(state => {
+      const { result: a, state: stateA } = this.run(state);
+      if (Either.isLeft(a)) {
+        return { result: a as unknown as Either<[T, B], ParseErrorBundle>, state: stateA };
+      }
+      const { result: b, state: stateB } = parserB.run(stateA);
+      if (Either.isLeft(b)) {
+        return { result: b as unknown as Either<[T, B], ParseErrorBundle>, state: stateB };
+      }
+      return Parser.succeed([a.right, b.right], stateB);
+    });
+  }
+
+  then<B>(parserB: Parser<B, Ctx>): Parser<B, Ctx> {
+    return this.zip(parserB).map(([_, b]) => b);
+  }
+
+  zipRight = this.then;
+
+  thenDiscard<B>(parserB: Parser<B, Ctx>): Parser<T, Ctx> {
+    return this.zip(parserB).map(([a, _]) => a);
+  }
+
+  zipLeft = this.thenDiscard;
+
+  bind<K extends string, B>(
+    k: K,
+    other: Parser<B, Ctx> | ((a: T) => Parser<B, Ctx>)
+  ): Parser<BindResult<T, K, B>, Ctx> {
+    return new Parser<BindResult<T, K, B>, Ctx>(state => {
+      const { result: resultA, state: stateA } = this.run(state);
+      if (Either.isLeft(resultA)) {
+        return {
+          result: resultA as unknown as Either<BindResult<T, K, B>, ParseErrorBundle>,
+          state: stateA
+        };
+      }
+      const nextParser = other instanceof Parser ? other : other(resultA.right);
+      const { result: resultB, state: stateB } = nextParser.run(stateA);
+      if (Either.isLeft(resultB)) {
+        return {
+          result: resultB as unknown as Either<BindResult<T, K, B>, ParseErrorBundle>,
+          state: stateB
+        };
+      }
+      return Parser.succeed(
+        { ...resultA.right, [k]: resultB.right } as BindResult<T, K, B>,
+        stateB
+      );
+    }, this.options);
+  }
+
+  *[Symbol.iterator](): Generator<Parser<T, Ctx>, T, any> {
+    return yield this;
+  }
+
+  /**
+   * Adds a tap point to observe the current state and result during parsing.
+   * Useful for debugging parser behavior.
+   *
+   * @param callback - Function called with current state and result
+   * @returns The same parser with the tap point added
+   */
+  tap(
+    callback: (args: { state: ParserState<Ctx>; result: ParserOutput<T, Ctx> }) => void
+  ): Parser<T, Ctx> {
+    return new Parser(state => {
+      const result = this.run(state);
+      callback({ state, result });
+      return result;
+    }, this.options);
+  }
+
+  static gen = <T, Ctx = unknown>(f: () => Generator<Parser<any, Ctx>, T, any>): Parser<T, Ctx> =>
+    new Parser<T, Ctx>(state => {
+      const iterator = f();
+      let current = iterator.next();
+      let currentState: ParserState<Ctx> = state;
+      while (!current.done) {
+        const { result, state: updatedState } = current.value.run(currentState);
+        if (Either.isLeft(result)) {
+          // Check if any error is fatal
+          const hasFatalError = result.left.errors.some(e => e.tag === "Fatal");
+
+          // Check if we're in a committed state
+          const isCommitted = updatedState.context?.committed || state.context?.committed;
+          return {
+            result: result as unknown as Either<T, ParseErrorBundle>,
+            state: updatedState
+          };
+        }
+        currentState = updatedState;
+        current = iterator.next(result.right);
+      }
+      return Parser.succeed(current.value, currentState);
+    });
+
+  trim(parser: Parser<any, Ctx>) {
+    return parser.then(this).thenDiscard(parser);
+  }
+
+  trimLeft(parser: Parser<any, Ctx>): Parser<T, Ctx> {
+    return parser.then(this);
+  }
+
+  trimRight(parser: Parser<any, Ctx>): Parser<T, Ctx> {
+    return this.thenDiscard(parser);
+  }
+
+  /**
+   * Adds a label to this parser for better error messages
+   * @param name - The label name to add to the context stack
+   * @returns A new parser with the label added
+   */
+  label(name: string): Parser<T, Ctx> {
+    return new Parser(state => {
+      const newState = {
+        ...state,
+        context: { ...state.context, labelStack: [name, ...(state.context.labelStack || [])] }
+      };
+
+      const result = this.run(newState);
+
+      if (Either.isLeft(result.result)) {
+        // Convert generic errors to labeled expectations
+        const labeledError: ParseErr = {
+          tag: "Expected",
+          span: createSpan(state),
+          items: [name],
+          context: newState.context.labelStack || []
+        };
+
+        return Parser.failRich({ errors: [labeledError] }, result.state);
+      }
+
+      return result;
+    }, this.options);
+  }
+
+  /**
+   * Helper for creating semantic expectations with both label and error message
+   * @param description - The description for both the label and error message
+   * @returns A new parser with both labeling and error message
+   */
+  expect(description: string): Parser<T, Ctx> {
+    return this.withError(() => `Expected ${description}`).label(description);
+  }
+
+  /**
+   * Helper for creating semantic expectations with both label and error message
+   * @param errorBundle - The error bundle containing the errors to be displayed
+   * @param state - The current parser state
+   * @returns A parser output with the error bundle and the current state
+   */
+  static failRich<Ctx = {}>(
+    errorBundle: { errors: ParseErr[] },
+    state: ParserState<Ctx>
+  ): ParserOutput<never, Ctx> {
+    const bundle = new ParseErrorBundle(
+      errorBundle.errors,
+      state.context?.source ?? state.remaining
+    );
+
+    return { state, result: Either.left(bundle) };
+  }
+
+  /**
+   * Commits to the current parsing path, preventing backtracking beyond this point.
+   *
+   * Once a parser is committed, if it fails later in the sequence, the error won't
+   * backtrack to try other alternatives in a `choice` or `or` combinator. This leads
+   * to more specific error messages instead of generic "expected one of" errors.
+   *
+   * @returns A new parser that sets the commit flag after successful parsing
+   *
+   * @example
+   * ```ts
+   * // Use commit after matching a keyword to ensure specific error messages
+   * const ifStatement = Parser.gen(function* () {
+   *   yield* keyword("if")
+   *   yield* commit()  // After seeing "if", we know it's an if statement
+   *   yield* char('(').expect("opening parenthesis after 'if'")
+   *   const condition = yield* expression
+   *   yield* char(')').expect("closing parenthesis")
+   *   const body = yield* block
+   *   return { type: "if", condition, body }
+   * })
+   *
+   * // In a choice, commit prevents backtracking
+   * const statement = choice([
+   *   ifStatement,
+   *   whileStatement,
+   *   assignment
+   * ])
+   *
+   * // Input: "if x > 5 {}"  (missing parentheses)
+   * // Without commit: "Expected if, while, or assignment"
+   * // With commit: "Expected opening parenthesis after 'if'"
+   * ```
+   *
+   * @example
+   * ```ts
+   * // Commit can be chained with other methods
+   * const jsonObject = char('{')
+   *   .commit()  // Once we see '{', it must be an object
+   *   .then(whitespace)
+   *   .then(objectContent)
+   *   .expect("valid JSON object")
+   * ```
+   *
+   * @see {@link commit} - Standalone function version
+   * @see {@link cut} - Alias with Prolog-style naming
+   */
+  commit(): Parser<T, Ctx> {
+    return new Parser(state => {
+      const result = this.run(state);
+      if (Either.isRight(result.result)) {
+        return {
+          ...result,
+          state: {
+            ...result.state,
+            context: { ...result.state.context, committed: true }
+          }
+        };
+      }
+      return result;
+    }, this.options);
+  }
+
+  /**
+   * Creates an atomic parser that either fully succeeds or resets to the original state.
+   *
+   * This is useful for "all-or-nothing" parsing where you want to try a complex
+   * parser but not consume any input if it fails. The parser acts as a transaction -
+   * if any part fails, the entire parse is rolled back.
+   *
+   * @returns A new parser that resets state on failure
+   *
+   * @example
+   * ```ts
+   * // Without atomic - partial consumption on failure
+   * const badParser = Parser.gen(function* () {
+   *   yield* string("foo")
+   *   yield* string("bar")  // If this fails, "foo" is already consumed
+   * })
+   *
+   * // With atomic - no consumption on failure
+   * const goodParser = Parser.gen(function* () {
+   *   yield* string("foo")
+   *   yield* string("bar")  // If this fails, we reset to before "foo"
+   * }).atomic()
+   * ```
+   *
+   * @example
+   * ```ts
+   * // Useful for trying complex alternatives
+   * const value = or(
+   *   // Try to parse as a complex expression
+   *   expression.atomic(),
+   *   // If that fails completely, try as a simple literal
+   *   literal
+   * )
+   * ```
+   *
+   * @example
+   * ```ts
+   * // Lookahead parsing without consumption
+   * const startsWithKeyword = or(
+   *   string("function").atomic(),
+   *   string("const").atomic(),
+   *   string("let").atomic()
+   * ).map(() => true).or(Parser.succeed(false))
+   * ```
+   *
+   * @see {@link atomic} - Standalone function version
+   */
+  atomic(): Parser<T, Ctx> {
+    return new Parser(state => {
+      const result = this.run(state);
+      if (Either.isLeft(result.result)) {
+        // On failure, return the error but with the original state
+        return {
+          result: result.result,
+          state // Reset to original state
+        };
+      }
+      return result;
+    }, this.options);
+  }
+}
+
+export const parser = Parser.gen;
+</file>
+
+<file path="state.ts">
+import type { Either } from "./either";
+import type { Prettify } from "./types";
+import type { ParseErrorBundle } from "./errors";
+
+export type ParserContext<Ctx = {}> = Prettify<
+  Ctx & { source: string; debug?: boolean; labelStack?: string[]; committed?: boolean }
+>;
+
+export type ParserOptions = { name?: string };
+
+export class ParserError {
+  constructor(
+    public message: string,
+    public expected: string[],
+    public found?: string
+  ) {}
+}
+
+export type ParserOutput<T, Ctx = {}> = {
+  state: ParserState<Ctx>;
+  result: Either<T, ParseErrorBundle>;
+};
+
+export type SourcePosition = { line: number; column: number; offset: number };
+
+export type ParserState<Ctx = {}> = {
+  remaining: string;
+  pos: SourcePosition;
+  context: ParserContext<Ctx>;
+};
+
+/**
+ * Utility object containing static methods for creating and manipulating parser state.
+ */
+export const State = {
+  /**
+   * Creates a new parser state from an input string.
+   *
+   * @param input - The input string to parse
+   * @returns A new parser state initialized at the start of the input
+   */
+  fromInput<Ctx = {}>(input: string, context: ParserContext<Ctx>): ParserState<Ctx> {
+    return { remaining: input, pos: { line: 1, column: 1, offset: 0 }, context };
+  },
+
+  /**
+   * Creates a new state by consuming n characters from the current state.
+   *
+   * @param state - The current parser state
+   * @param n - Number of characters to consume
+   * @returns A new state with n characters consumed and position updated
+   * @throws Error if attempting to consume more characters than remaining
+   */
+  consume<Ctx = {}>(state: ParserState<Ctx>, n: number): ParserState<Ctx> {
+    if (n === 0) return state;
+    if (n > state.remaining.length) {
+      throw new Error("Cannot consume more characters than remaining");
+    }
+
+    const consumed = state.remaining.slice(0, n);
+    let { line, column, offset } = state.pos;
+
+    for (const char of consumed) {
+      if (char === "\n") {
+        line++;
+        column = 1;
+      } else {
+        column++;
+      }
+      offset++;
+    }
+
+    return {
+      remaining: state.remaining.slice(n),
+      pos: { line, column, offset },
+      context: state.context
+    };
+  },
+
+  /**
+   * Creates a new state by consuming a specific string from the current state.
+   *
+   * @param state - The current parser state
+   * @param str - The string to consume
+   * @returns A new state with the string consumed and position updated
+   * @throws Error if the input doesn't start with the specified string
+   */
+  consumeString<Ctx = {}>(state: ParserState<Ctx>, str: string): ParserState<Ctx> {
+    if (!state.remaining.startsWith(str)) {
+      throw new Error(`Cannot consume "${str}" - input "${state.remaining}" doesn't start with it`);
+    }
+    return State.consume(state, str.length);
+  },
+
+  move<Ctx = {}>(state: ParserState<Ctx>, moveBy: number) {
+    return State.consume(
+      { ...state, remaining: state.context.source, pos: { line: 1, column: 1, offset: 0 } },
+      state.pos.offset + moveBy
+    );
+  },
+
+  /**
+   * Creates a new state by consuming characters while a predicate is true.
+   *
+   * @param state - The current parser state
+   * @param predicate - Function that tests each character
+   * @returns A new state with matching characters consumed
+   */
+  consumeWhile<Ctx = {}>(
+    state: ParserState<Ctx>,
+    predicate: (char: string) => boolean
+  ): ParserState<Ctx> {
+    let i = 0;
+    while (i < state.remaining.length && predicate(state.remaining[i])) {
+      i++;
+    }
+    return State.consume(state, i);
+  },
+
+  /**
+   * Gets the next n characters from the input without consuming them.
+   *
+   * @param state - The current parser state
+   * @param n - Number of characters to peek (default: 1)
+   * @returns The next n characters as a string
+   */
+  peek<Ctx = {}>(state: ParserState<Ctx>, n: number = 1): string {
+    return state.remaining.slice(0, n);
+  },
+
+  /**
+   * Checks if the parser has reached the end of input.
+   *
+   * @param state - The current parser state
+   * @returns True if at end of input, false otherwise
+   */
+  isAtEnd<Ctx = {}>(state: ParserState<Ctx>): boolean {
+    return state.remaining.length === 0;
+  },
+
+  printPosition<Ctx = {}>(state: ParserState<Ctx>): string {
+    return `line ${state.pos.line}, column ${state.pos.column}, offset ${state.pos.offset}`;
+  }
+};
+</file>
+
+<file path="types.ts">
+export type Prettify<T> = { [K in keyof T]: T[K] } & {};
+
+export type Last<T> = T extends [...any[], infer L] ? L : never;
+</file>
+
+<file path="utils.ts">
+/**
+ * @fileoverview Utility parsers for inspecting parser state without consuming input.
+ * These utilities are useful for debugging and understanding parser behavior.
+ */
+
+import { Parser } from "./parser";
+
+export const peekState = new Parser(s => {
+  return Parser.succeed(s, s);
+});
+
+export const peekRemaining = new Parser(s => {
+  return Parser.succeed(s.remaining, s);
+});
+
+export const peekAhead = (n: number) =>
+  new Parser(s => {
+    return Parser.succeed(s.remaining.slice(0, n), s);
+  });
+
+export const peekLine = new Parser(s => {
+  const restOfLine = s.remaining.slice(0, s.remaining.indexOf("\n"));
+  console.log(restOfLine);
+  return Parser.succeed(restOfLine, s);
+});
+
+export const peekUntil = (ch: string) =>
+  new Parser(s => {
+    const index = s.remaining.indexOf(ch);
+    return Parser.succeed(s.remaining.slice(0, index), s);
+  });
+</file>
+
+</files>
