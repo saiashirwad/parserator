@@ -77,7 +77,7 @@ export class ErrorFormatter {
     }
 
     // Add pointer arrow (accounting for line prefix)
-    const linePrefix = `  >   ${primary.span.line.toString().padStart(3, " ")} | `;
+    const linePrefix = `  >   ${primary.span.line.toString().padStart(0, " ")} | `;
     const adjustedColumn = primary.span.column + linePrefix.length - 2; // -2 for the "  " we add
     const pointer = this.createPointer(adjustedColumn, primary.span.length);
     parts.push(`  ${pointer}`);

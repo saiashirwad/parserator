@@ -395,7 +395,6 @@ const expressionStatement: Parser<Statement> = Parser.gen(function* () {
   return { type: "expression" as const, expression: expr };
 });
 
-// Combined statement parser
 statement = or(
   blockStatement,
   variableStatement,
