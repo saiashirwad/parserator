@@ -749,6 +749,12 @@ export function choice<T, Ctx = {}>(parsers: Parser<T, Ctx>[]): Parser<T, Ctx> {
 type LastParser<T, Ctx = {}> =
   T extends [...any[], Parser<infer L, Ctx>] ? L : never;
 
+type SequenceOutput<T extends Parser<any, any>[], Acc extends any[] = []> =
+  T["length"] extends 0 ? Acc
+  : T extends [Parser<infer Head extends any>, ...infer Tail extends any[]] ?
+    SequenceOutput<Tail, [...Acc, Head]>
+  : never;
+
 /**
  * Creates a parser that runs multiple parsers in sequence and returns all results.
  *
@@ -761,13 +767,6 @@ type LastParser<T, Ctx = {}> =
  * parser.run('1-2') // Right([['1', '-', '2'], {...}])
  * ```
  */
-
-type SequenceOutput<T extends Parser<any, any>[], Acc extends any[] = []> =
-  T["length"] extends 0 ? Acc
-  : T extends [Parser<infer Head extends any>, ...infer Tail extends any[]] ?
-    SequenceOutput<Tail, [...Acc, Head]>
-  : [T, Acc];
-
 export function sequence<const T extends any[]>(
   parsers: T
 ): Parser<SequenceOutput<T>> {
