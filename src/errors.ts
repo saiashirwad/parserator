@@ -1,4 +1,9 @@
-export type Span = { offset: number; length: number; line: number; column: number };
+export type Span = {
+  offset: number;
+  length: number;
+  line: number;
+  column: number;
+};
 
 type ExpectedParseErr = {
   tag: "Expected";
@@ -31,7 +36,11 @@ type FatalParseErr = {
   context: string[];
 };
 
-export type ParseErr = ExpectedParseErr | UnexpectedParseErr | CustomParseErr | FatalParseErr;
+export type ParseErr =
+  | ExpectedParseErr
+  | UnexpectedParseErr
+  | CustomParseErr
+  | FatalParseErr;
 
 export class ParseErrorBundle {
   constructor(
@@ -74,5 +83,10 @@ export function createSpan(
   state: { pos: { offset: number; line: number; column: number } },
   length: number = 0
 ): Span {
-  return { offset: state.pos.offset, length, line: state.pos.line, column: state.pos.column };
+  return {
+    offset: state.pos.offset,
+    length,
+    line: state.pos.line,
+    column: state.pos.column
+  };
 }

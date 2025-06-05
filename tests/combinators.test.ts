@@ -180,13 +180,17 @@ describe("complex combinations", () => {
 
 describe("error handling", () => {
   test("custom error messages", () => {
-    const p = digit.withError(({ state }) => `Expected a digit at position ${state.pos.offset}`);
+    const p = digit.withError(
+      ({ state }) => `Expected a digit at position ${state.pos.offset}`
+    );
     const { result } = p.parse("a");
     expect(Either.isLeft(result)).toBe(true);
   });
 
   test("error callback", () => {
-    const p = digit.withError(({ state }) => `Expected a digit at position ${state.pos.offset}`);
+    const p = digit.withError(
+      ({ state }) => `Expected a digit at position ${state.pos.offset}`
+    );
     const { result } = p.parse("a");
     expect(Either.isLeft(result)).toBe(true);
   });
@@ -230,7 +234,10 @@ describe("advanced combinators", () => {
 
   test("optional with chaining", () => {
     const p = optional(char("-")).flatMap(sign =>
-      many1(digit).map(digits => ({ sign: sign === "-" ? -1 : 1, value: Number(digits.join("")) }))
+      many1(digit).map(digits => ({
+        sign: sign === "-" ? -1 : 1,
+        value: Number(digits.join(""))
+      }))
     );
 
     expect(p.parseOrThrow("123")).toEqual({ sign: 1, value: 123 });
@@ -240,7 +247,9 @@ describe("advanced combinators", () => {
 
 describe("error recovery", () => {
   test("custom error with context", () => {
-    const identifier = regex(/[a-z]+/).withError(() => "Expected lowercase identifier");
+    const identifier = regex(/[a-z]+/).withError(
+      () => "Expected lowercase identifier"
+    );
     const number = regex(/[0-9]+/).withError(() => "Expected number");
     const assignment = identifier
       .thenDiscard(char("=").thenDiscard(skipSpaces))

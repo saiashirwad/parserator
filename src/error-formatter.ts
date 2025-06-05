@@ -18,7 +18,10 @@ export class ErrorFormatter {
   private _format: ErrorFormat;
   private options: ErrorFormatterOptions;
 
-  constructor(format: ErrorFormat = "plain", options: ErrorFormatterOptions = {}) {
+  constructor(
+    format: ErrorFormat = "plain",
+    options: ErrorFormatterOptions = {}
+  ) {
     this._format = format;
     // Set default options
     this.options = {
@@ -61,7 +64,9 @@ export class ErrorFormatter {
     const parts: string[] = [];
 
     // Error header with location
-    parts.push(`\x1b[31mError\x1b[0m at line ${primary.span.line}, column ${primary.span.column}:`);
+    parts.push(
+      `\x1b[31mError\x1b[0m at line ${primary.span.line}, column ${primary.span.column}:`
+    );
 
     // Show context lines if enabled
     if (this.options.showContext && this.options.maxContextLines! > 0) {
@@ -95,7 +100,11 @@ export class ErrorFormatter {
     }
 
     // Add context stack if available
-    if (this.options.showContext && primary.context && primary.context.length > 0) {
+    if (
+      this.options.showContext &&
+      primary.context &&
+      primary.context.length > 0
+    ) {
       parts.push("");
       parts.push(`  \x1b[90mContext: ${primary.context.join(" > ")}\x1b[0m`);
     }
@@ -114,7 +123,9 @@ export class ErrorFormatter {
     const parts: string[] = [];
 
     // Error header
-    parts.push(`Error at line ${primary.span.line}, column ${primary.span.column}:`);
+    parts.push(
+      `Error at line ${primary.span.line}, column ${primary.span.column}:`
+    );
 
     // Show context lines
     if (this.options.showContext && this.options.maxContextLines! > 0) {
@@ -131,7 +142,11 @@ export class ErrorFormatter {
     // Add pointer (accounting for line prefix)
     const linePrefix = `  >   ${primary.span.line.toString()} | `;
     const adjustedColumn = primary.span.column + linePrefix.length - 2; // -2 for the "  " we add
-    const pointer = this.createPointer(adjustedColumn, primary.span.length, false);
+    const pointer = this.createPointer(
+      adjustedColumn,
+      primary.span.length,
+      false
+    );
     parts.push(`  ${pointer}`);
 
     // Error message
@@ -147,7 +162,11 @@ export class ErrorFormatter {
     }
 
     // Add context
-    if (this.options.showContext && primary.context && primary.context.length > 0) {
+    if (
+      this.options.showContext &&
+      primary.context &&
+      primary.context.length > 0
+    ) {
       parts.push("");
       parts.push(`  Context: ${primary.context.join(" > ")}`);
     }
@@ -181,14 +200,22 @@ export class ErrorFormatter {
         this.options.maxContextLines!
       );
       for (const line of contextLines) {
-        parts.push(`    <div class="context-line">${this.escapeHtml(line)}</div>`);
+        parts.push(
+          `    <div class="context-line">${this.escapeHtml(line)}</div>`
+        );
       }
     } else {
-      parts.push(`    <div class="error-line">${this.escapeHtml(errorLine)}</div>`);
+      parts.push(
+        `    <div class="error-line">${this.escapeHtml(errorLine)}</div>`
+      );
     }
 
     // Pointer (accounting for line prefix in plain text representation)
-    const pointer = this.createPointer(primary.span.column, primary.span.length, false);
+    const pointer = this.createPointer(
+      primary.span.column,
+      primary.span.length,
+      false
+    );
     parts.push(`    <div class="error-pointer">${pointer}</div>`);
     parts.push("  </div>");
 
@@ -210,7 +237,11 @@ export class ErrorFormatter {
     }
 
     // Context
-    if (this.options.showContext && primary.context && primary.context.length > 0) {
+    if (
+      this.options.showContext &&
+      primary.context &&
+      primary.context.length > 0
+    ) {
       parts.push(
         `  <div class="error-context-stack">Context: ${primary.context.map(c => `<span class="context-item">${this.escapeHtml(c)}</span>`).join(" &gt; ")}</div>`
       );
@@ -230,7 +261,11 @@ export class ErrorFormatter {
 
     const contextLines =
       this.options.showContext ?
-        this.getContextLines(lines, primary.span.line - 1, this.options.maxContextLines!)
+        this.getContextLines(
+          lines,
+          primary.span.line - 1,
+          this.options.maxContextLines!
+        )
       : [lines[primary.span.line - 1] || ""];
 
     return JSON.stringify(
@@ -259,7 +294,10 @@ export class ErrorFormatter {
           context: err.context || [],
           ...(err.tag === "Expected" && { items: err.items, found: err.found }),
           ...(err.tag === "Unexpected" && { found: err.found }),
-          ...(err.tag === "Custom" && { message: err.message, hints: err.hints }),
+          ...(err.tag === "Custom" && {
+            message: err.message,
+            hints: err.hints
+          }),
           ...(err.tag === "Fatal" && { message: err.message })
         }))
       },
@@ -271,7 +309,10 @@ export class ErrorFormatter {
   /**
    * Format the error message based on error type.
    */
-  private formatErrorMessage(error: ParseErr, useColors: boolean = true): string {
+  private formatErrorMessage(
+    error: ParseErr,
+    useColors: boolean = true
+  ): string {
     const red = useColors ? "\x1b[31m" : "";
     const yellow = useColors ? "\x1b[33m" : "";
     const reset = useColors ? "\x1b[0m" : "";
@@ -309,7 +350,11 @@ export class ErrorFormatter {
   /**
    * Create a pointer/caret pointing to the error location.
    */
-  private createPointer(column: number, length: number = 1, useColors: boolean = true): string {
+  private createPointer(
+    column: number,
+    length: number = 1,
+    useColors: boolean = true
+  ): string {
     const spaces = " ".repeat(Math.max(0, column - 1));
     const carets = "^".repeat(Math.max(1, length));
     const red = useColors ? "\x1b[31m" : "";
@@ -320,10 +365,17 @@ export class ErrorFormatter {
   /**
    * Get context lines around the error location.
    */
-  private getContextLines(allLines: string[], errorLineIndex: number, maxLines: number): string[] {
+  private getContextLines(
+    allLines: string[],
+    errorLineIndex: number,
+    maxLines: number
+  ): string[] {
     const contextRadius = Math.floor(maxLines / 2);
     const startLine = Math.max(0, errorLineIndex - contextRadius);
-    const endLine = Math.min(allLines.length - 1, errorLineIndex + contextRadius);
+    const endLine = Math.min(
+      allLines.length - 1,
+      errorLineIndex + contextRadius
+    );
 
     const contextLines: string[] = [];
     for (let i = startLine; i <= endLine; i++) {

@@ -64,7 +64,7 @@
   },
   "homepage": "https://github.com/saiashirwad/parserator#readme",
   "prettier": {
-    "printWidth": 100,
+    "printWidth": 80,
     "useTabs": false,
     "semi": true,
     "objectWrap": "preserve",

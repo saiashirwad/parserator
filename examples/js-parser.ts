@@ -23,7 +23,9 @@ import {
 
 const whitespace = regex(/\s+/).label("whitespace");
 const lineComment = regex(/\/\/[^\n]*/).label("line comment");
-const blockComment = regex(/\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\//).label("block comment");
+const blockComment = regex(/\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\//).label(
+  "block comment"
+);
 const space = or(whitespace, lineComment, blockComment);
 const spaces = skipMany0(space);
 
@@ -31,15 +33,28 @@ function token<T>(parser: Parser<T>): Parser<T> {
   return parser.trimLeft(spaces);
 }
 
-const keywords = ["let", "const", "function", "if", "else", "return", "true", "false", "null"];
-const keyword = (k: string) => token(string(k).thenDiscard(regex(/(?![a-zA-Z0-9_])/))).commit();
+const keywords = [
+  "let",
+  "const",
+  "function",
+  "if",
+  "else",
+  "return",
+  "true",
+  "false",
+  "null"
+];
+const keyword = (k: string) =>
+  token(string(k).thenDiscard(regex(/(?![a-zA-Z0-9_])/))).commit();
 
 const identifier = token(
   regex(/[a-zA-Z_][a-zA-Z0-9_]*/)
     .label("identifier")
     .flatMap(name =>
       keywords.includes(name) ?
-        Parser.error(`'${name}' is a reserved keyword and cannot be used as an identifier`)
+        Parser.error(
+          `'${name}' is a reserved keyword and cannot be used as an identifier`
+        )
       : Parser.lift(name)
     )
 );
@@ -68,7 +83,9 @@ const booleanLiteral = token(
 const nullLiteral = token(keyword("null").map(() => null)).label("null");
 
 // Operators
-const assignmentOp = token(or(string("="), string("+="), string("-="), string("*="), string("/=")));
+const assignmentOp = token(
+  or(string("="), string("+="), string("-="), string("*="), string("/="))
+);
 const binaryOp = token(
   or(
     string("==="),
@@ -109,7 +126,12 @@ type Statement =
   | { type: "expression"; expression: Expression }
   | { type: "variable"; kind: "let" | "const"; name: string; init?: Expression }
   | { type: "function"; name: string; params: string[]; body: Statement[] }
-  | { type: "if"; test: Expression; consequent: Statement; alternate?: Statement }
+  | {
+      type: "if";
+      test: Expression;
+      consequent: Statement;
+      alternate?: Statement;
+    }
   | { type: "return"; value?: Expression }
   | { type: "block"; body: Statement[] };
 
@@ -155,17 +177,23 @@ const primaryExpression: Parser<Expression> = or(
       yield* commit();
       const properties = yield* sepBy(
         Parser.gen(function* () {
-          const key = yield* or(identifier, stringLiteral).expect("property key");
+          const key = yield* or(identifier, stringLiteral).expect(
+            "property key"
+          );
           // Check if we have a colon (for key: value syntax)
           const hasColon = yield* optional(token(char(":")));
 
           let value: Expression;
           if (hasColon) {
-            value = yield* Parser.lazy(() => expression).expect("property value");
+            value = yield* Parser.lazy(() => expression).expect(
+              "property value"
+            );
           } else {
             // Shorthand property - key must be an identifier
             if (typeof key !== "string") {
-              return yield* Parser.error("Shorthand properties must use identifiers");
+              return yield* Parser.error(
+                "Shorthand properties must use identifiers"
+              );
             }
             value = { type: "identifier" as const, name: key };
           }
@@ -216,7 +244,9 @@ const postfixExpression: Parser<Expression> = Parser.gen(function* () {
               Parser.lazy(() => expression),
               token(char(","))
             );
-            yield* token(char(")")).expect("closing parenthesis for function call");
+            yield* token(char(")")).expect(
+              "closing parenthesis for function call"
+            );
             return { type: "call" as const, args };
           })
         ),
@@ -224,7 +254,9 @@ const postfixExpression: Parser<Expression> = Parser.gen(function* () {
         atomic(
           Parser.gen(function* () {
             yield* token(char("."));
-            const property = yield* identifier.expect("property name after '.'");
+            const property = yield* identifier.expect(
+              "property name after '.'"
+            );
             return { type: "member" as const, property };
           })
         )
@@ -277,7 +309,9 @@ expression = Parser.gen(function* () {
     Parser.gen(function* () {
       const op = yield* assignmentOp;
       yield* commit(); // After seeing assignment op, we're committed
-      const right = yield* expression.expect("expression after assignment operator");
+      const right = yield* expression.expect(
+        "expression after assignment operator"
+      );
       return { op, right };
     })
   );
@@ -287,7 +321,12 @@ expression = Parser.gen(function* () {
     if (left.type !== "identifier" && left.type !== "member") {
       return yield* Parser.fatal("Invalid assignment target");
     }
-    return { type: "binary" as const, left, op: assignment.op, right: assignment.right };
+    return {
+      type: "binary" as const,
+      left,
+      op: assignment.op,
+      right: assignment.right
+    };
   }
 
   return left;
@@ -310,7 +349,9 @@ const blockStatement: Parser<Statement> = atomic(
 );
 
 const variableStatement: Parser<Statement> = Parser.gen(function* () {
-  const kind = yield* or(keyword("let"), keyword("const")) as Parser<"let" | "const">;
+  const kind = yield* or(keyword("let"), keyword("const")) as Parser<
+    "let" | "const"
+  >;
   yield* commit();
 
   const name = yield* identifier.expect("variable name");

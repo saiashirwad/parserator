@@ -3,7 +3,12 @@ import type { Prettify } from "./types";
 import type { ParseErrorBundle } from "./errors";
 
 export type ParserContext<Ctx = {}> = Prettify<
-  Ctx & { source: string; debug?: boolean; labelStack?: string[]; committed?: boolean }
+  Ctx & {
+    source: string;
+    gebug?: boolean;
+    labelStack?: string[];
+    committed?: boolean;
+  }
 >;
 
 export type ParserOptions = { name?: string };
@@ -31,8 +36,15 @@ export const State = {
    * @param input - The input string to parse
    * @returns A new parser state initialized at the start of the input
    */
-  fromInput<Ctx = {}>(input: string, context: ParserContext<Ctx>): ParserState<Ctx> {
-    return { remaining: input, pos: { line: 1, column: 1, offset: 0 }, context };
+  fromInput<Ctx = {}>(
+    input: string,
+    context: ParserContext<Ctx>
+  ): ParserState<Ctx> {
+    return {
+      remaining: input,
+      pos: { line: 1, column: 1, offset: 0 },
+      context
+    };
   },
 
   /**
@@ -77,16 +89,25 @@ export const State = {
    * @returns A new state with the string consumed and position updated
    * @throws Error if the input doesn't start with the specified string
    */
-  consumeString<Ctx = {}>(state: ParserState<Ctx>, str: string): ParserState<Ctx> {
+  consumeString<Ctx = {}>(
+    state: ParserState<Ctx>,
+    str: string
+  ): ParserState<Ctx> {
     if (!state.remaining.startsWith(str)) {
-      throw new Error(`Cannot consume "${str}" - input "${state.remaining}" doesn't start with it`);
+      throw new Error(
+        `Cannot consume "${str}" - input "${state.remaining}" doesn't start with it`
+      );
     }
     return State.consume(state, str.length);
   },
 
   move<Ctx = {}>(state: ParserState<Ctx>, moveBy: number) {
     return State.consume(
-      { ...state, remaining: state.context.source, pos: { line: 1, column: 1, offset: 0 } },
+      {
+        ...state,
+        remaining: state.context.source,
+        pos: { line: 1, column: 1, offset: 0 }
+      },
       state.pos.offset + moveBy
     );
   },

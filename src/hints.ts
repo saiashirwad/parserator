@@ -119,7 +119,9 @@ export const keywordWithHints = (keywords: string[]) => (keyword: string) =>
  * const result = keywordParser.parse("functoin")
  * ```
  */
-export function anyKeywordWithHints<Ctx = {}>(keywords: string[]): Parser<string, Ctx> {
+export function anyKeywordWithHints<Ctx = {}>(
+  keywords: string[]
+): Parser<string, Ctx> {
   return new Parser(state => {
     // Try each keyword
     for (const keyword of keywords) {
@@ -160,7 +162,9 @@ export function anyKeywordWithHints<Ctx = {}>(keywords: string[]): Parser<string
  * const result = colorParser.parse('"gren"')
  * ```
  */
-export function stringWithHints<Ctx = {}>(validStrings: string[]): Parser<string, Ctx> {
+export function stringWithHints<Ctx = {}>(
+  validStrings: string[]
+): Parser<string, Ctx> {
   return new Parser(state => {
     // Must start with quote
     if (!state.remaining.startsWith('"')) {

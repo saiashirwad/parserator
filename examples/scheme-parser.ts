@@ -20,7 +20,15 @@ import {
 import { peekAhead } from "../src/utils";
 
 export namespace LispExpr {
-  export type LispExpr = Symbol | Number | String | Boolean | List | If | Lambda | Let;
+  export type LispExpr =
+    | Symbol
+    | Number
+    | String
+    | Boolean
+    | List
+    | If
+    | Lambda
+    | Let;
 
   export type Symbol = { readonly type: "Symbol"; name: string };
 
@@ -39,7 +47,11 @@ export namespace LispExpr {
     alternate: LispExpr;
   };
 
-  export type Lambda = { readonly type: "Lambda"; params: string[]; body: LispExpr };
+  export type Lambda = {
+    readonly type: "Lambda";
+    params: string[];
+    body: LispExpr;
+  };
 
   export type Let = {
     readonly type: "Let";
@@ -57,7 +69,10 @@ export const LispExpr = {
 
   bool: (value: boolean): LispExpr.LispExpr => ({ type: "Boolean", value }),
 
-  list: (items: LispExpr.LispExpr[]): LispExpr.LispExpr => ({ type: "List", items }),
+  list: (items: LispExpr.LispExpr[]): LispExpr.LispExpr => ({
+    type: "List",
+    items
+  }),
 
   if: (
     condition: LispExpr.LispExpr,
@@ -114,7 +129,9 @@ const number = token(
     const decimalPart = yield* optional(
       parser(function* () {
         yield* char(".");
-        const fractionalDigits = yield* many1(digit).expect("Expected digits after decimal point");
+        const fractionalDigits = yield* many1(digit).expect(
+          "Expected digits after decimal point"
+        );
         return "." + fractionalDigits.join("");
       })
     );
@@ -162,7 +179,9 @@ const list = atomic(
 const lambdaParser = (items: LispExpr.LispExpr[]) =>
   parser(function* () {
     if (items.length !== 3) {
-      return yield* Parser.fatal("Lambda requires exactly 3 elements: (lambda (params...) body)");
+      return yield* Parser.fatal(
+        "Lambda requires exactly 3 elements: (lambda (params...) body)"
+      );
     }
 
     const [lambdaSymbol, paramsExpr, bodyExpr] = items;
@@ -189,7 +208,9 @@ const lambdaParser = (items: LispExpr.LispExpr[]) =>
 const letParser = (items: LispExpr.LispExpr[]) =>
   parser(function* () {
     if (items.length !== 3) {
-      return yield* Parser.fatal("Let requires exactly 3 elements: (let ((var val)...) body)");
+      return yield* Parser.fatal(
+        "Let requires exactly 3 elements: (let ((var val)...) body)"
+      );
     }
 
     const [letSymbol, bindingsExpr, bodyExpr] = items;
@@ -205,7 +226,9 @@ const letParser = (items: LispExpr.LispExpr[]) =>
     const bindings: LispExpr.Let["bindings"] = [];
     for (const binding of bindingsExpr.items) {
       if (binding.type !== "List" || binding.items.length !== 2) {
-        return yield* Parser.fatal("Each let binding must be a list of exactly 2 elements");
+        return yield* Parser.fatal(
+          "Each let binding must be a list of exactly 2 elements"
+        );
       }
 
       const [nameExpr, valueExpr] = binding.items;
@@ -430,7 +453,9 @@ function prettyPrintAST(expr: LispExpr.LispExpr, indent = 0): string {
     case "Boolean":
       return `${spaces}Boolean: ${expr.value}`;
     case "List":
-      const items = expr.items.map(item => prettyPrintAST(item, indent + 1)).join("\n");
+      const items = expr.items
+        .map(item => prettyPrintAST(item, indent + 1))
+        .join("\n");
       return `${spaces}List:\n${items}`;
     case "Lambda":
       const params = expr.params.join(", ");

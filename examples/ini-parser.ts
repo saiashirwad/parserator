@@ -15,7 +15,9 @@ import {
 } from "../src";
 
 const whitespace = regex(/[ \t]+/).label("whitespace");
-const lineBreak = or(string("\r\n"), string("\n"), string("\r")).label("line break");
+const lineBreak = or(string("\r\n"), string("\n"), string("\r")).label(
+  "line break"
+);
 const blankLine = regex(/[ \t]*[\r\n]/).label("blank line");
 const comment = regex(/[;#][^\n\r]*/).label("comment");
 const space = or(whitespace, comment);
