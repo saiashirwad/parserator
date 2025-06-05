@@ -2,10 +2,10 @@
  * @fileoverview
  */
 
-import { Parser } from "./parser";
-import type { ParseErr, ParseErrorBundle } from "./errors";
-import { type ParserState, State } from "./state";
 import { Either } from "./either";
+import type { ParseErr, ParseErrorBundle } from "./errors";
+import { Parser } from "./parser";
+import { type ParserState, State } from "./state";
 
 /**
  * Creates a parser that looks ahead in the input stream without consuming any input.
@@ -761,12 +761,16 @@ type LastParser<T, Ctx = {}> =
  * parser.run('1-2') // Right([['1', '-', '2'], {...}])
  * ```
  */
-export function sequence<T extends readonly Parser<any, any>[]>(
+
+type SequenceOutput<T extends Parser<any, any>[], Acc extends any[] = []> =
+  T["length"] extends 0 ? Acc
+  : T extends [Parser<infer Head extends any>, ...infer Tail extends any[]] ?
+    SequenceOutput<Tail, [...Acc, Head]>
+  : [T, Acc];
+
+export function sequence<const T extends any[]>(
   parsers: T
-): Parser<
-  { [K in keyof T]: T[K] extends Parser<infer U, any> ? U : never },
-  T[0] extends Parser<any, infer Ctx> ? Ctx : {}
-> {
+): Parser<SequenceOutput<T>> {
   return Parser.gen(function* () {
     const results = [];
     for (const parser of parsers) {
