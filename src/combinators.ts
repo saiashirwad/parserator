@@ -781,48 +781,6 @@ export function sequence<const T extends any[]>(
 }
 
 /**
- * Creates a parser that runs multiple parsers in sequence and returns only the last result.
- * This is the original behavior of sequence for backward compatibility.
- *
- * @param parsers - Array of parsers to run in sequence
- * @returns A parser that succeeds if all parsers succeed, returning only the last result
- *
- * @example
- * ```ts
- * const parser = sequenceLast([string('hello'), char(' '), string('world')])
- * parser.run('hello world') // Right(['world', {...}])
- * ```
- */
-export function sequenceLast<Parsers extends Parser<any, any>[], Ctx = {}>(
-  parsers: [...Parsers]
-): Parser<LastParser<Parsers, Ctx>, Ctx> {
-  return new Parser((state: ParserState<Ctx>) => {
-    let currentState = state;
-    let lastResult: any;
-
-    for (const parser of parsers) {
-      const { result, state: newState } = parser.run(currentState);
-      if (Either.isLeft(result)) {
-        return {
-          result: result as Either<LastParser<Parsers, Ctx>, ParseErrorBundle>,
-          state: newState as ParserState<Ctx>
-        };
-      }
-      currentState = newState as ParserState<Ctx>;
-      lastResult = result.right;
-    }
-
-    return {
-      result: Either.right(lastResult) as Either<
-        LastParser<Parsers, Ctx>,
-        ParseErrorBundle
-      >,
-      state: currentState
-    };
-  });
-}
-
-/**
  * Creates a parser that matches input against a regular expression.
  * The regex must match at the start of the input.
  *
