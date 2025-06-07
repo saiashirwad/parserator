@@ -16,14 +16,8 @@ export class Parser<T> {
     /**
      * @internal
      */
-    public run: (state: ParserState) => ParserOutput<T>,
-    public options?: ParserOptions
+    public run: (state: ParserState) => ParserOutput<T>
   ) {}
-
-  name(name: string) {
-    this.options = { ...this.options, name };
-    return this;
-  }
 
   static succeed<T>(value: T, state: ParserState): ParserOutput<T> {
     return { state, result: Either.right(value) };
@@ -122,7 +116,7 @@ export class Parser<T> {
         );
       }
       return output;
-    }, this.options);
+    });
   }
 
   static fatal(message: string): Parser<never> {
@@ -281,7 +275,7 @@ export class Parser<T> {
         return this.run(state);
       }
       return debug(this, label).run(state);
-    }, this.options);
+    });
   }
 
   parseOrError(input: string) {
@@ -422,7 +416,7 @@ export class Parser<T> {
         { ...resultA.right, [k]: resultB.right } as BindResult<T, K, B>,
         stateB
       );
-    }, this.options);
+    });
   }
 
   *[Symbol.iterator](): Generator<Parser<T>, T, any> {
@@ -443,7 +437,7 @@ export class Parser<T> {
       const result = this.run(state);
       callback({ state, result });
       return result;
-    }, this.options);
+    });
   }
 
   static gen = <T, Ctx = unknown>(
@@ -514,7 +508,7 @@ export class Parser<T> {
       }
 
       return result;
-    }, this.options);
+    });
   }
 
   /**
@@ -604,7 +598,7 @@ export class Parser<T> {
         };
       }
       return result;
-    }, this.options);
+    });
   }
 
   /**
@@ -665,7 +659,7 @@ export class Parser<T> {
         };
       }
       return result;
-    }, this.options);
+    });
   }
 }
 

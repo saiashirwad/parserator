@@ -74,27 +74,24 @@ export function notFollowedBy<T>(parser: Parser<T>): Parser<boolean> {
  * ```
  */
 export const string = (str: string): Parser<string> =>
-  new Parser(
-    state => {
-      if (state.remaining.startsWith(str)) {
-        return Parser.succeed(str, State.consume(state, str.length));
-      }
+  new Parser(state => {
+    if (state.remaining.startsWith(str)) {
+      return Parser.succeed(str, State.consume(state, str.length));
+    }
 
-      const message =
-        `Expected '${str}', ` +
-        `but found '${state.remaining.slice(0, str.length)}'`;
+    const message =
+      `Expected '${str}', ` +
+      `but found '${state.remaining.slice(0, str.length)}'`;
 
-      return Parser.fail(
-        {
-          message,
-          expected: [str],
-          found: state.remaining.slice(0, str.length)
-        },
-        state
-      );
-    },
-    { name: str }
-  );
+    return Parser.fail(
+      {
+        message,
+        expected: [str],
+        found: state.remaining.slice(0, str.length)
+      },
+      state
+    );
+  });
 
 /**
  * Creates a parser that matches an exact string literal type.
@@ -124,26 +121,23 @@ export function narrowedString<const T extends string>(str: T): Parser<T> {
  * ```
  */
 export const char = <T extends string>(ch: T): Parser<T> =>
-  new Parser(
-    state => {
-      if (ch.length !== 1) {
-        return Parser.fail(
-          { message: "Incorrect usage of char parser.", expected: [ch] },
-          state
-        );
-      }
-      if (state.remaining[0] === ch) {
-        return Parser.succeed(ch, State.consume(state, 1));
-      }
-
-      const message = `Expected ${ch} but found ${state.remaining.at(0)}.`;
+  new Parser(state => {
+    if (ch.length !== 1) {
       return Parser.fail(
-        { message, expected: [ch], found: state.remaining.at(0) },
+        { message: "Incorrect usage of char parser.", expected: [ch] },
         state
       );
-    },
-    { name: ch }
-  );
+    }
+    if (state.remaining[0] === ch) {
+      return Parser.succeed(ch, State.consume(state, 1));
+    }
+
+    const message = `Expected ${ch} but found ${state.remaining.at(0)}.`;
+    return Parser.fail(
+      { message, expected: [ch], found: state.remaining.at(0) },
+      state
+    );
+  });
 
 /**
  * A parser that matches any single alphabetic character (a-z, A-Z).
@@ -154,26 +148,23 @@ export const char = <T extends string>(ch: T): Parser<T> =>
  * parser.run("123") // Left(error)
  * ```
  */
-export const alphabet = new Parser(
-  state => {
-    if (State.isAtEnd(state)) {
-      return Parser.fail(
-        { message: "Unexpected end of input", expected: [] },
-        state
-      );
-    }
-    const first = state.remaining[0];
-    if (first && /^[a-zA-Z]$/.test(first)) {
-      return Parser.succeed(first, State.consume(state, 1));
-    }
-    const message = `Expected alphabetic character, but got '${first}'`;
+export const alphabet = new Parser(state => {
+  if (State.isAtEnd(state)) {
     return Parser.fail(
-      { message, expected: [], found: state.remaining[0] },
+      { message: "Unexpected end of input", expected: [] },
       state
     );
-  },
-  { name: "alphabet" }
-);
+  }
+  const first = state.remaining[0];
+  if (first && /^[a-zA-Z]$/.test(first)) {
+    return Parser.succeed(first, State.consume(state, 1));
+  }
+  const message = `Expected alphabetic character, but got '${first}'`;
+  return Parser.fail(
+    { message, expected: [], found: state.remaining[0] },
+    state
+  );
+});
 
 /**
  * A parser that matches any single digit character (0-9).
@@ -184,26 +175,23 @@ export const alphabet = new Parser(
  * parser.run("abc") // Left(error)
  * ```
  */
-export const digit = new Parser(
-  state => {
-    if (State.isAtEnd(state)) {
-      return Parser.fail(
-        { message: "Unexpected end of input", expected: [] },
-        state
-      );
-    }
-    const first = state.remaining[0];
-    if (first && /^[0-9]$/.test(first)) {
-      return Parser.succeed(first, State.consume(state, 1));
-    }
-    const message = `Expected digit, but got '${first}'`;
+export const digit = new Parser(state => {
+  if (State.isAtEnd(state)) {
     return Parser.fail(
-      { message, expected: [], found: state.remaining[0] },
+      { message: "Unexpected end of input", expected: [] },
       state
     );
-  },
-  { name: "digit" }
-);
+  }
+  const first = state.remaining[0];
+  if (first && /^[0-9]$/.test(first)) {
+    return Parser.succeed(first, State.consume(state, 1));
+  }
+  const message = `Expected digit, but got '${first}'`;
+  return Parser.fail(
+    { message, expected: [], found: state.remaining[0] },
+    state
+  );
+});
 
 /**
  * Creates a parser that matches zero or more occurrences of elements separated by a separator.
@@ -598,13 +586,11 @@ export function parseUntilChar(char: string): Parser<string> {
 /**
  * A parser that skips any number of space characters.
  */
-export const skipSpaces = new Parser(
-  state =>
-    Parser.succeed(
-      undefined,
-      State.consumeWhile(state, char => char === " ")
-    ),
-  { name: "skipSpaces" }
+export const skipSpaces = new Parser(state =>
+  Parser.succeed(
+    undefined,
+    State.consumeWhile(state, char => char === " ")
+  )
 );
 
 /**
@@ -769,18 +755,15 @@ export const regex = (re: RegExp): Parser<string> => {
   // Create a new RegExp without global flag to ensure consistent behavior
   const nonGlobalRe = new RegExp(re.source, re.flags.replace("g", ""));
 
-  return new Parser(
-    state => {
-      const match = nonGlobalRe.exec(state.remaining);
-      if (match && match.index === 0) {
-        const value = match[0];
-        return Parser.succeed(value, State.consume(state, value.length));
-      }
-      const message = `Expected ${re} but found ${state.remaining.slice(0, 10)}...`;
-      return Parser.fail({ message, expected: [re.toString()] }, state);
-    },
-    { name: re.toString() }
-  );
+  return new Parser(state => {
+    const match = nonGlobalRe.exec(state.remaining);
+    if (match && match.index === 0) {
+      const value = match[0];
+      return Parser.succeed(value, State.consume(state, value.length));
+    }
+    const message = `Expected ${re} but found ${state.remaining.slice(0, 10)}...`;
+    return Parser.fail({ message, expected: [re.toString()] }, state);
+  });
 };
 
 export function zip<A, B>(
