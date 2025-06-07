@@ -2,7 +2,6 @@ import { debug } from "./debug";
 import { Either } from "./either";
 import { type ParseErr, ParseErrorBundle, createSpan } from "./errors";
 import {
-  type ParserContext,
   type ParserOptions,
   type ParserOutput,
   type ParserState,
@@ -12,12 +11,12 @@ import type { Prettify } from "./types";
 
 type BindResult<T, K extends string, B> = Prettify<T & { [k in K]: B }>;
 
-export class Parser<T, Ctx = {}> {
+export class Parser<T> {
   constructor(
     /**
      * @internal
      */
-    public run: (state: ParserState<Ctx>) => ParserOutput<T, Ctx>,
+    public run: (state: ParserState) => ParserOutput<T>,
     public options?: ParserOptions
   ) {}
 
@@ -26,14 +25,11 @@ export class Parser<T, Ctx = {}> {
     return this;
   }
 
-  static succeed<T, Ctx = {}>(
-    value: T,
-    state: ParserState<Ctx>
-  ): ParserOutput<T, Ctx> {
+  static succeed<T>(value: T, state: ParserState): ParserOutput<T> {
     return { state, result: Either.right(value) };
   }
 
-  static lift = <A, Ctx = {}>(a: A): Parser<A, Ctx> =>
+  static lift = <A>(a: A): Parser<A> =>
     new Parser(state => Parser.succeed(a, state));
 
   static liftA2 = <A, B, C>(
@@ -45,10 +41,10 @@ export class Parser<T, Ctx = {}> {
   static ap = <A, B>(ma: Parser<A>, mf: Parser<(_: A) => B>) =>
     mf.zip(ma).map(([f, a]) => f(a));
 
-  static fail<Ctx = {}>(
+  static fail(
     error: { message: string; expected?: string[]; found?: string },
-    state: ParserState<Ctx>
-  ): ParserOutput<never, Ctx> {
+    state: ParserState
+  ): ParserOutput<never> {
     const span = createSpan({
       pos: {
         offset: state.pos.offset,
@@ -61,30 +57,30 @@ export class Parser<T, Ctx = {}> {
       tag: "Custom",
       span,
       message: error.message,
-      context: state.context?.labelStack ?? [],
+      context: state?.labelStack ?? [],
       hints: []
     };
 
     const bundle = new ParseErrorBundle(
       [parseErr],
-      state.context?.source ?? state.remaining
+      state?.source ?? state.remaining
     );
 
     return { state, result: Either.left(bundle) };
   }
 
-  static error<Ctx = {}>(
+  static error(
     message: string,
     hints?: string[],
-    stateCallback?: (state: ParserState<Ctx>) => ParserState<Ctx>
-  ): Parser<never, Ctx> {
+    stateCallback?: (state: ParserState) => ParserState
+  ): Parser<never> {
     return new Parser(state => {
       const error: ParseErr = {
         tag: "Custom",
         span: createSpan(state),
         message,
         hints,
-        context: state.context?.labelStack ?? []
+        context: state?.labelStack ?? []
       };
       return Parser.failRich(
         { errors: [error] },
@@ -93,11 +89,11 @@ export class Parser<T, Ctx = {}> {
     });
   }
 
-  static selectRight<A>(p: Parser<A>): Parser<Either<A, never>, {}> {
+  static selectRight<A>(p: Parser<A>): Parser<Either<A, never>> {
     return p.flatMap(a => Parser.lift(Either.right(a)));
   }
 
-  static selectLeft<A>(p: Parser<A>): Parser<Either<never, A>, {}> {
+  static selectLeft<A>(p: Parser<A>): Parser<Either<never, A>> {
     return p.flatMap(a => Parser.lift(Either.left(a)));
   }
 
@@ -109,10 +105,10 @@ export class Parser<T, Ctx = {}> {
   withError(
     makeMessage: (errorCtx: {
       error: ParseErrorBundle;
-      state: ParserState<Ctx>;
+      state: ParserState;
     }) => string
-  ): Parser<T, Ctx> {
-    return new Parser<T, Ctx>(state => {
+  ): Parser<T> {
+    return new Parser<T>(state => {
       const output = this.run(state);
       if (Either.isLeft(output.result)) {
         return Parser.fail(
@@ -129,14 +125,14 @@ export class Parser<T, Ctx = {}> {
     }, this.options);
   }
 
-  static fatal<Ctx = {}>(message: string): Parser<never, Ctx> {
+  static fatal(message: string): Parser<never> {
     return new Parser(state => {
       const span = createSpan(state);
       const fatalError: ParseErr = {
         tag: "Fatal",
         span,
         message,
-        context: state.context?.labelStack ?? []
+        context: state?.labelStack ?? []
       };
 
       return Parser.failRich({ errors: [fatalError] }, state);
@@ -157,17 +153,14 @@ export class Parser<T, Ctx = {}> {
    * Parser.expected(["identifier"])   // Expected identifier
    * ```
    */
-  static expected<Ctx = {}>(
-    items: string[],
-    found?: string
-  ): Parser<never, Ctx> {
+  static expected(items: string[], found?: string): Parser<never> {
     return new Parser(state => {
       const error: ParseErr = {
         tag: "Expected",
         span: createSpan(state),
         items,
         found,
-        context: state.context?.labelStack ?? []
+        context: state?.labelStack ?? []
       };
       return Parser.failRich({ errors: [error] }, state);
     });
@@ -187,17 +180,14 @@ export class Parser<T, Ctx = {}> {
    * Parser.unexpected("123", ["Identifiers cannot start with numbers"])
    * ```
    */
-  static unexpected<Ctx = {}>(
-    found: string,
-    hints?: string[]
-  ): Parser<never, Ctx> {
+  static unexpected(found: string, hints?: string[]): Parser<never> {
     return new Parser(state => {
       const error: ParseErr = {
         tag: "Unexpected",
         span: createSpan(state),
         found,
         hints,
-        context: state.context?.labelStack ?? []
+        context: state?.labelStack ?? []
       };
       return Parser.failRich({ errors: [error] }, state);
     });
@@ -225,16 +215,16 @@ export class Parser<T, Ctx = {}> {
    * })
    * ```
    */
-  static failWith<Ctx = {}>(options: {
+  static failWith(options: {
     type: "expected" | "unexpected" | "custom" | "fatal";
     message?: string;
     items?: string[];
     found?: string;
     hints?: string[];
-  }): Parser<never, Ctx> {
+  }): Parser<never> {
     return new Parser(state => {
       const span = createSpan(state);
-      const context = state.context?.labelStack ?? [];
+      const context = state?.labelStack ?? [];
 
       let error: ParseErr;
       switch (options.type) {
@@ -279,37 +269,31 @@ export class Parser<T, Ctx = {}> {
     });
   }
 
-  parse(input: string, context = { source: input }): ParserOutput<T, Ctx> {
-    const st = State.fromInput(input, context);
-    const { result, state } = this.run(State.fromInput(input, context) as any);
+  parse(input: string): ParserOutput<T> {
+    const st = State.fromInput(input);
+    const { result, state } = this.run(State.fromInput(input) as any);
     return { result, state };
   }
 
-  withTrace(label: string): Parser<T, Ctx> {
-    return new Parser<T, Ctx>(state => {
-      if (!state.context?.debug) {
+  withTrace(label: string): Parser<T> {
+    return new Parser<T>(state => {
+      if (!state?.debug) {
         return this.run(state);
       }
       return debug(this, label).run(state);
     }, this.options);
   }
 
-  parseOrError(
-    input: string,
-    context = { source: input } as ParserContext<Ctx>
-  ) {
-    const { result } = this.run(State.fromInput(input, context));
+  parseOrError(input: string) {
+    const { result } = this.run(State.fromInput(input));
     if (Either.isRight(result)) {
       return result.right;
     }
     return result.left;
   }
 
-  parseOrThrow(
-    input: string,
-    context = { source: input } as ParserContext<Ctx>
-  ): T {
-    const { result } = this.parse(input, context ?? { source: input });
+  parseOrThrow(input: string): T {
+    const { result } = this.parse(input);
 
     if (Either.isLeft(result)) {
       throw result.left;
@@ -317,8 +301,8 @@ export class Parser<T, Ctx = {}> {
     return result.right;
   }
 
-  map<B>(f: (a: T) => B): Parser<B, Ctx> {
-    return new Parser<B, Ctx>(state => {
+  map<B>(f: (a: T) => B): Parser<B> {
+    return new Parser<B>(state => {
       const { result, state: newState } = this.run(state);
       if (Either.isLeft(result)) {
         return {
@@ -330,8 +314,8 @@ export class Parser<T, Ctx = {}> {
     });
   }
 
-  flatMap<B>(f: (a: T) => Parser<B, Ctx>): Parser<B, Ctx> {
-    return new Parser<B, Ctx>(state => {
+  flatMap<B>(f: (a: T) => Parser<B>): Parser<B> {
+    return new Parser<B>(state => {
       const { result, state: newState } = this.run(state);
       if (Either.isLeft(result)) {
         return {
@@ -344,7 +328,7 @@ export class Parser<T, Ctx = {}> {
     });
   }
 
-  static pure = <A, Ctx = {}>(a: A): Parser<A, Ctx> =>
+  static pure = <A>(a: A): Parser<A> =>
     new Parser(state => Parser.succeed(a, state));
 
   static Do = Parser.pure({});
@@ -376,7 +360,7 @@ export class Parser<T, Ctx = {}> {
     });
   }
 
-  zip<B>(parserB: Parser<B, Ctx>): Parser<[T, B], Ctx> {
+  zip<B>(parserB: Parser<B>): Parser<[T, B]> {
     return new Parser(state => {
       const { result: a, state: stateA } = this.run(state);
       if (Either.isLeft(a)) {
@@ -396,13 +380,13 @@ export class Parser<T, Ctx = {}> {
     });
   }
 
-  then<B>(parserB: Parser<B, Ctx>): Parser<B, Ctx> {
+  then<B>(parserB: Parser<B>): Parser<B> {
     return this.zip(parserB).map(([_, b]) => b);
   }
 
   zipRight = this.then;
 
-  thenDiscard<B>(parserB: Parser<B, Ctx>): Parser<T, Ctx> {
+  thenDiscard<B>(parserB: Parser<B>): Parser<T> {
     return this.zip(parserB).map(([a, _]) => a);
   }
 
@@ -410,9 +394,9 @@ export class Parser<T, Ctx = {}> {
 
   bind<K extends string, B>(
     k: K,
-    other: Parser<B, Ctx> | ((a: T) => Parser<B, Ctx>)
-  ): Parser<BindResult<T, K, B>, Ctx> {
-    return new Parser<BindResult<T, K, B>, Ctx>(state => {
+    other: Parser<B> | ((a: T) => Parser<B>)
+  ): Parser<BindResult<T, K, B>> {
+    return new Parser<BindResult<T, K, B>>(state => {
       const { result: resultA, state: stateA } = this.run(state);
       if (Either.isLeft(resultA)) {
         return {
@@ -441,7 +425,7 @@ export class Parser<T, Ctx = {}> {
     }, this.options);
   }
 
-  *[Symbol.iterator](): Generator<Parser<T, Ctx>, T, any> {
+  *[Symbol.iterator](): Generator<Parser<T>, T, any> {
     return yield this;
   }
 
@@ -453,11 +437,8 @@ export class Parser<T, Ctx = {}> {
    * @returns The same parser with the tap point added
    */
   tap(
-    callback: (args: {
-      state: ParserState<Ctx>;
-      result: ParserOutput<T, Ctx>;
-    }) => void
-  ): Parser<T, Ctx> {
+    callback: (args: { state: ParserState; result: ParserOutput<T> }) => void
+  ): Parser<T> {
     return new Parser(state => {
       const result = this.run(state);
       callback({ state, result });
@@ -466,12 +447,12 @@ export class Parser<T, Ctx = {}> {
   }
 
   static gen = <T, Ctx = unknown>(
-    f: () => Generator<Parser<any, Ctx>, T, any>
-  ): Parser<T, Ctx> =>
-    new Parser<T, Ctx>(state => {
+    f: () => Generator<Parser<any>, T, any>
+  ): Parser<T> =>
+    new Parser<T>(state => {
       const iterator = f();
       let current = iterator.next();
-      let currentState: ParserState<Ctx> = state;
+      let currentState: ParserState = state;
       while (!current.done) {
         const { result, state: updatedState } = current.value.run(currentState);
         if (Either.isLeft(result)) {
@@ -479,8 +460,7 @@ export class Parser<T, Ctx = {}> {
           const hasFatalError = result.left.errors.some(e => e.tag === "Fatal");
 
           // Check if we're in a committed state
-          const isCommitted =
-            updatedState.context?.committed || state.context?.committed;
+          const isCommitted = updatedState?.committed || state?.committed;
           return {
             result: result as unknown as Either<T, ParseErrorBundle>,
             state: updatedState
@@ -492,15 +472,15 @@ export class Parser<T, Ctx = {}> {
       return Parser.succeed(current.value, currentState);
     });
 
-  trim(parser: Parser<any, Ctx>) {
+  trim(parser: Parser<any>) {
     return parser.then(this).thenDiscard(parser);
   }
 
-  trimLeft(parser: Parser<any, Ctx>): Parser<T, Ctx> {
+  trimLeft(parser: Parser<any>): Parser<T> {
     return parser.then(this);
   }
 
-  trimRight(parser: Parser<any, Ctx>): Parser<T, Ctx> {
+  trimRight(parser: Parser<any>): Parser<T> {
     return this.thenDiscard(parser);
   }
 
@@ -509,13 +489,13 @@ export class Parser<T, Ctx = {}> {
    * @param name - The label name to add to the context stack
    * @returns A new parser with the label added
    */
-  label(name: string): Parser<T, Ctx> {
+  label(name: string): Parser<T> {
     return new Parser(state => {
       const newState = {
         ...state,
         context: {
-          ...state.context,
-          labelStack: [name, ...(state.context.labelStack || [])]
+          ...state,
+          labelStack: [name, ...(state.labelStack || [])]
         }
       };
 
@@ -527,7 +507,7 @@ export class Parser<T, Ctx = {}> {
           tag: "Expected",
           span: createSpan(state),
           items: [name],
-          context: newState.context.labelStack || []
+          context: newState.labelStack || []
         };
 
         return Parser.failRich({ errors: [labeledError] }, result.state);
@@ -542,7 +522,7 @@ export class Parser<T, Ctx = {}> {
    * @param description - The description for both the label and error message
    * @returns A new parser with both labeling and error message
    */
-  expect(description: string): Parser<T, Ctx> {
+  expect(description: string): Parser<T> {
     return this.withError(() => `Expected ${description}`).label(description);
   }
 
@@ -552,13 +532,13 @@ export class Parser<T, Ctx = {}> {
    * @param state - The current parser state
    * @returns A parser output with the error bundle and the current state
    */
-  static failRich<Ctx = {}>(
+  static failRich(
     errorBundle: { errors: ParseErr[] },
-    state: ParserState<Ctx>
-  ): ParserOutput<never, Ctx> {
+    state: ParserState
+  ): ParserOutput<never> {
     const bundle = new ParseErrorBundle(
       errorBundle.errors,
-      state.context?.source ?? state.remaining
+      state?.source ?? state.remaining
     );
 
     return { state, result: Either.left(bundle) };
@@ -611,7 +591,7 @@ export class Parser<T, Ctx = {}> {
    * @see {@link commit} - Standalone function version
    * @see {@link cut} - Alias with Prolog-style naming
    */
-  commit(): Parser<T, Ctx> {
+  commit(): Parser<T> {
     return new Parser(state => {
       const result = this.run(state);
       if (Either.isRight(result.result)) {
@@ -619,7 +599,7 @@ export class Parser<T, Ctx = {}> {
           ...result,
           state: {
             ...result.state,
-            context: { ...result.state.context, committed: true }
+            context: { ...result.state, committed: true }
           }
         };
       }
@@ -674,7 +654,7 @@ export class Parser<T, Ctx = {}> {
    *
    * @see {@link atomic} - Standalone function version
    */
-  atomic(): Parser<T, Ctx> {
+  atomic(): Parser<T> {
     return new Parser(state => {
       const result = this.run(state);
       if (Either.isLeft(result.result)) {

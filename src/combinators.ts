@@ -19,9 +19,7 @@ import { type ParserState, State } from "./state";
  * // Input position remains at 'abc', 'a' is not consumed
  * ```
  */
-export function lookahead<T, Ctx = {}>(
-  parser: Parser<T, Ctx>
-): Parser<T | undefined, Ctx> {
+export function lookahead<T>(parser: Parser<T>): Parser<T | undefined> {
   return new Parser(state => {
     const { result } = parser.run(state);
     if (Either.isRight(result)) {
@@ -43,9 +41,7 @@ export function lookahead<T, Ctx = {}>(
  * notA.run('abc') // Left(error) - Fails because 'a' is found
  * ```
  */
-export function notFollowedBy<T, Ctx = {}>(
-  parser: Parser<T, Ctx>
-): Parser<boolean, Ctx> {
+export function notFollowedBy<T>(parser: Parser<T>): Parser<boolean> {
   return new Parser(state => {
     const { result, state: newState } = parser.run(state);
     if (Either.isRight(result)) {
@@ -77,7 +73,7 @@ export function notFollowedBy<T, Ctx = {}>(
  * parser.run("goodbye") // Left(error)
  * ```
  */
-export const string = <Ctx = {}>(str: string): Parser<string, Ctx> =>
+export const string = (str: string): Parser<string> =>
   new Parser(
     state => {
       if (state.remaining.startsWith(str)) {
@@ -112,9 +108,7 @@ export const string = <Ctx = {}>(str: string): Parser<string, Ctx> =>
  * parser.run("goodbye") // Left(error)
  * ```
  */
-export function narrowedString<const T extends string, Ctx>(
-  str: T
-): Parser<T, Ctx> {
+export function narrowedString<const T extends string>(str: T): Parser<T> {
   return string(str) as any;
 }
 
@@ -129,7 +123,7 @@ export function narrowedString<const T extends string, Ctx>(
  * parser.run("xyz") // Left(error)
  * ```
  */
-export const char = <T extends string, Ctx = {}>(ch: T): Parser<T, Ctx> =>
+export const char = <T extends string>(ch: T): Parser<T> =>
   new Parser(
     state => {
       if (ch.length !== 1) {
@@ -225,10 +219,10 @@ export const digit = new Parser(
  * ```
  */
 // TODO: fix this
-export function sepBy<S, T, Ctx>(
-  parser: Parser<T, Ctx>,
-  sepParser: Parser<S, Ctx>
-): Parser<T[], Ctx> {
+export function sepBy<S, T>(
+  parser: Parser<T>,
+  sepParser: Parser<S>
+): Parser<T[]> {
   return new Parser(state => {
     const results: T[] = [];
     let currentState = state;
@@ -276,10 +270,10 @@ export function sepBy<S, T, Ctx>(
  * numbers.parse("") // Error: Expected at least one element
  * ```
  */
-export function sepBy1<S, T, Ctx>(
-  parser: Parser<T, Ctx>,
-  sepParser: Parser<S, Ctx>
-): Parser<T[], Ctx> {
+export function sepBy1<S, T>(
+  parser: Parser<T>,
+  sepParser: Parser<S>
+): Parser<T[]> {
   return Parser.gen(function* () {
     const first = yield* parser;
     const rest = yield* many0(sepParser.then(parser));
@@ -302,11 +296,11 @@ export function sepBy1<S, T, Ctx>(
  * parser.run('(5') // Left(error: Expected closing delimiter)
  * ```
  */
-export function between<T, Ctx = {}>(
-  start: Parser<any, Ctx>,
-  end: Parser<any, Ctx>,
-  parser: Parser<T, Ctx>
-): Parser<T, Ctx> {
+export function between<T>(
+  start: Parser<any>,
+  end: Parser<any>,
+  parser: Parser<T>
+): Parser<T> {
   return Parser.gen(function* () {
     yield* start;
     const content = yield* parser;
@@ -315,8 +309,8 @@ export function between<T, Ctx = {}>(
   });
 }
 
-export function anyChar<Ctx = {}>() {
-  return new Parser<string, Ctx>(state => {
+export function anyChar() {
+  return new Parser<string>(state => {
     if (State.isAtEnd(state)) {
       return Parser.fail(
         { message: "Unexpected end of input", expected: [] },
@@ -333,11 +327,8 @@ export function anyChar<Ctx = {}>() {
  * @param count - Minimum number of repetitions required
  * @returns A function that creates a parser matching multiple occurrences
  */
-function many_<S, T, Ctx = {}>(count: number) {
-  return (
-    parser: Parser<T, Ctx>,
-    separator?: Parser<S, Ctx>
-  ): Parser<T[], Ctx> => {
+function many_<S, T>(count: number) {
+  return (parser: Parser<T>, separator?: Parser<S>): Parser<T[]> => {
     return new Parser(state => {
       const results: T[] = [];
       let currentState = state;
@@ -348,8 +339,7 @@ function many_<S, T, Ctx = {}>(count: number) {
         if (Either.isLeft(itemResult.result)) {
           // Check if we're in a committed state
           const isCommitted =
-            itemResult.state.context?.committed &&
-            !currentState.context?.committed;
+            itemResult.state?.committed && !currentState?.committed;
 
           // If committed, propagate the error regardless of count
           if (isCommitted) {
@@ -374,7 +364,7 @@ function many_<S, T, Ctx = {}>(count: number) {
         if (newState.pos.offset <= currentState.pos.offset) {
           throw new Error("Parser did not advance - infinite loop prevented");
         }
-        currentState = newState as ParserState<Ctx>;
+        currentState = newState as ParserState;
 
         // If we have a separator, try to parse it
         if (separator) {
@@ -388,7 +378,7 @@ function many_<S, T, Ctx = {}>(count: number) {
               "Separator parser did not advance - infinite loop prevented"
             );
           }
-          currentState = state as ParserState<Ctx>;
+          currentState = state as ParserState;
         }
       }
 
@@ -408,10 +398,8 @@ function many_<S, T, Ctx = {}>(count: number) {
  * @param parser - The parser to repeat
  * @returns A parser that produces an array of all matches
  */
-export const many0 = <S, T, Ctx = {}>(
-  parser: Parser<T, Ctx>,
-  separator?: Parser<S, Ctx>
-) => many_<S, T, Ctx>(0)(parser, separator);
+export const many0 = <S, T>(parser: Parser<T>, separator?: Parser<S>) =>
+  many_<S, T>(0)(parser, separator);
 
 /**
  * Parses zero or more occurrences of a parser (alias for many0).
@@ -419,7 +407,7 @@ export const many0 = <S, T, Ctx = {}>(
  * @param parser - The parser to repeat
  * @returns A parser that produces an array of parsed elements
  */
-export const many = <T, Ctx = {}>(parser: Parser<T, Ctx>) => many0(parser);
+export const many = <T>(parser: Parser<T>) => many0(parser);
 
 /**
  * Creates a parser that matches one or more occurrences of the input parser.
@@ -427,10 +415,8 @@ export const many = <T, Ctx = {}>(parser: Parser<T, Ctx>) => many0(parser);
  * @param parser - The parser to repeat
  * @returns A parser that produces an array of all matches (at least one)
  */
-export const many1 = <S, T, Ctx>(
-  parser: Parser<T, Ctx>,
-  separator?: Parser<S, Ctx>
-) => many_<S, T, Ctx>(1)(parser, separator);
+export const many1 = <S, T>(parser: Parser<T>, separator?: Parser<S>) =>
+  many_<S, T>(1)(parser, separator);
 
 /**
  * Creates a parser that matches at least n occurrences of the input parser.
@@ -439,11 +425,11 @@ export const many1 = <S, T, Ctx>(
  * @param n - Number of required repetitions
  * @returns A parser that produces an array of at least n matches
  */
-export const manyN = <S, T, Ctx>(
-  parser: Parser<T, Ctx>,
+export const manyN = <S, T>(
+  parser: Parser<T>,
   n: number,
-  separator?: Parser<S, Ctx>
-) => many_<S, T, Ctx>(n)(parser, separator);
+  separator?: Parser<S>
+) => many_<S, T>(n)(parser, separator);
 
 /**
  * Creates a parser that matches exactly n occurrences of the input parser.
@@ -454,16 +440,16 @@ export const manyN = <S, T, Ctx>(
  * @returns A parser that produces an array of exactly n matches
  */
 
-export const manyNExact = <S, T, Ctx>(
-  parser: Parser<T, Ctx>,
+export const manyNExact = <S, T>(
+  parser: Parser<T>,
   n: number,
-  separator?: Parser<S, Ctx>
+  separator?: Parser<S>
 ) =>
   Parser.gen(function* () {
     const results = yield* manyN(parser, n, separator);
     if (results.length !== n) {
       const message = `Expected exactly ${n} occurrences, but found ${results.length}`;
-      return yield* Parser.error<Ctx>(message);
+      return yield* Parser.error(message);
     }
     return results;
   });
@@ -474,8 +460,8 @@ export const manyNExact = <S, T, Ctx>(
  * @param count - Minimum number of repetitions required
  * @returns A function that creates a parser skipping multiple occurrences
  */
-function skipMany_<T, Ctx>(count: number) {
-  return (parser: Parser<T, Ctx>): Parser<undefined, Ctx> => {
+function skipMany_<T>(count: number) {
+  return (parser: Parser<T>): Parser<undefined> => {
     return new Parser(state => {
       let currentState = state;
       let successes = 0;
@@ -492,7 +478,7 @@ function skipMany_<T, Ctx>(count: number) {
         }
 
         successes++;
-        currentState = newState as ParserState<Ctx>;
+        currentState = newState as ParserState;
       }
 
       if (successes >= count) {
@@ -510,8 +496,7 @@ function skipMany_<T, Ctx>(count: number) {
  * @param parser - The parser to skip
  * @returns A parser that skips all matches
  */
-export const skipMany0 = <T, Ctx = {}>(parser: Parser<T, Ctx>) =>
-  skipMany_<T, Ctx>(0)(parser);
+export const skipMany0 = <T>(parser: Parser<T>) => skipMany_<T>(0)(parser);
 
 /**
  * Creates a parser that skips one or more occurrences of the input parser.
@@ -519,8 +504,7 @@ export const skipMany0 = <T, Ctx = {}>(parser: Parser<T, Ctx>) =>
  * @param parser - The parser to skip
  * @returns A parser that skips all matches (requires at least one)
  */
-export const skipMany1 = <T, Ctx>(parser: Parser<T, Ctx>) =>
-  skipMany_<T, Ctx>(1)(parser);
+export const skipMany1 = <T>(parser: Parser<T>) => skipMany_<T>(1)(parser);
 
 /**
  * Creates a parser that skips exactly n occurrences of the input parser.
@@ -529,8 +513,8 @@ export const skipMany1 = <T, Ctx>(parser: Parser<T, Ctx>) =>
  * @param n - Number of required repetitions to skip
  * @returns A parser that skips exactly n matches
  */
-export const skipManyN = <T, Ctx>(parser: Parser<T, Ctx>, n: number) =>
-  skipMany_<T, Ctx>(n)(parser);
+export const skipManyN = <T>(parser: Parser<T>, n: number) =>
+  skipMany_<T>(n)(parser);
 
 /**
  * Creates a parser that skips input until the given parser succeeds.
@@ -538,9 +522,7 @@ export const skipManyN = <T, Ctx>(parser: Parser<T, Ctx>, n: number) =>
  * @param parser - The parser to look for
  * @returns A parser that skips input until a match is found
  */
-export function skipUntil<T, Ctx = {}>(
-  parser: Parser<T, Ctx>
-): Parser<undefined, Ctx> {
+export function skipUntil<T>(parser: Parser<T>): Parser<undefined> {
   return new Parser(state => {
     let currentState = state;
 
@@ -562,9 +544,7 @@ export function skipUntil<T, Ctx = {}>(
  * @param parser - The parser to look for
  * @returns A parser that takes input until a match is found
  */
-export function takeUntil<T, Ctx = {}>(
-  parser: Parser<T, Ctx>
-): Parser<string, Ctx> {
+export function takeUntil<T>(parser: Parser<T>): Parser<string> {
   return new Parser(state => {
     let currentState = state;
     let collected = "";
@@ -588,7 +568,7 @@ export function takeUntil<T, Ctx = {}>(
  * @param char - The character to look for
  * @returns A parser that takes input until the character is found
  */
-export function parseUntilChar<Ctx = {}>(char: string): Parser<string, Ctx> {
+export function parseUntilChar(char: string): Parser<string> {
   return new Parser(state => {
     if (char.length !== 1) {
       return Parser.fail(
@@ -683,9 +663,9 @@ export const skipSpaces = new Parser(
  * // Errors from all three parsers are accumulated
  * ```
  */
-export function or<Parsers extends Parser<any, any>[], Ctx = {}>(
+export function or<Parsers extends Parser<any>[]>(
   ...parsers: Parsers
-): Parser<Parsers[number] extends Parser<infer T, Ctx> ? T : never, Ctx> {
+): Parser<Parsers[number] extends Parser<infer T> ? T : never> {
   return new Parser(state => {
     const errors: ParseErr[] = [];
 
@@ -700,7 +680,7 @@ export function or<Parsers extends Parser<any, any>[], Ctx = {}>(
       errors.push(...result.left.errors);
 
       // Check if we're committed - if so, don't try other alternatives
-      if (newState.context?.committed && !state.context?.committed) {
+      if (newState?.committed && !state?.committed) {
         return Parser.failRich({ errors }, newState);
       }
     }
@@ -717,8 +697,8 @@ export function or<Parsers extends Parser<any, any>[], Ctx = {}>(
  * @param parser - The parser to make optional
  * @returns A parser that either succeeds with a value or undefined
  */
-export function optional<T, Ctx = {}>(parser: Parser<T, Ctx>) {
-  return new Parser((state: ParserState<Ctx>) => {
+export function optional<T>(parser: Parser<T>) {
+  return new Parser((state: ParserState) => {
     const { result, state: newState } = parser.run(state);
     if (Either.isLeft(result)) {
       return Parser.succeed(undefined, state);
@@ -741,14 +721,13 @@ export function optional<T, Ctx = {}>(parser: Parser<T, Ctx>) {
  * const anyKeyword = choice(keywords);
  * ```
  */
-export function choice<T, Ctx = {}>(parsers: Parser<T, Ctx>[]): Parser<T, Ctx> {
+export function choice<T>(parsers: Parser<T>[]): Parser<T> {
   return or(...parsers);
 }
 
-type LastParser<T, Ctx = {}> =
-  T extends [...any[], Parser<infer L, Ctx>] ? L : never;
+type LastParser<T> = T extends [...any[], Parser<infer L>] ? L : never;
 
-type SequenceOutput<T extends Parser<any, any>[], Acc extends any[] = []> =
+type SequenceOutput<T extends Parser<any>[], Acc extends any[] = []> =
   T["length"] extends 0 ? Acc
   : T extends [Parser<infer Head extends any>, ...infer Tail extends any[]] ?
     SequenceOutput<Tail, [...Acc, Head]>
@@ -786,7 +765,7 @@ export function sequence<const T extends any[]>(
  * @param re - The regular expression to match against
  * @returns A parser that matches the regex pattern
  */
-export const regex = <Ctx = {}>(re: RegExp): Parser<string, Ctx> => {
+export const regex = (re: RegExp): Parser<string> => {
   // Create a new RegExp without global flag to ensure consistent behavior
   const nonGlobalRe = new RegExp(re.source, re.flags.replace("g", ""));
 
@@ -795,7 +774,7 @@ export const regex = <Ctx = {}>(re: RegExp): Parser<string, Ctx> => {
       const match = nonGlobalRe.exec(state.remaining);
       if (match && match.index === 0) {
         const value = match[0];
-        return Parser.succeed(value, State.consume<Ctx>(state, value.length));
+        return Parser.succeed(value, State.consume(state, value.length));
       }
       const message = `Expected ${re} but found ${state.remaining.slice(0, 10)}...`;
       return Parser.fail({ message, expected: [re.toString()] }, state);
@@ -906,13 +885,12 @@ export function takeUpto<T>(parser: Parser<T>): Parser<string> {
  * ```
  *
  * @see {@link cut} - Alias with Prolog-style naming
- * @see {@link Parser.commit} - Instance method version
  */
-export function commit<Ctx extends { source: string }>(): Parser<void, Ctx> {
+export function commit(): Parser<void> {
   return new Parser(state => {
     return Parser.succeed(void 0, {
       ...state,
-      context: { ...state.context, committed: true }
+      committed: true
     }) as any;
   });
 }
@@ -987,7 +965,7 @@ export const cut = commit;
  *
  * @see {@link Parser.atomic} - Instance method version
  */
-export function atomic<T, Ctx = {}>(parser: Parser<T, Ctx>): Parser<T, Ctx> {
+export function atomic<T>(parser: Parser<T>): Parser<T> {
   return parser.atomic();
 }
 
@@ -1004,7 +982,7 @@ export function atomic<T, Ctx = {}>(parser: Parser<T, Ctx>): Parser<T, Ctx> {
  * notQuote.parse('"') // Error: Expected any character except '"'
  * ```
  */
-export function notChar<Ctx = {}>(ch: string): Parser<string, Ctx> {
+export function notChar(ch: string): Parser<string> {
   return new Parser(state => {
     if (ch.length !== 1) {
       return Parser.fail(
@@ -1041,7 +1019,7 @@ export function notChar<Ctx = {}>(ch: string): Parser<string, Ctx> {
  * parser.parse("hello world") // Error: Expected end of input
  * ```
  */
-export const eof = new Parser<void, any>(state => {
+export const eof = new Parser<void>(state => {
   if (state.remaining.length === 0) {
     return Parser.succeed(undefined, state);
   }
@@ -1071,10 +1049,7 @@ export const eof = new Parser<void, any>(state => {
  * threeDigits.parse("12") // Error: not enough matches
  * ```
  */
-export function count<T, Ctx = {}>(
-  n: number,
-  parser: Parser<T, Ctx>
-): Parser<T[], Ctx> {
+export function count<T>(n: number, parser: Parser<T>): Parser<T[]> {
   return Parser.gen(function* () {
     const results: T[] = [];
     for (let i = 0; i < n; i++) {
@@ -1099,16 +1074,13 @@ export function count<T, Ctx = {}>(
  * list.parse("1,2,3,") // Success: [1, 2, 3] (trailing comma OK)
  * ```
  */
-export function sepEndBy<S, T, Ctx = {}>(
-  parser: Parser<T, Ctx>,
-  sep: Parser<S, Ctx>
-): Parser<T[], Ctx> {
+export function sepEndBy<S, T>(parser: Parser<T>, sep: Parser<S>): Parser<T[]> {
   return or(
-    Parser.gen<T[], Ctx>(function* () {
+    Parser.gen<T[]>(function* () {
       const elements = yield* sepBy(parser, sep);
       yield* optional(sep); // Allow trailing separator
       return elements;
     }),
-    Parser.pure<T[], Ctx>([])
+    Parser.pure<T[]>([])
   );
 }

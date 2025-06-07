@@ -1,29 +1,22 @@
 import type { Either } from "./either";
-import type { Prettify } from "./types";
 import type { ParseErrorBundle } from "./errors";
-
-export type ParserContext<Ctx = {}> = Prettify<
-  Ctx & {
-    source: string;
-    gebug?: boolean;
-    labelStack?: string[];
-    committed?: boolean;
-  }
->;
 
 export type ParserOptions = { name?: string };
 
-export type ParserOutput<T, Ctx = {}> = {
-  state: ParserState<Ctx>;
+export type ParserOutput<T> = {
+  state: ParserState;
   result: Either<T, ParseErrorBundle>;
 };
 
 export type SourcePosition = { line: number; column: number; offset: number };
 
-export type ParserState<Ctx = {}> = {
+export type ParserState = {
   remaining: string;
   pos: SourcePosition;
-  context: ParserContext<Ctx>;
+  source: string;
+  debug?: boolean;
+  labelStack?: string[];
+  committed?: boolean;
 };
 
 /**
@@ -36,14 +29,11 @@ export const State = {
    * @param input - The input string to parse
    * @returns A new parser state initialized at the start of the input
    */
-  fromInput<Ctx = {}>(
-    input: string,
-    context: ParserContext<Ctx>
-  ): ParserState<Ctx> {
+  fromInput(input: string): ParserState {
     return {
       remaining: input,
-      pos: { line: 1, column: 1, offset: 0 },
-      context
+      source: input,
+      pos: { line: 1, column: 1, offset: 0 }
     };
   },
 
@@ -55,7 +45,7 @@ export const State = {
    * @returns A new state with n characters consumed and position updated
    * @throws Error if attempting to consume more characters than remaining
    */
-  consume<Ctx = {}>(state: ParserState<Ctx>, n: number): ParserState<Ctx> {
+  consume(state: ParserState, n: number): ParserState {
     if (n === 0) return state;
     if (n > state.remaining.length) {
       throw new Error("Cannot consume more characters than remaining");
@@ -75,9 +65,9 @@ export const State = {
     }
 
     return {
+      ...state,
       remaining: state.remaining.slice(n),
-      pos: { line, column, offset },
-      context: state.context
+      pos: { line, column, offset }
     };
   },
 
@@ -89,10 +79,7 @@ export const State = {
    * @returns A new state with the string consumed and position updated
    * @throws Error if the input doesn't start with the specified string
    */
-  consumeString<Ctx = {}>(
-    state: ParserState<Ctx>,
-    str: string
-  ): ParserState<Ctx> {
+  consumeString(state: ParserState, str: string): ParserState {
     if (!state.remaining.startsWith(str)) {
       throw new Error(
         `Cannot consume "${str}" - input "${state.remaining}" doesn't start with it`
@@ -101,11 +88,11 @@ export const State = {
     return State.consume(state, str.length);
   },
 
-  move<Ctx = {}>(state: ParserState<Ctx>, moveBy: number) {
+  move(state: ParserState, moveBy: number) {
     return State.consume(
       {
         ...state,
-        remaining: state.context.source,
+        remaining: state.source,
         pos: { line: 1, column: 1, offset: 0 }
       },
       state.pos.offset + moveBy
@@ -119,10 +106,10 @@ export const State = {
    * @param predicate - Function that tests each character
    * @returns A new state with matching characters consumed
    */
-  consumeWhile<Ctx = {}>(
-    state: ParserState<Ctx>,
+  consumeWhile(
+    state: ParserState,
     predicate: (char: string) => boolean
-  ): ParserState<Ctx> {
+  ): ParserState {
     let i = 0;
     while (i < state.remaining.length && predicate(state.remaining[i])) {
       i++;
@@ -137,7 +124,7 @@ export const State = {
    * @param n - Number of characters to peek (default: 1)
    * @returns The next n characters as a string
    */
-  peek<Ctx = {}>(state: ParserState<Ctx>, n: number = 1): string {
+  peek(state: ParserState, n: number = 1): string {
     return state.remaining.slice(0, n);
   },
 
@@ -147,11 +134,11 @@ export const State = {
    * @param state - The current parser state
    * @returns True if at end of input, false otherwise
    */
-  isAtEnd<Ctx = {}>(state: ParserState<Ctx>): boolean {
+  isAtEnd(state: ParserState): boolean {
     return state.remaining.length === 0;
   },
 
-  printPosition<Ctx = {}>(state: ParserState<Ctx>): string {
+  printPosition(state: ParserState): string {
     return `line ${state.pos.line}, column ${state.pos.column}, offset ${state.pos.offset}`;
   }
 };

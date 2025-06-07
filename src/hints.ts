@@ -97,7 +97,7 @@ export const keywordWithHints = (keywords: string[]) => (keyword: string) =>
       tag: "Unexpected",
       span: createSpan(state, found.length),
       found,
-      context: state.context.labelStack || [],
+      context: state.labelStack || [],
       ...(hints.length > 0 && { hints })
     };
 
@@ -119,9 +119,7 @@ export const keywordWithHints = (keywords: string[]) => (keyword: string) =>
  * const result = keywordParser.parse("functoin")
  * ```
  */
-export function anyKeywordWithHints<Ctx = {}>(
-  keywords: string[]
-): Parser<string, Ctx> {
+export function anyKeywordWithHints(keywords: string[]): Parser<string> {
   return new Parser(state => {
     // Try each keyword
     for (const keyword of keywords) {
@@ -140,7 +138,7 @@ export function anyKeywordWithHints<Ctx = {}>(
       tag: "Unexpected",
       span: createSpan(state, found.length),
       found,
-      context: state.context.labelStack || [],
+      context: state.labelStack || [],
       ...(hints.length > 0 && { hints })
     };
 
@@ -162,9 +160,7 @@ export function anyKeywordWithHints<Ctx = {}>(
  * const result = colorParser.parse('"gren"')
  * ```
  */
-export function stringWithHints<Ctx = {}>(
-  validStrings: string[]
-): Parser<string, Ctx> {
+export function stringWithHints(validStrings: string[]): Parser<string> {
   return new Parser(state => {
     // Must start with quote
     if (!state.remaining.startsWith('"')) {
@@ -172,7 +168,7 @@ export function stringWithHints<Ctx = {}>(
         tag: "Expected",
         span: createSpan(state, 1),
         items: ["string literal"],
-        context: state.context.labelStack || []
+        context: state.labelStack || []
       };
       return Parser.failRich({ errors: [error] }, state);
     }
@@ -190,7 +186,7 @@ export function stringWithHints<Ctx = {}>(
         tag: "Expected",
         span: createSpan(state, i),
         items: ["closing quote"],
-        context: state.context.labelStack || []
+        context: state.labelStack || []
       };
       return Parser.failRich({ errors: [error] }, state);
     }
@@ -207,7 +203,7 @@ export function stringWithHints<Ctx = {}>(
       tag: "Unexpected",
       span: createSpan(state, i + 1),
       found: `"${content}"`,
-      context: state.context.labelStack || [],
+      context: state.labelStack || [],
       ...(hints.length > 0 && { hints: hints.map(h => `"${h}"`) })
     };
 
