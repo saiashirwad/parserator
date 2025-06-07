@@ -129,8 +129,8 @@ export function narrowedString<const T extends string, Ctx>(
  * parser.run("xyz") // Left(error)
  * ```
  */
-export const char = <T extends string, Ctx = {}>(ch: T): Parser<T, Ctx> => {
-  return new Parser(
+export const char = <T extends string, Ctx = {}>(ch: T): Parser<T, Ctx> =>
+  new Parser(
     state => {
       if (ch.length !== 1) {
         return Parser.fail(
@@ -150,7 +150,6 @@ export const char = <T extends string, Ctx = {}>(ch: T): Parser<T, Ctx> => {
     },
     { name: ch }
   );
-};
 
 /**
  * A parser that matches any single alphabetic character (a-z, A-Z).
@@ -1057,12 +1056,6 @@ export const eof = new Parser<void, any>(state => {
     state
   );
 });
-
-/**
- * Backward-compatible alias for lookahead.
- * @deprecated Use {@link lookahead} instead
- */
-export const lookAhead = lookahead;
 
 /**
  * Parses exactly n occurrences of a parser.
