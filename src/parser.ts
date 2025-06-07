@@ -7,9 +7,9 @@ import {
   type ParserState,
   State
 } from "./state";
-import type { Prettify } from "./types";
+import type { Clean } from "./types";
 
-type BindResult<T, K extends string, B> = Prettify<T & { [k in K]: B }>;
+type BindResult<T, K extends string, B> = Clean<T & { [k in K]: B }>;
 
 export class Parser<T> {
   constructor(

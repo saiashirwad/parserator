@@ -8,7 +8,11 @@ export type ParserOutput<T> = {
   result: Either<T, ParseErrorBundle>;
 };
 
-export type SourcePosition = { line: number; column: number; offset: number };
+export type SourcePosition = {
+  line: number;
+  column: number;
+  offset: number;
+};
 
 export type ParserState = {
   remaining: string;
