@@ -1,5 +1,5 @@
 export * from "./combinators";
-export * from "./debug";
+// export * from "./debug";
 export * from "./either";
 export * from "./error-formatter";
 export * from "./hints";

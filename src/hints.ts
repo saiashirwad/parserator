@@ -1,5 +1,5 @@
 import { Parser } from "./parser";
-import { type ParseErr, createSpan } from "./errors";
+import { type ParseError, createSpan } from "./errors";
 import { State } from "./state";
 
 /**
@@ -93,7 +93,7 @@ export const keywordWithHints = (keywords: string[]) => (keyword: string) =>
 
     const hints = generateHints(found, keywords);
 
-    const error: ParseErr = {
+    const error: ParseError = {
       tag: "Unexpected",
       span: createSpan(state, found.length),
       found,
@@ -134,7 +134,7 @@ export function anyKeywordWithHints(keywords: string[]): Parser<string> {
 
     const hints = generateHints(found, keywords);
 
-    const error: ParseErr = {
+    const error: ParseError = {
       tag: "Unexpected",
       span: createSpan(state, found.length),
       found,
@@ -164,7 +164,7 @@ export function stringWithHints(validStrings: string[]): Parser<string> {
   return new Parser(state => {
     // Must start with quote
     if (!state.remaining.startsWith('"')) {
-      const error: ParseErr = {
+      const error: ParseError = {
         tag: "Expected",
         span: createSpan(state, 1),
         items: ["string literal"],
@@ -182,7 +182,7 @@ export function stringWithHints(validStrings: string[]): Parser<string> {
     }
 
     if (i >= state.remaining.length) {
-      const error: ParseErr = {
+      const error: ParseError = {
         tag: "Expected",
         span: createSpan(state, i),
         items: ["closing quote"],
@@ -199,7 +199,7 @@ export function stringWithHints(validStrings: string[]): Parser<string> {
     // Generate hints for invalid content
     const hints = generateHints(content, validStrings);
 
-    const error: ParseErr = {
+    const error: ParseError = {
       tag: "Unexpected",
       span: createSpan(state, i + 1),
       found: `"${content}"`,

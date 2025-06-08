@@ -3,7 +3,7 @@
  */
 
 import { Either } from "./either";
-import type { ParseErr, ParseErrorBundle } from "./errors";
+import type { ParseError, ParseErrorBundle } from "./errors";
 import { Parser } from "./parser";
 import { type ParserState, State } from "./state";
 
@@ -437,7 +437,7 @@ export const manyNExact = <S, T>(
     const results = yield* manyN(parser, n, separator);
     if (results.length !== n) {
       const message = `Expected exactly ${n} occurrences, but found ${results.length}`;
-      return yield* Parser.error(message);
+      return yield* Parser.fatal(message);
     }
     return results;
   });
@@ -653,7 +653,7 @@ export function or<Parsers extends Parser<any>[]>(
   ...parsers: Parsers
 ): Parser<Parsers[number] extends Parser<infer T> ? T : never> {
   return new Parser(state => {
-    const errors: ParseErr[] = [];
+    const errors: ParseError[] = [];
 
     for (const parser of parsers) {
       const { result, state: newState } = parser.run(state);

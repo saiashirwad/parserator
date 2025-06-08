@@ -1,8 +1,6 @@
 import type { Either } from "./either";
 import type { ParseErrorBundle } from "./errors";
 
-export type ParserOptions = { name?: string };
-
 export type ParserOutput<T> = {
   state: ParserState;
   result: Either<T, ParseErrorBundle>;

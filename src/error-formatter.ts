@@ -1,4 +1,4 @@
-import type { ParseErr, ParseErrorBundle } from "./errors";
+import type { ParseError, ParseErrorBundle } from "./errors";
 
 export type ErrorFormat = "plain" | "ansi" | "html" | "json";
 
@@ -294,10 +294,6 @@ export class ErrorFormatter {
           context: err.context || [],
           ...(err.tag === "Expected" && { items: err.items, found: err.found }),
           ...(err.tag === "Unexpected" && { found: err.found }),
-          ...(err.tag === "Custom" && {
-            message: err.message,
-            hints: err.hints
-          }),
           ...(err.tag === "Fatal" && { message: err.message })
         }))
       },
@@ -310,7 +306,7 @@ export class ErrorFormatter {
    * Format the error message based on error type.
    */
   private formatErrorMessage(
-    error: ParseErr,
+    error: ParseError,
     useColors: boolean = true
   ): string {
     const red = useColors ? "\x1b[31m" : "";
@@ -333,7 +329,7 @@ export class ErrorFormatter {
   /**
    * Get plain error message without formatting.
    */
-  private getPlainErrorMessage(error: ParseErr): string {
+  private getPlainErrorMessage(error: ParseError): string {
     switch (error.tag) {
       case "Expected":
         const foundText = error.found ? `, found ${error.found}` : "";
@@ -419,10 +415,10 @@ export class ErrorFormatter {
   /**
    * Get hints from an error, handling the union type safely.
    */
-  private getHints(error: ParseErr): string[] {
-    if (error.tag === "Custom" && error.hints) {
-      return error.hints;
-    }
+  private getHints(error: ParseError): string[] {
+    // if (error.tag === "Custom" && error.hints) {
+    //   return error.hints;
+    // }
     if (error.tag === "Unexpected" && error.hints) {
       return error.hints;
     }

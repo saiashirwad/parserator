@@ -52,7 +52,7 @@ const identifier = token(
     .label("identifier")
     .flatMap(name =>
       keywords.includes(name) ?
-        Parser.error(
+        Parser.fatal(
           `'${name}' is a reserved keyword and cannot be used as an identifier`
         )
       : Parser.lift(name)
@@ -191,7 +191,7 @@ const primaryExpression: Parser<Expression> = or(
           } else {
             // Shorthand property - key must be an identifier
             if (typeof key !== "string") {
-              return yield* Parser.error(
+              return yield* Parser.fatal(
                 "Shorthand properties must use identifiers"
               );
             }

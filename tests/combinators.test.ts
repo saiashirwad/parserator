@@ -40,7 +40,7 @@ const stringParser = skipSpaces
 const integerParser = skipSpaces
   .then(many1(digit))
   .map(s => parseInt(s.join("")))
-  .withError(() => "Expected an integer");
+  .expect("an integer");
 
 // test("sepBy string array", () => {
 //   const p = char("[")
@@ -180,10 +180,9 @@ describe("complex combinations", () => {
 
 describe("error handling", () => {
   test("custom error messages", () => {
-    const p = digit.withError(
-      ({ state }) => `Expected a digit at position ${state.pos.offset}`
-    );
+    const p = digit.expect("a digit");
     const { result } = p.parse("a");
+    console.log(result._tag === "Left" && result.left.format("ansi"));
     expect(Either.isLeft(result)).toBe(true);
   });
 

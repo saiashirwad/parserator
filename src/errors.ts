@@ -5,15 +5,15 @@ export type Span = {
   column: number;
 };
 
-type ExpectedParseErr = {
+type ExpectedParseError = {
   tag: "Expected";
   span: Span;
   items: string[];
   context: string[];
-  found?: string; // ADD: What was actually found
+  found?: string;
 };
 
-type UnexpectedParseErr = {
+type UnexpectedParseError = {
   tag: "Unexpected";
   span: Span;
   found: string;
@@ -21,7 +21,7 @@ type UnexpectedParseErr = {
   hints?: string[];
 };
 
-type CustomParseErr = {
+type CustomParseError = {
   tag: "Custom";
   span: Span;
   message: string;
@@ -29,32 +29,53 @@ type CustomParseErr = {
   context: string[];
 };
 
-type FatalParseErr = {
+type FatalParseError = {
   tag: "Fatal";
   span: Span;
   message: string;
   context: string[];
 };
 
-export type ParseErr =
-  | ExpectedParseErr
-  | UnexpectedParseErr
-  | CustomParseErr
-  | FatalParseErr;
+export type ParseError =
+  | CustomParseError
+  | ExpectedParseError
+  | UnexpectedParseError
+  | FatalParseError;
+
+export const ParseError = {
+  expected: (params: Omit<ExpectedParseError, "tag">): ExpectedParseError => ({
+    tag: "Expected",
+    ...params
+  }),
+  unexpected: (
+    params: Omit<UnexpectedParseError, "tag">
+  ): UnexpectedParseError => ({
+    tag: "Unexpected",
+    ...params
+  }),
+  custom: (params: Omit<CustomParseError, "tag">): CustomParseError => ({
+    tag: "Custom",
+    ...params
+  }),
+  fatal: (params: Omit<FatalParseError, "tag">): FatalParseError => ({
+    tag: "Fatal",
+    ...params
+  })
+};
 
 export class ParseErrorBundle {
   constructor(
-    public errors: ParseErr[],
+    public errors: ParseError[],
     public source: string
   ) {}
 
-  get primary(): ParseErr {
+  get primary(): ParseError {
     return this.errors.reduce((furthest, current) =>
       current.span.offset > furthest.span.offset ? current : furthest
     );
   }
 
-  get primaryErrors(): ParseErr[] {
+  get primaryErrors(): ParseError[] {
     const maxOffset = this.primary.span.offset;
     return this.errors.filter(err => err.span.offset === maxOffset);
   }

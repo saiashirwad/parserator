@@ -1,12 +1,7 @@
-import { debug } from "./debug";
+// import { debug } from "./debug";
 import { Either } from "./either";
-import { type ParseErr, ParseErrorBundle, createSpan } from "./errors";
-import {
-  type ParserOptions,
-  type ParserOutput,
-  type ParserState,
-  State
-} from "./state";
+import { ParseError, ParseErrorBundle, createSpan } from "./errors";
+import { type ParserOutput, type ParserState, State } from "./state";
 import type { Clean } from "./types";
 
 type BindResult<T, K extends string, B> = Clean<T & { [k in K]: B }>;
@@ -19,21 +14,118 @@ export class Parser<T> {
     public run: (state: ParserState) => ParserOutput<T>
   ) {}
 
+  // Monad/Applicative
+
   static succeed<T>(value: T, state: ParserState): ParserOutput<T> {
     return { state, result: Either.right(value) };
   }
 
+  /**
+   * Creates a parser that always succeeds with the given value without consuming any input.
+   *
+   * This is the basic way to inject a value into the parser context. The parser will
+   * succeed immediately with the provided value and won't advance the parser state.
+   *
+   * @param a - The value to lift into the parser context
+   * @returns A parser that always succeeds with the given value
+   * @template A The type of the value being lifted
+   *
+   * @example
+   * ```ts
+   * const always42 = Parser.lift(42)
+   * always42.parse("any input") // succeeds with 42
+   *
+   * // Useful for providing default values
+   * const parseNumberOrDefault = number.or(Parser.lift(0))
+   *
+   * // Can be used to inject values in parser chains
+   * const parser = Parser.gen(function* () {
+   *   const name = yield* identifier
+   *   const separator = yield* Parser.lift(":")
+   *   const value = yield* number
+   *   return { name, separator, value }
+   * })
+   * ```
+   */
   static lift = <A>(a: A): Parser<A> =>
     new Parser(state => Parser.succeed(a, state));
 
+  /**
+   * Lifts a binary function into the parser context, applying it to the results of two parsers.
+   *
+   * This is the applicative functor's version of `map` for functions of two arguments.
+   * It runs both parsers in sequence and applies the function to their results if both succeed.
+   *
+   * @param ma - The first parser
+   * @param mb - The second parser
+   * @param f - A function that takes the results of both parsers and produces a new value
+   * @returns A parser that applies the function to the results of both input parsers
+   * @template A The type of value produced by the first parser
+   * @template B The type of value produced by the second parser
+   * @template C The type of value produced by applying the function
+   *
+   * @example
+   * ```ts
+   * // Combine two parsed values with a function
+   * const parsePoint = Parser.liftA2(
+   *   number,
+   *   number.trimLeft(comma),
+   *   (x, y) => ({ x, y })
+   * )
+   * parsePoint.parse("10, 20") // succeeds with { x: 10, y: 20 }
+   *
+   * // Build a data structure from multiple parsers
+   * const parsePerson = Parser.liftA2(
+   *   identifier,
+   *   number.trimLeft(colon),
+   *   (name, age) => ({ name, age })
+   * )
+   * parsePerson.parse("John:30") // succeeds with { name: "John", age: 30 }
+   * ```
+   */
   static liftA2 = <A, B, C>(
     ma: Parser<A>,
     mb: Parser<B>,
     f: (a: A, b: B) => C
   ) => ma.zip(mb).map(args => f(...args));
 
+  /**
+   * Applies a parser that produces a function to a parser that produces a value.
+   *
+   * This is the applicative functor's application operator. It allows you to apply
+   * functions within the parser context, enabling powerful composition patterns.
+   *
+   * @param ma - A parser that produces a value
+   * @param mf - A parser that produces a function from that value type to another type
+   * @returns A parser that applies the parsed function to the parsed value
+   * @template A The type of the input value
+   * @template B The type of the output value after function application
+   *
+   * @example
+   * ```ts
+   * // Parse a function name and apply it
+   * const parseFn = choice([
+   *   string("double").map(() => (x: number) => x * 2),
+   *   string("square").map(() => (x: number) => x * x)
+   * ])
+   * const result = Parser.ap(number, parseFn.trimLeft(space))
+   * result.parse("5 double") // succeeds with 10
+   * result.parse("5 square") // succeeds with 25
+   *
+   * // Chain multiple applications
+   * const add = (x: number) => (y: number) => x + y
+   * const parseAdd = Parser.lift(add)
+   * const addParser = Parser.ap(
+   *   number,
+   *   Parser.ap(number.trimLeft(plus), parseAdd)
+   * )
+   * addParser.parse("3 + 4") // succeeds with 7
+   * ```
+   */
   static ap = <A, B>(ma: Parser<A>, mf: Parser<(_: A) => B>) =>
     mf.zip(ma).map(([f, a]) => f(a));
+
+  // Error handling
 
   static fail(
     error: { message: string; expected?: string[]; found?: string },
@@ -47,7 +139,7 @@ export class Parser<T> {
       }
     });
 
-    const parseErr: ParseErr = {
+    const parseErr: ParseError = {
       tag: "Custom",
       span,
       message: error.message,
@@ -61,34 +153,6 @@ export class Parser<T> {
     );
 
     return { state, result: Either.left(bundle) };
-  }
-
-  static error(
-    message: string,
-    hints?: string[],
-    stateCallback?: (state: ParserState) => ParserState
-  ): Parser<never> {
-    return new Parser(state => {
-      const error: ParseErr = {
-        tag: "Custom",
-        span: createSpan(state),
-        message,
-        hints,
-        context: state?.labelStack ?? []
-      };
-      return Parser.failRich(
-        { errors: [error] },
-        stateCallback ? stateCallback(state) : state
-      );
-    });
-  }
-
-  static selectRight<A>(p: Parser<A>): Parser<Either<A, never>> {
-    return p.flatMap(a => Parser.lift(Either.right(a)));
-  }
-
-  static selectLeft<A>(p: Parser<A>): Parser<Either<never, A>> {
-    return p.flatMap(a => Parser.lift(Either.left(a)));
   }
 
   /**
@@ -122,160 +186,27 @@ export class Parser<T> {
   static fatal(message: string): Parser<never> {
     return new Parser(state => {
       const span = createSpan(state);
-      const fatalError: ParseErr = {
-        tag: "Fatal",
-        span,
-        message,
-        context: state?.labelStack ?? []
-      };
 
-      return Parser.failRich({ errors: [fatalError] }, state);
-    });
-  }
-
-  /**
-   * Creates a parser that fails with an Expected error.
-   * Used when specific tokens or patterns were expected.
-   *
-   * @param items - Array of expected items (tokens, patterns, etc.)
-   * @param found - What was actually found (optional)
-   * @returns A parser that always fails with an Expected error
-   *
-   * @example
-   * ```ts
-   * Parser.expected([")", "]"], "{")  // Expected ) or ], found {
-   * Parser.expected(["identifier"])   // Expected identifier
-   * ```
-   */
-  static expected(items: string[], found?: string): Parser<never> {
-    return new Parser(state => {
-      const error: ParseErr = {
-        tag: "Expected",
-        span: createSpan(state),
-        items,
-        found,
-        context: state?.labelStack ?? []
-      };
-      return Parser.failRich({ errors: [error] }, state);
-    });
-  }
-
-  /**
-   * Creates a parser that fails with an Unexpected error.
-   * Used when unexpected input was encountered.
-   *
-   * @param found - What was found that wasn't expected
-   * @param hints - Optional hints for the user
-   * @returns A parser that always fails with an Unexpected error
-   *
-   * @example
-   * ```ts
-   * Parser.unexpected("}", ["Expected closing paren"])
-   * Parser.unexpected("123", ["Identifiers cannot start with numbers"])
-   * ```
-   */
-  static unexpected(found: string, hints?: string[]): Parser<never> {
-    return new Parser(state => {
-      const error: ParseErr = {
-        tag: "Unexpected",
-        span: createSpan(state),
-        found,
-        hints,
-        context: state?.labelStack ?? []
-      };
-      return Parser.failRich({ errors: [error] }, state);
-    });
-  }
-
-  /**
-   * Creates a parser that fails with a specific error type and options.
-   * This is the most powerful error creation method for complex cases.
-   *
-   * @param options - Configuration object for the error
-   * @returns A parser that always fails with the specified error
-   *
-   * @example
-   * ```ts
-   * Parser.failWith({
-   *   type: "expected",
-   *   items: ["identifier", "number"],
-   *   found: "string literal",
-   *   hints: ["Variables must start with letters"]
-   * })
-   *
-   * Parser.failWith({
-   *   type: "fatal",
-   *   message: "Cannot recover from this syntax error"
-   * })
-   * ```
-   */
-  static failWith(options: {
-    type: "expected" | "unexpected" | "custom" | "fatal";
-    message?: string;
-    items?: string[];
-    found?: string;
-    hints?: string[];
-  }): Parser<never> {
-    return new Parser(state => {
-      const span = createSpan(state);
-      const context = state?.labelStack ?? [];
-
-      let error: ParseErr;
-      switch (options.type) {
-        case "expected":
-          error = {
-            tag: "Expected",
-            span,
-            items: options.items ?? [],
-            found: options.found,
-            context
-          };
-          break;
-        case "unexpected":
-          error = {
-            tag: "Unexpected",
-            span,
-            found: options.found ?? "",
-            hints: options.hints,
-            context
-          };
-          break;
-        case "custom":
-          error = {
-            tag: "Custom",
-            span,
-            message: options.message ?? "",
-            hints: options.hints,
-            context
-          };
-          break;
-        case "fatal":
-          error = {
-            tag: "Fatal",
-            span,
-            message: options.message ?? "",
-            context
-          };
-          break;
-      }
-
-      return Parser.failRich({ errors: [error] }, state);
+      return Parser.failRich(
+        {
+          errors: [
+            {
+              tag: "Fatal",
+              span,
+              message,
+              context: state?.labelStack ?? []
+            }
+          ]
+        },
+        state
+      );
     });
   }
 
   parse(input: string): ParserOutput<T> {
-    const st = State.fromInput(input);
+    // const st = State.fromInput(input);
     const { result, state } = this.run(State.fromInput(input) as any);
     return { result, state };
-  }
-
-  withTrace(label: string): Parser<T> {
-    return new Parser<T>(state => {
-      if (!state?.debug) {
-        return this.run(state);
-      }
-      return debug(this, label).run(state);
-    });
   }
 
   parseOrError(input: string) {
@@ -497,7 +428,7 @@ export class Parser<T> {
 
       if (Either.isLeft(result.result)) {
         // Convert generic errors to labeled expectations
-        const labeledError: ParseErr = {
+        const labeledError: ParseError = {
           tag: "Expected",
           span: createSpan(state),
           items: [name],
@@ -517,7 +448,18 @@ export class Parser<T> {
    * @returns A new parser with both labeling and error message
    */
   expect(description: string): Parser<T> {
-    return this.withError(() => `Expected ${description}`).label(description);
+    return new Parser<T>(state => {
+      const output = this.run(state);
+      if (Either.isLeft(output.result)) {
+        return Parser.fail(
+          {
+            message: `Expected ${description}`
+          },
+          output.state
+        );
+      }
+      return output;
+    });
   }
 
   /**
@@ -527,7 +469,7 @@ export class Parser<T> {
    * @returns A parser output with the error bundle and the current state
    */
   static failRich(
-    errorBundle: { errors: ParseErr[] },
+    errorBundle: { errors: ParseError[] },
     state: ParserState
   ): ParserOutput<never> {
     const bundle = new ParseErrorBundle(
@@ -664,3 +606,172 @@ export class Parser<T> {
 }
 
 export const parser = Parser.gen;
+
+// /**
+//  * Creates a parser that fails with an Expected error.
+//  * Used when specific tokens or patterns were expected.
+//  *
+//  * @param items - Array of expected items (tokens, patterns, etc.)
+//  * @param found - What was actually found (optional)
+//  * @returns A parser that always fails with an Expected error
+//  *
+//  * @example
+//  * ```ts
+//  * Parser.expected([")", "]"], "{")  // Expected ) or ], found {
+//  * Parser.expected(["identifier"])   // Expected identifier
+//  * ```
+//  */
+// static expected(items: string[], found?: string): Parser<never> {
+//   return new Parser(state => {
+//     const error: ParseErr = {
+//       tag: "Expected",
+//       span: createSpan(state),
+//       items,
+//       found,
+//       context: state?.labelStack ?? []
+//     };
+//     return Parser.failRich({ errors: [error] }, state);
+//   });
+// }
+
+// /**
+//  * Creates a parser that fails with an Unexpected error.
+//  * Used when unexpected input was encountered.
+//  *
+//  * @param found - What was found that wasn't expected
+//  * @param hints - Optional hints for the user
+//  * @returns A parser that always fails with an Unexpected error
+//  *
+//  * @example
+//  * ```ts
+//  * Parser.unexpected("}", ["Expected closing paren"])
+//  * Parser.unexpected("123", ["Identifiers cannot start with numbers"])
+//  * ```
+//  */
+// static unexpected(found: string, hints?: string[]): Parser<never> {
+//   return new Parser(state => {
+//     const error: ParseErr = {
+//       tag: "Unexpected",
+//       span: createSpan(state),
+//       found,
+//       hints,
+//       context: state?.labelStack ?? []
+//     };
+//     return Parser.failRich({ errors: [error] }, state);
+//   });
+// }
+
+// static selectRight<A>(p: Parser<A>): Parser<Either<A, never>> {
+//   return p.flatMap(a => Parser.lift(Either.right(a)));
+// }
+
+// static selectLeft<A>(p: Parser<A>): Parser<Either<never, A>> {
+//   return p.flatMap(a => Parser.lift(Either.left(a)));
+// }
+
+// /**
+//  * Creates a parser that fails with a specific error type and options.
+//  * This is the most powerful error creation method for complex cases.
+//  *
+//  * @param options - Configuration object for the error
+//  * @returns A parser that always fails with the specified error
+//  *
+//  * @example
+//  * ```ts
+//  * Parser.failWith({
+//  *   type: "expected",
+//  *   items: ["identifier", "number"],
+//  *   found: "string literal",
+//  *   hints: ["Variables must start with letters"]
+//  * })
+//  *
+//  * Parser.failWith({
+//  *   type: "fatal",
+//  *   message: "Cannot recover from this syntax error"
+//  * })
+//  * ```
+//  */
+// static failWith(options: {
+//   type: "expected" | "unexpected" | "custom" | "fatal";
+//   message?: string;
+//   items?: string[];
+//   found?: string;
+//   hints?: string[];
+// }): Parser<never> {
+//   return new Parser(state => {
+//     const span = createSpan(state);
+//     const context = state?.labelStack ?? [];
+
+//     let error: ParseError;
+//     switch (options.type) {
+//       case "expected":
+//         error = {
+//           tag: "Expected",
+//           span,
+//           items: options.items ?? [],
+//           found: options.found,
+//           context
+//         };
+//         break;
+//       case "unexpected":
+//         error = {
+//           tag: "Unexpected",
+//           span,
+//           found: options.found ?? "",
+//           hints: options.hints,
+//           context
+//         };
+//         break;
+//       case "custom":
+//         error = {
+//           tag: "Custom",
+//           span,
+//           message: options.message ?? "",
+//           hints: options.hints,
+//           context
+//         };
+//         break;
+//       case "fatal":
+//         error = {
+//           tag: "Fatal",
+//           span,
+//           message: options.message ?? "",
+//           context
+//         };
+//         break;
+//     }
+
+//     return Parser.failRich({ errors: [error] }, state);
+//   });
+// }
+
+// static error(
+//   message: string,
+//   hints?: string[],
+//   stateCallback?: (state: ParserState) => ParserState
+// ): Parser<never> {
+//   return new Parser(state => {
+//     return Parser.failRich(
+//       {
+//         errors: [
+//           ParseError.custom({
+//             span: createSpan(state),
+//             message,
+//             hints,
+//             context: state?.labelStack ?? []
+//           })
+//         ]
+//       },
+//       stateCallback ? stateCallback(state) : state
+//     );
+//   });
+// }
+
+// withTrace(label: string): Parser<T> {
+//   return new Parser<T>(state => {
+//     if (!state?.debug) {
+//       return this.run(state);
+//     }
+//     return debug(this, label).run(state);
+//   });
+// }
