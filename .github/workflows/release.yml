@@ -1,0 +1,130 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version type to release'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      dry-run:
+        description: 'Perform a dry run (no actual publish)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Type check
+        run: bun run typecheck
+
+      - name: Build
+        run: bun run build
+
+      - name: Run tests
+        run: bun test
+
+      - name: Get current version
+        id: current-version
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Bump version (dry run)
+        if: ${{ inputs.dry-run }}
+        run: |
+          echo "Would bump version from ${{ steps.current-version.outputs.version }} with ${{ inputs.version }} bump"
+          npm version ${{ inputs.version }} --no-git-tag-version
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "New version would be: $NEW_VERSION"
+          git checkout -- package.json package-lock.json
+
+      - name: Bump version and create tag
+        if: ${{ !inputs.dry-run }}
+        run: |
+          npm version ${{ inputs.version }} -m "chore(release): %s"
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+
+      - name: Publish to npm (dry run)
+        if: ${{ inputs.dry-run }}
+        run: |
+          echo "Would publish to npm with:"
+          echo "  npm publish --access public --dry-run"
+          npm publish --access public --dry-run
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish to npm
+        if: ${{ !inputs.dry-run }}
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Push changes
+        if: ${{ !inputs.dry-run }}
+        run: |
+          git push origin main --follow-tags
+
+      - name: Create GitHub Release
+        if: ${{ !inputs.dry-run }}
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ env.NEW_VERSION }}
+          release_name: Release v${{ env.NEW_VERSION }}
+          body: |
+            ## What's Changed
+
+            This is a ${{ inputs.version }} release.
+
+            See the [commit history](https://github.com/${{ github.repository }}/compare/v${{ steps.current-version.outputs.version }}...v${{ env.NEW_VERSION }}) for details.
+          draft: false
+          prerelease: false
+
+      - name: Summary
+        run: |
+          if [[ "${{ inputs.dry-run }}" == "true" ]]; then
+            echo "## 🧪 Dry Run Complete" >> $GITHUB_STEP_SUMMARY
+            echo "Would have released version with ${{ inputs.version }} bump" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## 🚀 Release Complete" >> $GITHUB_STEP_SUMMARY
+            echo "Released version ${{ env.NEW_VERSION }}" >> $GITHUB_STEP_SUMMARY
+            echo "- NPM Package: https://www.npmjs.com/package/parserator" >> $GITHUB_STEP_SUMMARY
+            echo "- GitHub Release: https://github.com/${{ github.repository }}/releases/tag/v${{ env.NEW_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          fi

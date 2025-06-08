@@ -1,8 +1,8 @@
-import { copyFile } from "node:fs/promises"
-import { join } from "node:path"
+import { copyFile } from "node:fs/promises";
+import { join } from "node:path";
 
 async function main() {
-	await copyFile(join("dist", "index.d.ts"), join("dist", "index.d.cts"))
+  await copyFile(join("dist", "index.d.ts"), join("dist", "index.d.cts"));
 }
 
-main().catch(console.error)
+main().catch(console.error);
