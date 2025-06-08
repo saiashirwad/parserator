@@ -19,15 +19,14 @@ import { type ParserState, State } from "./state";
  * // Input position remains at 'abc', 'a' is not consumed
  * ```
  */
-export function lookahead<T>(parser: Parser<T>): Parser<T | undefined> {
-  return new Parser(state => {
+export const lookahead = <T>(parser: Parser<T>): Parser<T | undefined> =>
+  new Parser(state => {
     const { result } = parser.run(state);
     if (Either.isRight(result)) {
       return Parser.succeed(result.right, state);
     }
     return Parser.succeed(undefined, state);
   });
-}
 
 /**
  * Creates a parser that succeeds only if the given parser fails to match.
@@ -712,10 +711,10 @@ type SequenceOutput<T extends Parser<any>[], Acc extends any[] = []> =
  * parser.run('1-2') // Right([['1', '-', '2'], {...}])
  * ```
  */
-export function sequence<const T extends any[]>(
+export const sequence = <const T extends any[]>(
   parsers: T
-): Parser<SequenceOutput<T>> {
-  return Parser.gen(function* () {
+): Parser<SequenceOutput<T>> =>
+  Parser.gen(function* () {
     const results = [];
     for (const parser of parsers) {
       const result = yield* parser;
@@ -723,7 +722,6 @@ export function sequence<const T extends any[]>(
     }
     return results as any;
   });
-}
 
 /**
  * Creates a parser that matches input against a regular expression.

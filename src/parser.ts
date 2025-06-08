@@ -3,7 +3,24 @@ import { Either } from "./either";
 import { ParseError, ParseErrorBundle, createSpan } from "./errors";
 import { type ParserOutput, type ParserState, State } from "./state";
 
+/**
+ * Parser is the core type that represents a parser combinator.
+ *
+ * A parser is a function that takes an input state and produces either:
+ * - A successful parse result with the remaining input state
+ * - An error describing why the parse failed
+ *
+ * Parsers can be composed using various combinators to build complex parsers
+ * from simple building blocks.
+ *
+ * @template T The type of value this parser produces when successful
+ */
 export class Parser<T> {
+  /**
+   * Creates a new Parser instance.
+   *
+   * @param run - The parsing function that takes a parser state and returns a parse result
+   */
   constructor(
     /**
      * @internal
@@ -13,6 +30,18 @@ export class Parser<T> {
 
   // Monad/Applicative
 
+  /**
+   * Creates a successful parser output with the given value and state.
+   *
+   * This is a low-level helper used internally to construct successful parse results.
+   * It doesn't consume any input and returns the value with the current state unchanged.
+   *
+   * @param value - The value to wrap in a successful result
+   * @param state - The current parser state
+   * @returns A successful parser output containing the value
+   * @template T The type of the successful value
+   * @internal
+   */
   static succeed<T>(value: T, state: ParserState): ParserOutput<T> {
     return { state, result: Either.right(value) };
   }
@@ -124,6 +153,17 @@ export class Parser<T> {
 
   // Error handling
 
+  /**
+   * Creates a failed parser output with the given error information.
+   *
+   * This is a low-level helper for constructing parse errors. It creates a custom
+   * error with the provided message and optional expected/found information.
+   *
+   * @param error - Error details including message and optional expected/found values
+   * @param state - The parser state where the error occurred
+   * @returns A failed parser output containing the error
+   * @internal
+   */
   static fail(
     error: { message: string; expected?: string[]; found?: string },
     state: ParserState
@@ -136,13 +176,12 @@ export class Parser<T> {
       }
     });
 
-    const parseErr: ParseError = {
-      tag: "Custom",
+    const parseErr = ParseError.custom({
       span,
       message: error.message,
       context: state?.labelStack ?? [],
       hints: []
-    };
+    });
 
     const bundle = new ParseErrorBundle(
       [parseErr],
@@ -152,23 +191,38 @@ export class Parser<T> {
     return { state, result: Either.left(bundle) };
   }
 
+  /**
+   * Creates a parser that always fails with a fatal error.
+   *
+   * Fatal errors are non-recoverable and prevent backtracking in choice combinators.
+   * Use this when you've determined that the input is definitely malformed and trying
+   * other alternatives would be meaningless.
+   *
+   * @param message - The error message to display
+   * @returns A parser that always fails with a fatal error
+   *
+   * @example
+   * ```ts
+   * const number = regex(/-?[0-9]+/).map(Number);
+   * const parsePositive = number.flatMap(n =>
+   *   n > 0 ? Parser.lift(n) : Parser.fatal("Expected positive number")
+   * )
+   * ```
+   */
   static fatal(message: string): Parser<never> {
     return new Parser(state => {
       const span = createSpan(state);
-
-      return Parser.failRich(
-        {
-          errors: [
-            {
-              tag: "Fatal",
-              span,
-              message,
-              context: state?.labelStack ?? []
-            }
-          ]
-        },
-        state
+      const bundle = new ParseErrorBundle(
+        [
+          ParseError.fatal({
+            span,
+            message,
+            context: state?.labelStack ?? []
+          })
+        ],
+        state?.source ?? state.remaining
       );
+      return { state, result: Either.left(bundle) };
     });
   }
 
