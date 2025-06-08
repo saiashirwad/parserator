@@ -4,16 +4,16 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version type to release'
+        description: "Version type to release"
         required: true
-        default: 'patch'
+        default: "patch"
         type: choice
         options:
           - patch
           - minor
           - major
       dry-run:
-        description: 'Perform a dry run (no actual publish)'
+        description: "Perform a dry run (no actual publish)"
         required: false
         default: false
         type: boolean
@@ -44,9 +44,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
-          registry-url: 'https://registry.npmjs.org'
-          cache: 'npm'
+          node-version: "20.x"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         run: bun install
