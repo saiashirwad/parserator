@@ -694,25 +694,6 @@ export function optional<T>(parser: Parser<T>) {
   });
 }
 
-/**
- * Creates a parser that tries multiple parsers in order and returns the first success.
- * Convenience function for when you have an array of parsers.
- *
- * @param parsers - Array of parsers to try
- * @returns A parser that succeeds with the first successful parser's result
- *
- * @example
- * ```ts
- * const keywords = ["let", "const", "var"].map(k => string(k));
- * const anyKeyword = choice(keywords);
- * ```
- */
-export function choice<T>(parsers: Parser<T>[]): Parser<T> {
-  return or(...parsers);
-}
-
-type LastParser<T> = T extends [...any[], Parser<infer L>] ? L : never;
-
 type SequenceOutput<T extends Parser<any>[], Acc extends any[] = []> =
   T["length"] extends 0 ? Acc
   : T extends [Parser<infer Head extends any>, ...infer Tail extends any[]] ?
