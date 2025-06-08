@@ -14,11 +14,14 @@ function parseEmail(input: string) {
 
 // You write this:
 const email = parser(function* () {
-  const username = yield* many1(or(alphabet, digit, char(".")));
-  yield* char("@");
-  const domain = yield* sepBy1(many1(alphabet), char(".")).map(parts =>
-    parts.map(part => part.join("")).join(".")
+  const username = yield* many1(or(alphabet, digit, char("."))).expect(
+    "username"
   );
+  yield* char("@").expect("at symbol '@'");
+
+  const domain = yield* sepBy1(many1(or(alphabet, digit)), char("."))
+    .map(parts => parts.map(chars => chars.join("")).join("."))
+    .expect("domain name");
   return { username: username.join(""), domain };
 });
 ```
@@ -40,11 +43,11 @@ number.parseOrThrow("123"); // → 123
 
 // Parse coordinates like "(10, 20)"
 const coordinate = parser(function* () {
-  yield* char("(");
+  yield* char("(").expect("opening parenthesis '('");
   const x = yield* number;
-  yield* string(", ");
+  yield* string(", ").expect("comma between coordinates");
   const y = yield* number;
-  yield* char(")");
+  yield* char(")").expect("closing parenthesis ')'");
   return { x, y };
 });
 
