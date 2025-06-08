@@ -6,6 +6,14 @@ export type ParserOutput<T> = {
   result: Either<T, ParseErrorBundle>;
 };
 
+export const ParserOutput = <T>(
+  state: ParserState,
+  result: Either<T, ParseErrorBundle>
+): ParserOutput<T> => ({
+  state,
+  result
+});
+
 export type SourcePosition = {
   line: number;
   column: number;
