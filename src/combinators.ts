@@ -7,7 +7,6 @@ import type { ParseError, ParseErrorBundle } from "./errors";
 import { Parser, parser } from "./parser";
 import { type ParserState, State } from "./state";
 
-
 /**
  * Creates a parser that looks ahead in the input stream without consuming any input.
  * The parser will succeed with the result of the given parser but won't advance the input position.
