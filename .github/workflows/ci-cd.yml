@@ -1,0 +1,143 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main, master]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Type check
+        run: bun run typecheck
+
+      - name: Build
+        run: bun run build
+
+      - name: Run tests
+        run: bun test
+
+      - name: Format check
+        run: bun x prettier --check .
+
+  publish-npm:
+    needs: test
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build
+        run: bun run build
+
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  build-docs:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Generate docs
+        run: bun run docs
+
+      # Uncomment when VitePress is set up
+      # - name: Build VitePress site
+      #   run: bun run docs:build
+
+      # - name: Upload docs artifacts
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: docs
+      #     path: docs/.vitepress/dist
+
+  # Uncomment when ready to deploy docs
+  # deploy-docs:
+  #   needs: build-docs
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+  #   permissions:
+  #     contents: read
+  #     pages: write
+  #     id-token: write
+  #   environment:
+  #     name: github-pages
+  #     url: ${{ steps.deployment.outputs.page_url }}
+  #
+  #   steps:
+  #     - name: Download docs artifacts
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: docs
+  #         path: ./dist
+  #
+  #     - name: Setup Pages
+  #       uses: actions/configure-pages@v3
+  #
+  #     - name: Upload to GitHub Pages
+  #       uses: actions/upload-pages-artifact@v2
+  #       with:
+  #         path: ./dist
+  #
+  #     - name: Deploy to GitHub Pages
+  #       id: deployment
+  #       uses: actions/deploy-pages@v2

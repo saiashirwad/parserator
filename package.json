@@ -24,7 +24,6 @@
   "scripts": {
     "build": "tsup && bun build.ts",
     "test": "bun test",
-    "docs": "bun scripts/generate-docs.ts",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "bun run build && bun test",
     "publish:patch": "bun run build && npm version patch && npm publish --access public",
@@ -33,7 +32,15 @@
     "release:patch": "bun run build && bun test && bun run publish:patch",
     "release:minor": "bun run build && bun test && bun run publish:minor",
     "release:major": "bun run build && bun test && bun run publish:major",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "ci": "bun run typecheck && bun run build && bun test && bun run format:check",
+    "preversion": "bun run ci",
+    "version": "bun run format && git add -A",
+    "postversion": "git push && git push --tags",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "keywords": [
     "parser",
@@ -47,7 +54,8 @@
     "@types/bun": "^1.1.10",
     "prettier": "^3.5.3",
     "tsup": "^8.3.5",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitepress": "^1.6.3"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
