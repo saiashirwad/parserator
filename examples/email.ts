@@ -6,8 +6,11 @@ const email = parser(function* () {
   );
   yield* char("@").expect("at symbol '@'");
 
-  const domain = yield* sepBy1(many1(or(alphabet, digit)), char("."))
-    .map(parts => parts.map(chars => chars.join("")).join("."))
+  const domain = yield* sepBy1(
+    many1(or(alphabet, digit)).map(chars => chars.join("")),
+    char(".")
+  )
+    .map(parts => parts.join("."))
     .expect("domain name");
   return { username: username.join(""), domain };
 });
