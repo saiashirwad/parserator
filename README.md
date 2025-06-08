@@ -16,7 +16,9 @@ function parseEmail(input: string) {
 const email = parser(function* () {
   const username = yield* many1(or(alphabet, digit, char(".")));
   yield* char("@");
-  const domain = yield* sepBy1(many1(alphabet), char("."));
+  const domain = yield* sepBy1(many1(alphabet), char(".")).map(parts =>
+    parts.map(part => part.join("")).join(".")
+  );
   return { username: username.join(""), domain };
 });
 ```
