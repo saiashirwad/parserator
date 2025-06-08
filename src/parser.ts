@@ -65,7 +65,7 @@ export class Parser<T> {
    * const parseNumberOrDefault = number.or(Parser.lift(0))
    *
    * // Can be used to inject values in parser chains
-   * const parser = Parser.gen(function* () {
+   * const parser = parser(function* () {
    *   const name = yield* identifier
    *   const separator = yield* Parser.lift(":")
    *   const value = yield* number
@@ -606,7 +606,7 @@ export class Parser<T> {
    *
    * @example
    * ```ts
-   * const parser = Parser.gen(function* () {
+   * const parser = parser(function* () {
    *   const name = yield* identifier();
    *   yield* char(':');
    *   const value = yield* number();
@@ -757,7 +757,7 @@ export class Parser<T> {
    * @example
    * ```ts
    * // Use commit after matching a keyword to ensure specific error messages
-   * const ifStatement = Parser.gen(function* () {
+   * const ifStatement = parser(function* () {
    *   yield* keyword("if")
    *   yield* commit()  // After seeing "if", we know it's an if statement
    *   yield* char('(').expect("opening parenthesis after 'if'")
@@ -816,13 +816,13 @@ export class Parser<T> {
    * @example
    * ```ts
    * // Without atomic - partial consumption on failure
-   * const badParser = Parser.gen(function* () {
+   * const badParser = parser(function* () {
    *   yield* string("foo")
    *   yield* string("bar")  // If this fails, "foo" is already consumed
    * })
    *
    * // With atomic - no consumption on failure
-   * const goodParser = Parser.gen(function* () {
+   * const goodParser = parser(function* () {
    *   yield* string("foo")
    *   yield* string("bar")  // If this fails, we reset to before "foo"
    * }).atomic()

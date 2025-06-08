@@ -155,7 +155,7 @@ const primaryExpression: Parser<Expression> = or(
 
   // Function expression
   atomic(
-    Parser.gen(function* () {
+    parser(function* () {
       yield* keyword("function");
       yield* commit();
       yield* token(char("(")).expect("opening parenthesis after 'function'");
@@ -172,11 +172,11 @@ const primaryExpression: Parser<Expression> = or(
 
   // Object literal
   atomic(
-    Parser.gen(function* () {
+    parser(function* () {
       yield* token(char("{"));
       yield* commit();
       const properties = yield* sepBy(
-        Parser.gen(function* () {
+        parser(function* () {
           const key = yield* or(identifier, stringLiteral).expect(
             "property key"
           );
@@ -209,7 +209,7 @@ const primaryExpression: Parser<Expression> = or(
 
   // Array literal
   atomic(
-    Parser.gen(function* () {
+    parser(function* () {
       yield* token(char("["));
       yield* commit();
       const elements = yield* sepBy(
@@ -230,7 +230,7 @@ const primaryExpression: Parser<Expression> = or(
 );
 
 // Postfix expressions (function calls, member access)
-const postfixExpression: Parser<Expression> = Parser.gen(function* () {
+const postfixExpression: Parser<Expression> = parser(function* () {
   let expr = yield* primaryExpression;
 
   while (true) {
@@ -238,7 +238,7 @@ const postfixExpression: Parser<Expression> = Parser.gen(function* () {
       or(
         // Function call
         atomic(
-          Parser.gen(function* () {
+          parser(function* () {
             yield* token(char("("));
             const args = yield* sepBy(
               Parser.lazy(() => expression),
@@ -252,7 +252,7 @@ const postfixExpression: Parser<Expression> = Parser.gen(function* () {
         ),
         // Member access
         atomic(
-          Parser.gen(function* () {
+          parser(function* () {
             yield* token(char("."));
             const property = yield* identifier.expect(
               "property name after '.'"
@@ -277,7 +277,7 @@ const postfixExpression: Parser<Expression> = Parser.gen(function* () {
 
 // Unary expressions
 const unaryExpression: Parser<Expression> = or(
-  Parser.gen(function* () {
+  parser(function* () {
     const op = yield* unaryOp;
     const arg = yield* unaryExpression;
     return { type: "unary" as const, op, arg };
@@ -286,10 +286,10 @@ const unaryExpression: Parser<Expression> = or(
 );
 
 // Binary expressions (simplified - no precedence for now)
-const binaryExpression: Parser<Expression> = Parser.gen(function* () {
+const binaryExpression: Parser<Expression> = parser(function* () {
   const left = yield* unaryExpression;
   const rest = yield* optional(
-    Parser.gen(function* () {
+    parser(function* () {
       const op = yield* binaryOp;
       const right = yield* binaryExpression;
       return { op, right };
@@ -303,10 +303,10 @@ const binaryExpression: Parser<Expression> = Parser.gen(function* () {
 });
 
 // Assignment expression
-expression = Parser.gen(function* () {
+expression = parser(function* () {
   const left = yield* binaryExpression;
   const assignment = yield* optional(
-    Parser.gen(function* () {
+    parser(function* () {
       const op = yield* assignmentOp;
       yield* commit(); // After seeing assignment op, we're committed
       const right = yield* expression.expect(
@@ -339,7 +339,7 @@ expression = Parser.gen(function* () {
 let statement: Parser<Statement>;
 
 const blockStatement: Parser<Statement> = atomic(
-  Parser.gen(function* () {
+  parser(function* () {
     yield* token(char("{"));
     // Don't commit immediately - this could be an object literal
     const body = yield* many(Parser.lazy(() => statement));
@@ -348,7 +348,7 @@ const blockStatement: Parser<Statement> = atomic(
   })
 );
 
-const variableStatement: Parser<Statement> = Parser.gen(function* () {
+const variableStatement: Parser<Statement> = parser(function* () {
   const kind = yield* or(keyword("let"), keyword("const")) as Parser<
     "let" | "const"
   >;
@@ -357,7 +357,7 @@ const variableStatement: Parser<Statement> = Parser.gen(function* () {
   const name = yield* identifier.expect("variable name");
 
   const init = yield* optional(
-    Parser.gen(function* () {
+    parser(function* () {
       yield* token(char("="));
       return yield* expression.expect("initializer expression");
     })
@@ -372,7 +372,7 @@ const variableStatement: Parser<Statement> = Parser.gen(function* () {
   return { type: "variable" as const, kind, name, init };
 });
 
-const functionStatement: Parser<Statement> = Parser.gen(function* () {
+const functionStatement: Parser<Statement> = parser(function* () {
   yield* keyword("function");
   yield* commit();
 
@@ -411,7 +411,7 @@ const ifStatement: Parser<Statement> = parser(function* () {
   return { type: "if" as const, test, consequent, alternate };
 });
 
-const returnStatement: Parser<Statement> = Parser.gen(function* () {
+const returnStatement: Parser<Statement> = parser(function* () {
   yield* keyword("return");
   yield* commit();
 
@@ -427,7 +427,7 @@ const returnStatement: Parser<Statement> = Parser.gen(function* () {
 });
 
 // Expression statement
-const expressionStatement: Parser<Statement> = Parser.gen(function* () {
+const expressionStatement: Parser<Statement> = parser(function* () {
   const expr = yield* expression;
   yield* token(char(";")).expect("semicolon after expression");
   return { type: "expression" as const, expression: expr };
@@ -443,7 +443,7 @@ statement = or(
 );
 
 // Program parser
-const program = Parser.gen(function* () {
+const program = parser(function* () {
   yield* spaces; // Skip leading whitespace
   const statements = yield* many(statement);
   yield* spaces; // Skip trailing whitespace

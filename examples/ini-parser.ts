@@ -11,7 +11,8 @@ import {
   Parser,
   regex,
   skipMany0,
-  string
+  string,
+  parser
 } from "../src";
 
 const whitespace = regex(/[ \t]+/).label("whitespace");
@@ -43,7 +44,7 @@ const value = regex(/[^\r\n]*/)
   .label("property value");
 
 const property = atomic(
-  Parser.gen(function* () {
+  parser(function* () {
     const k = yield* key;
     yield* token(char("="));
     yield* commit();
@@ -53,7 +54,7 @@ const property = atomic(
 );
 
 const section: Parser<IniValue> = atomic(
-  Parser.gen(function* () {
+  parser(function* () {
     yield* spacesNewlines;
     yield* token(char("["));
     yield* commit();
@@ -64,7 +65,7 @@ const section: Parser<IniValue> = atomic(
     yield* optional(lineBreak);
 
     const properties = yield* many(
-      Parser.gen(function* () {
+      parser(function* () {
         yield* spaces;
         const prop = yield* property;
         yield* optional(lineBreak);
@@ -81,7 +82,7 @@ const section: Parser<IniValue> = atomic(
   })
 );
 
-const iniFile: Parser<IniFile> = Parser.gen(function* () {
+const iniFile: Parser<IniFile> = parser(function* () {
   yield* spacesNewlines;
   const sections = yield* many(section);
   yield* spacesNewlines;
