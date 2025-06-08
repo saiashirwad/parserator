@@ -131,9 +131,12 @@ export const char = <T extends string>(ch: T): Parser<T> =>
       return Parser.succeed(ch, State.consume(state, 1));
     }
 
-    const message = `Expected ${ch} but found ${state.remaining.at(0)}.`;
     return Parser.fail(
-      { message, expected: [ch], found: state.remaining.at(0) },
+      {
+        message: `Expected ${ch} but found ${state.remaining.at(0)}.`,
+        expected: [ch],
+        found: state.remaining.at(0)
+      },
       state
     );
   });

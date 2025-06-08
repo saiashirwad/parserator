@@ -8,28 +8,24 @@ Think of parser combinators as small, reusable parsing functions that you can co
 
 ```typescript
 // Instead of this mess:
-function parseEmail(input: string) {
-  // 50 lines of regex and string manipulation...
+function parsePhoneNumber(input: string) {
+  // 20 lines of regex and string validation...
 }
 
 // You write this:
-const email = parser(function* () {
-  const username = yield* many1(or(alphabet, digit, char("."))).expect(
-    "username"
-  );
-  yield* char("@").expect("@");
-  const domain = yield* many1(or(alphabet, digit))
-    .map(chars => chars.join(""))
-    .expect("domain name");
-  yield* char(".").expect(".");
-  // For simplicity, we will not parse the full domain name here.
-  // In a complete implementation, you would typically parse the domain name
-  const tld = yield* many1(alphabet)
-    .map(chars => chars.join(""))
-    .expect("top-level domain (TLD)");
+const phoneNumber = parser(function* () {
+  yield* char("(");
+  const areaCode = yield* many1(digit).expect("area code");
+  yield* char(")");
+  yield* char(" ");
+  const exchange = yield* many1(digit).expect("exchange");
+  yield* char("-");
+  const number = yield* many1(digit).expect("number");
 
-  return { username: username.join(""), domain: domain + "." + tld };
+  return `(${areaCode.join("")}) ${exchange.join("")}-${number.join("")}`;
 });
+
+phoneNumber.parseOrThrow("(555) 123-4567"); // → "(555) 123-4567"
 ```
 
 ## Quick Start
