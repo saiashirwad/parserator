@@ -44,13 +44,10 @@
   "author": "Sai (https://bsky.app/profile/texoport.in)",
   "license": "MIT",
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
-    "@microsoft/tsdoc": "^0.15.1",
     "@types/bun": "^1.1.10",
     "prettier": "^3.5.3",
     "tsup": "^8.3.5",
-    "typescript": "^5.0.0",
-    "vitest": "^1.2.1"
+    "typescript": "^5.0.0"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"

@@ -14,22 +14,7 @@ import {
   takeUntil
 } from "../src/combinators";
 import { Either } from "../src/either";
-import type { ParseErrorBundle } from "../src/errors";
 import { Parser } from "../src/parser";
-
-// Helper to get error message from ParseErrorBundle
-function getErrorMessage(bundle: ParseErrorBundle): string {
-  const primary = bundle.primary;
-  if (primary.tag === "Custom") {
-    return primary.message;
-  } else if (primary.tag === "Unexpected") {
-    return `Unexpected: ${primary.found}`;
-  } else if (primary.tag === "Expected") {
-    return `Expected: ${primary.items.join(", ")}`;
-  } else {
-    return primary.message;
-  }
-}
 
 const stringParser = skipSpaces
   .then(char('"'))
@@ -187,9 +172,7 @@ describe("error handling", () => {
   });
 
   test("error callback", () => {
-    const p = digit.withError(
-      ({ state }) => `Expected a digit at position ${state.pos.offset}`
-    );
+    const p = digit.expect("a digit");
     const { result } = p.parse("a");
     expect(Either.isLeft(result)).toBe(true);
   });
@@ -246,14 +229,12 @@ describe("advanced combinators", () => {
 
 describe("error recovery", () => {
   test("custom error with context", () => {
-    const identifier = regex(/[a-z]+/).withError(
-      () => "Expected lowercase identifier"
-    );
-    const number = regex(/[0-9]+/).withError(() => "Expected number");
+    const identifier = regex(/[a-z]+/).expect("lowercase identifier");
+    const number = regex(/[0-9]+/).expect("number");
     const assignment = identifier
       .thenDiscard(char("=").thenDiscard(skipSpaces))
       .then(number)
-      .withError(({ error }) => getErrorMessage(error));
+      .expect("assignment");
 
     const { result } = assignment.parse("foo = bar");
     expect(Either.isLeft(result)).toBe(true);

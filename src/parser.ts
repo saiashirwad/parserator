@@ -2,9 +2,6 @@
 import { Either } from "./either";
 import { ParseError, ParseErrorBundle, createSpan } from "./errors";
 import { type ParserOutput, type ParserState, State } from "./state";
-import type { Clean } from "./types";
-
-type BindResult<T, K extends string, B> = Clean<T & { [k in K]: B }>;
 
 export class Parser<T> {
   constructor(
@@ -155,34 +152,6 @@ export class Parser<T> {
     return { state, result: Either.left(bundle) };
   }
 
-  /**
-   * Adds an error message to the parser
-   * @param makeMessage - A function that returns an error message
-   * @returns A new parser with the error message added
-   */
-  withError(
-    makeMessage: (errorCtx: {
-      error: ParseErrorBundle;
-      state: ParserState;
-    }) => string
-  ): Parser<T> {
-    return new Parser<T>(state => {
-      const output = this.run(state);
-      if (Either.isLeft(output.result)) {
-        return Parser.fail(
-          {
-            message: makeMessage({
-              error: output.result.left,
-              state: output.state
-            })
-          },
-          output.state
-        );
-      }
-      return output;
-    });
-  }
-
   static fatal(message: string): Parser<never> {
     return new Parser(state => {
       const span = createSpan(state);
@@ -256,8 +225,6 @@ export class Parser<T> {
   static pure = <A>(a: A): Parser<A> =>
     new Parser(state => Parser.succeed(a, state));
 
-  static Do = Parser.pure({});
-
   /**
    * Creates a new parser that lazily evaluates the given function.
    * This is useful for creating recursive parsers.
@@ -316,39 +283,6 @@ export class Parser<T> {
   }
 
   zipLeft = this.thenDiscard;
-
-  bind<K extends string, B>(
-    k: K,
-    other: Parser<B> | ((a: T) => Parser<B>)
-  ): Parser<BindResult<T, K, B>> {
-    return new Parser<BindResult<T, K, B>>(state => {
-      const { result: resultA, state: stateA } = this.run(state);
-      if (Either.isLeft(resultA)) {
-        return {
-          result: resultA as unknown as Either<
-            BindResult<T, K, B>,
-            ParseErrorBundle
-          >,
-          state: stateA
-        };
-      }
-      const nextParser = other instanceof Parser ? other : other(resultA.right);
-      const { result: resultB, state: stateB } = nextParser.run(stateA);
-      if (Either.isLeft(resultB)) {
-        return {
-          result: resultB as unknown as Either<
-            BindResult<T, K, B>,
-            ParseErrorBundle
-          >,
-          state: stateB
-        };
-      }
-      return Parser.succeed(
-        { ...resultA.right, [k]: resultB.right } as BindResult<T, K, B>,
-        stateB
-      );
-    });
-  }
 
   *[Symbol.iterator](): Generator<Parser<T>, T, any> {
     return yield this;
@@ -775,3 +709,67 @@ export const parser = Parser.gen;
 //     return debug(this, label).run(state);
 //   });
 // }
+
+// /**
+//  * Adds an error message to the parser
+//  * @param makeMessage - A function that returns an error message
+//  * @returns A new parser with the error message added
+//  */
+// withError(
+//   makeMessage: (errorCtx: {
+//     error: ParseErrorBundle;
+//     state: ParserState;
+//   }) => string
+// ): Parser<T> {
+//   return new Parser<T>(state => {
+//     const output = this.run(state);
+//     if (Either.isLeft(output.result)) {
+//       return Parser.fail(
+//         {
+//           message: makeMessage({
+//             error: output.result.left,
+//             state: output.state
+//           })
+//         },
+//         output.state
+//       );
+//     }
+//     return output;
+//   });
+// }
+
+// type BindResult<T, K extends string, B> = Clean<T & { [k in K]: B }>;
+// bind<K extends string, B>(
+//   k: K,
+//   other: Parser<B> | ((a: T) => Parser<B>)
+// ): Parser<BindResult<T, K, B>> {
+//   return new Parser<BindResult<T, K, B>>(state => {
+//     const { result: resultA, state: stateA } = this.run(state);
+//     if (Either.isLeft(resultA)) {
+//       return {
+//         result: resultA as unknown as Either<
+//           BindResult<T, K, B>,
+//           ParseErrorBundle
+//         >,
+//         state: stateA
+//       };
+//     }
+//     const nextParser = other instanceof Parser ? other : other(resultA.right);
+//     const { result: resultB, state: stateB } = nextParser.run(stateA);
+//     if (Either.isLeft(resultB)) {
+//       return {
+//         result: resultB as unknown as Either<
+//           BindResult<T, K, B>,
+//           ParseErrorBundle
+//         >,
+//         state: stateB
+//       };
+//     }
+//     return Parser.succeed(
+//       { ...resultA.right, [k]: resultB.right } as BindResult<T, K, B>,
+//       stateB
+//     );
+//   });
+// }
+
+// static Do = Parser.pure({});
