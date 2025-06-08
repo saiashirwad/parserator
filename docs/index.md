@@ -30,20 +30,19 @@ features:
   - icon: 🎯
     title: Developer Friendly
     details: Clear error messages, intuitive API, and comprehensive documentation make parsing accessible to everyone.
-
 ---
 
 ## Quick Example
 
 ```typescript
-import { string, number, sequence, many, map } from 'parserator';
+import { string, number, sequence, many, map } from "parserator";
 
 // Parse a simple arithmetic expression
 const digit = number();
-const operator = string('+').or(string('-'));
+const operator = string("+").or(string("-"));
 const expression = sequence(digit, many(sequence(operator, digit)));
 
-const result = expression.parse('1+2-3+4');
+const result = expression.parse("1+2-3+4");
 console.log(result); // Success with parsed AST
 ```
 

@@ -7,12 +7,14 @@ This directory contains automated workflows for the Parserator project.
 ### 1. CI/CD (`ci-cd.yml`)
 
 The main continuous integration and deployment workflow that runs on:
+
 - Push to main/master branches
 - Pull requests
-- Version tags (v*)
+- Version tags (v\*)
 - Manual dispatch
 
 **Jobs:**
+
 - **test**: Runs tests across multiple Node.js versions (18.x, 20.x)
   - Type checking
   - Building
@@ -27,6 +29,7 @@ The main continuous integration and deployment workflow that runs on:
 Manual release workflow for creating new versions with proper versioning and tagging.
 
 **Features:**
+
 - Interactive version selection (patch/minor/major)
 - Dry-run mode for testing
 - Automatic git tagging
@@ -35,6 +38,7 @@ Manual release workflow for creating new versions with proper versioning and tag
 - Comprehensive summary
 
 **Usage:**
+
 1. Go to Actions → Release
 2. Click "Run workflow"
 3. Select version type and optionally enable dry-run
@@ -45,6 +49,7 @@ Manual release workflow for creating new versions with proper versioning and tag
 Comprehensive validation for pull requests.
 
 **Features:**
+
 - Full test suite execution
 - Cross-platform compatibility testing (Ubuntu, Windows, macOS)
 - Multiple Node.js version testing
@@ -58,6 +63,7 @@ Comprehensive validation for pull requests.
 To enable automated npm publishing:
 
 1. Create an npm access token:
+
    - Log in to [npmjs.com](https://www.npmjs.com/)
    - Go to Account Settings → Access Tokens
    - Generate a new token (Automation type recommended)
@@ -72,6 +78,7 @@ To enable automated npm publishing:
 For future documentation deployment:
 
 1. Enable GitHub Pages:
+
    - Go to Settings → Pages
    - Source: GitHub Actions
 
@@ -117,11 +124,13 @@ bun run release:major
 The workflows are pre-configured for VitePress documentation. To enable:
 
 1. Set up VitePress:
+
    ```bash
    bun add -D vitepress
    ```
 
 2. Create docs structure:
+
    ```
    docs/
    ├── .vitepress/
@@ -132,6 +141,7 @@ The workflows are pre-configured for VitePress documentation. To enable:
    ```
 
 3. Add scripts to package.json:
+
    ```json
    {
      "scripts": {
@@ -149,6 +159,7 @@ The workflows are pre-configured for VitePress documentation. To enable:
 Consider adding automatic changelog generation:
 
 1. Install conventional-changelog:
+
    ```bash
    bun add -D conventional-changelog-cli
    ```
