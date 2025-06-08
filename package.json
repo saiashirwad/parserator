@@ -1,6 +1,6 @@
 {
   "name": "parserator",
-  "version": "0.1.39",
+  "version": "0.1.40",
   "description": "An elegant parser combinators library for Typescript",
   "type": "module",
   "main": "./dist/index.js",
