@@ -12,7 +12,7 @@ import { type ParserState, State } from "./state";
  * The parser will succeed with the result of the given parser but won't advance the input position.
  *
  * @param par - The parser to look ahead with
- * @returns A new parser that peeks at the input without consuming it
+ * @returns {Parser<T | undefined>} A new parser that peeks at the input without consuming it
  * ```ts
  * const parser = lookahead(char('a'))
  * parser.run('abc') // Right(['a', {...}])
@@ -33,7 +33,7 @@ export const lookahead = <T>(par: Parser<T>): Parser<T | undefined> =>
  * If the parser succeeds, this parser fails with an error message.
  *
  * @param par - The parser that should not match
- * @returns A new parser that succeeds only if the input parser fails
+ * @returns {Parser<boolean>} A new parser that succeeds only if the input parser fails
  * ```ts
  * const notA = notFollowedBy(char('a'))
  * notA.run('bcd') // Right([true, {...}]) - Succeeds because 'a' is not found
@@ -65,7 +65,7 @@ export function notFollowedBy<T>(par: Parser<T>): Parser<boolean> {
  * Creates a parser that matches an exact string in the input.
  *
  * @param str - The string to match
- * @returns A parser that matches and consumes the exact string
+ * @returns {Parser<string>} A parser that matches and consumes the exact string
  * ```ts
  * const parser = string("hello")
  * parser.run("hello world") // Right(["hello", {...}])
@@ -97,7 +97,7 @@ export const string = (str: string): Parser<string> =>
  * Similar to string parser but preserves the literal type information.
  *
  * @param str - The string literal to match
- * @returns A parser that matches and consumes the exact string with preserved type
+ * @returns {Parser<T>} A parser that matches and consumes the exact string with preserved type
  * ```ts
  * const parser = narrowedString("hello") // Parser<"hello">
  * parser.run("hello world") // Right(["hello", {...}])
@@ -112,7 +112,7 @@ export function narrowedString<const T extends string>(str: T): Parser<T> {
  * Creates a parser that matches a single character.
  *
  * @param ch - The character to match
- * @returns A parser that matches and consumes a single character
+ * @returns {Parser<T>} A parser that matches and consumes a single character
  * ```ts
  * const parser = char("a")
  * parser.run("abc") // Right(["a", {...}])
@@ -200,7 +200,7 @@ export const digit = new Parser(state => {
  *
  * @param sepParser - Parser for the separator between elements
  * @param parser - Parser for the elements
- * @returns A parser that produces an array of matched elements
+ * @returns {Parser<T[]>} A parser that produces an array of matched elements
  *
  * ```ts
  * const parser = sepBy(char(','), digit)
@@ -251,7 +251,7 @@ export function sepBy<S, T>(
  *
  * @param par - The parser for the elements
  * @param sepParser - The parser for the separator
- * @returns A parser that produces a non-empty array of parsed elements
+ * @returns {Parser<T[]>} A parser that produces a non-empty array of parsed elements
  *
  * @example
  * ```ts
@@ -277,7 +277,7 @@ export function sepBy1<S, T>(
  * @param start - The opening delimiter string
  * @param end - The closing delimiter string
  * @param par - The parser for the content between delimiters
- * @returns A parser that matches content between delimiters
+ * @returns {Parser<T>} A parser that matches content between delimiters
  *
  * ```ts
  * const parser = between(char('('), char(')'), digit)
@@ -299,7 +299,12 @@ export function between<T>(
   });
 }
 
-export function anyChar() {
+/**
+ * A parser that matches any single character.
+ *
+ * @returns {Parser<string>} A parser that matches any single character
+ */
+export function anyChar(): Parser<string> {
   return new Parser<string>(state => {
     if (State.isAtEnd(state)) {
       return Parser.fail(
@@ -315,9 +320,9 @@ export function anyChar() {
  * Internal helper function for creating repetition parsers.
  *
  * @param count - Minimum number of repetitions required
- * @returns A function that creates a parser matching multiple occurrences
+ * @returns {(parser: Parser<T>, separator?: Parser<S>) => Parser<T[]>} A function that creates a parser matching multiple occurrences
  */
-function many_<S, T>(count: number) {
+function many_<S, T>(count: number): (parser: Parser<T>, separator?: Parser<S>) => Parser<T[]> {
   return (parser: Parser<T>, separator?: Parser<S>): Parser<T[]> => {
     return new Parser(state => {
       const results: T[] = [];
@@ -386,7 +391,7 @@ function many_<S, T>(count: number) {
  * Creates a parser that matches zero or more occurrences of the input parser.
  *
  * @param parser - The parser to repeat
- * @returns A parser that produces an array of all matches
+ * @returns {Parser<T[]>} A parser that produces an array of all matches
  */
 export const many0 = <S, T>(parser: Parser<T>, separator?: Parser<S>) =>
   many_<S, T>(0)(parser, separator);
@@ -395,7 +400,7 @@ export const many0 = <S, T>(parser: Parser<T>, separator?: Parser<S>) =>
  * Parses zero or more occurrences of a parser (alias for many0).
  *
  * @param parser - The parser to repeat
- * @returns A parser that produces an array of parsed elements
+ * @returns {Parser<T[]>} A parser that produces an array of parsed elements
  */
 export const many = <T>(parser: Parser<T>) => many0(parser);
 
@@ -403,7 +408,7 @@ export const many = <T>(parser: Parser<T>) => many0(parser);
  * Creates a parser that matches one or more occurrences of the input parser.
  *
  * @param parser - The parser to repeat
- * @returns A parser that produces an array of all matches (at least one)
+ * @returns {Parser<T[]>} A parser that produces an array of all matches (at least one)
  */
 export const many1 = <S, T>(parser: Parser<T>, separator?: Parser<S>) =>
   many_<S, T>(1)(parser, separator);
@@ -413,7 +418,7 @@ export const many1 = <S, T>(parser: Parser<T>, separator?: Parser<S>) =>
  *
  * @param parser - The parser to repeat
  * @param n - Number of required repetitions
- * @returns A parser that produces an array of at least n matches
+ * @returns {Parser<T[]>} A parser that produces an array of at least n matches
  */
 export const manyN = <S, T>(
   parser: Parser<T>,
@@ -427,7 +432,7 @@ export const manyN = <S, T>(
  * @param parser - The parser to repeat
  * @param n - Number of required repetitions
  * @param separator - Optional parser to match between occurrences
- * @returns A parser that produces an array of exactly n matches
+ * @returns {Parser<T[]>} A parser that produces an array of exactly n matches
  */
 
 export const manyNExact = <S, T>(
@@ -448,7 +453,7 @@ export const manyNExact = <S, T>(
  * Internal helper function for creating skipping repetition parsers.
  *
  * @param count - Minimum number of repetitions required
- * @returns A function that creates a parser skipping multiple occurrences
+ * @returns {(parser: Parser<T>) => Parser<undefined>} A function that creates a parser skipping multiple occurrences
  */
 function skipMany_<T>(count: number) {
   return (parser: Parser<T>): Parser<undefined> => {
@@ -484,7 +489,7 @@ function skipMany_<T>(count: number) {
  * Creates a parser that skips zero or more occurrences of the input parser.
  *
  * @param parser - The parser to skip
- * @returns A parser that skips all matches
+ * @returns {Parser<undefined>} A parser that skips all matches
  */
 export const skipMany0 = <T>(parser: Parser<T>) => skipMany_<T>(0)(parser);
 
@@ -492,7 +497,7 @@ export const skipMany0 = <T>(parser: Parser<T>) => skipMany_<T>(0)(parser);
  * Creates a parser that skips one or more occurrences of the input parser.
  *
  * @param parser - The parser to skip
- * @returns A parser that skips all matches (requires at least one)
+ * @returns {Parser<undefined>} A parser that skips all matches (requires at least one)
  */
 export const skipMany1 = <T>(parser: Parser<T>) => skipMany_<T>(1)(parser);
 
@@ -609,7 +614,7 @@ export const skipSpaces = new Parser(state =>
  * by preventing backtracking once we've identified the intended parse path.
  *
  * @param parsers - Array of parsers to try in order
- * @returns A parser that succeeds with the first successful parser's result
+ * @returns {Parser<Parsers[number] extends Parser<infer T> ? T : never>} A parser that succeeds with the first successful parser's result
  *
  * @example
  * ```ts
@@ -683,7 +688,7 @@ export function or<Parsers extends Parser<any>[]>(
  * If the parser fails, returns undefined without consuming input.
  *
  * @param parser - The parser to make optional
- * @returns A parser that either succeeds with a value or undefined
+ * @returns {Parser<T | undefined>} A parser that either succeeds with a value or undefined
  */
 export function optional<T>(parser: Parser<T>) {
   return new Parser((state: ParserState) => {
@@ -706,7 +711,7 @@ type SequenceOutput<T extends Parser<any>[], Acc extends any[] = []> =
  * Creates a parser that runs multiple parsers in sequence and returns all results.
  *
  * @param parsers - Array of parsers to run in sequence
- * @returns A parser that succeeds if all parsers succeed in order, returning a tuple of all results
+ * @returns {Parser<SequenceOutput<T>>} A parser that succeeds if all parsers succeed in order, returning a tuple of all results
  *
  * @example
  * ```ts
@@ -731,7 +736,7 @@ export const sequence = <const T extends any[]>(
  * The regex must match at the start of the input.
  *
  * @param re - The regular expression to match against
- * @returns A parser that matches the regex pattern
+ * @returns {Parser<string>} A parser that matches the regex pattern
  */
 export const regex = (re: RegExp): Parser<string> => {
   // Create a new RegExp without global flag to ensure consistent behavior
@@ -800,7 +805,7 @@ export function takeUpto<T>(parser: Parser<T>): Parser<string> {
  * backtrack to try alternatives in a `choice` or `or` combinator. This results in
  * more specific, helpful error messages instead of generic "expected one of" errors.
  *
- * @returns A parser that sets the commit flag in the parsing context
+ * @returns {Parser<void>} A parser that sets the commit flag in the parsing context
  *
  * @example
  * ```ts
@@ -886,7 +891,7 @@ export const cut = commit;
  * started, as if no input was consumed.
  *
  * @param parser - The parser to make atomic
- * @returns A new parser with atomic (all-or-nothing) behavior
+ * @returns {Parser<T>} A new parser with atomic (all-or-nothing) behavior
  *
  * @example
  * ```ts
@@ -938,7 +943,7 @@ export function atomic<T>(parser: Parser<T>): Parser<T> {
  * Parses any character except the specified one.
  *
  * @param ch - The character to exclude
- * @returns A parser that matches any character except the specified one
+ * @returns {Parser<string>} A parser that matches any character except the specified one
  *
  * @example
  * ```ts
@@ -1005,7 +1010,7 @@ export const eof = new Parser<void>(state => {
  *
  * @param n - The exact number of occurrences
  * @param parser - The parser to repeat
- * @returns A parser that produces an array of exactly n elements
+ * @returns {Parser<T[]>} A parser that produces an array of exactly n elements
  *
  * @example
  * ```ts
@@ -1030,7 +1035,7 @@ export function count<T>(n: number, par: Parser<T>): Parser<T[]> {
  *
  * @param parser - The parser for list elements
  * @param sep - The parser for separators
- * @returns A parser that allows optional trailing separator
+ * @returns {Parser<T[]>} A parser that allows optional trailing separator
  *
  * @example
  * ```ts

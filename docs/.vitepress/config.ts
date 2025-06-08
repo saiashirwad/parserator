@@ -38,10 +38,12 @@ export default defineConfig({
       {
         text: "API Reference",
         items: [
-          { text: "Core Parsers", link: "/api/core-parsers" },
+          { text: "Overview", link: "/api/" },
+          { text: "Parser", link: "/api/parser" },
           { text: "Combinators", link: "/api/combinators" },
-          { text: "Utilities", link: "/api/utilities" },
-          { text: "Types", link: "/api/types" }
+          { text: "State", link: "/api/state" },
+          { text: "Error Formatter", link: "/api/error-formatter" },
+          { text: "Hints", link: "/api/hints" }
         ]
       },
       {

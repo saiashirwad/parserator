@@ -34,6 +34,7 @@
     "release:major": "bun run build && bun test && bun run publish:major",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "generate:docs": "bun run scripts/generate-api-docs.ts",
     "ci": "bun run typecheck && bun run build && bun test && bun run format:check",
     "preversion": "bun run ci",
     "version": "bun run format && git add -A",

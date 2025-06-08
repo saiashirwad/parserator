@@ -38,7 +38,7 @@ export class Parser<T> {
    *
    * @param value - The value to wrap in a successful result
    * @param state - The current parser state
-   * @returns A successful parser output containing the value
+   * @returns {ParserOutput<T>} A successful parser output containing the value
    * @template T The type of the successful value
    * @internal
    */
@@ -53,7 +53,7 @@ export class Parser<T> {
    * succeed immediately with the provided value and won't advance the parser state.
    *
    * @param a - The value to lift into the parser context
-   * @returns A parser that always succeeds with the given value
+   * @returns {Parser<A>} A parser that always succeeds with the given value
    * @template A The type of the value being lifted
    *
    * @example
@@ -85,7 +85,7 @@ export class Parser<T> {
    * @param ma - The first parser
    * @param mb - The second parser
    * @param f - A function that takes the results of both parsers and produces a new value
-   * @returns A parser that applies the function to the results of both input parsers
+   * @returns {Parser<C>} A parser that applies the function to the results of both input parsers
    * @template A The type of value produced by the first parser
    * @template B The type of value produced by the second parser
    * @template C The type of value produced by applying the function
@@ -113,7 +113,7 @@ export class Parser<T> {
     ma: Parser<A>,
     mb: Parser<B>,
     f: (a: A, b: B) => C
-  ) => ma.zip(mb).map(args => f(...args));
+  ): Parser<C> => ma.zip(mb).map(args => f(...args));
 
   /**
    * Applies a parser that produces a function to a parser that produces a value.
@@ -123,7 +123,7 @@ export class Parser<T> {
    *
    * @param ma - A parser that produces a value
    * @param mf - A parser that produces a function from that value type to another type
-   * @returns A parser that applies the parsed function to the parsed value
+   * @returns {Parser<B>} A parser that applies the parsed function to the parsed value
    * @template A The type of the input value
    * @template B The type of the output value after function application
    *
@@ -148,7 +148,7 @@ export class Parser<T> {
    * addParser.parse("3 + 4") // succeeds with 7
    * ```
    */
-  static ap = <A, B>(ma: Parser<A>, mf: Parser<(_: A) => B>) =>
+  static ap = <A, B>(ma: Parser<A>, mf: Parser<(_: A) => B>): Parser<B> =>
     mf.zip(ma).map(([f, a]) => f(a));
 
   // Error handling
@@ -161,7 +161,7 @@ export class Parser<T> {
    *
    * @param error - Error details including message and optional expected/found values
    * @param state - The parser state where the error occurred
-   * @returns A failed parser output containing the error
+   * @returns {ParserOutput<never>} A failed parser output containing the error
    * @internal
    */
   static fail(
@@ -200,7 +200,7 @@ export class Parser<T> {
    * other alternatives would be meaningless.
    *
    * @param message - The error message to display
-   * @returns A parser that always fails with a fatal error
+   * @returns {Parser<never>} A parser that always fails with a fatal error
    *
    * @example
    * ```ts
@@ -237,7 +237,7 @@ export class Parser<T> {
    * which includes information about the remaining unparsed input and position.
    *
    * @param input - The string to parse
-   * @returns A parser output containing both the result (success or error) and final state
+   * @returns {ParserOutput<T>} A parser output containing both the result (success or error) and final state
    *
    * @example
    * ```ts
@@ -260,7 +260,7 @@ export class Parser<T> {
    * full parser state information.
    *
    * @param input - The string to parse
-   * @returns The successfully parsed value of type T, or a ParseErrorBundle on failure
+   * @returns {T | ParseErrorBundle} The successfully parsed value of type T, or a ParseErrorBundle on failure
    *
    * @example
    * ```ts
@@ -289,7 +289,7 @@ export class Parser<T> {
    * contains detailed information about what went wrong.
    *
    * @param input - The string to parse
-   * @returns The successfully parsed value of type T
+   * @returns {T} The successfully parsed value of type T
    * @throws {ParseErrorBundle} Thrown when parsing fails
    *
    * @example
@@ -322,7 +322,7 @@ export class Parser<T> {
    * is not consumed if the transformation fails.
    *
    * @param f - A function that transforms the parsed value
-   * @returns A new parser that produces the transformed value
+   * @returns {Parser<B>} A new parser that produces the transformed value
    * @template B The type of the transformed value
    *
    * @example
@@ -365,7 +365,7 @@ export class Parser<T> {
    * depend on earlier results.
    *
    * @param f - A function that takes the parsed value and returns a new parser
-   * @returns A new parser that runs the second parser after the first succeeds
+   * @returns {Parser<B>} A new parser that runs the second parser after the first succeeds
    * @template B The type of value produced by the resulting parser
    *
    * @example
@@ -415,7 +415,7 @@ export class Parser<T> {
    * value into the parser context.
    *
    * @param a - The value to wrap in a successful parser
-   * @returns A parser that always succeeds with the given value
+   * @returns {Parser<A>} A parser that always succeeds with the given value
    * @template A The type of the value being lifted
    *
    * @example
@@ -438,7 +438,7 @@ export class Parser<T> {
    * This is useful for creating recursive parsers.
    *
    * @param fn - A function that returns a parser
-   * @returns A new parser that evaluates the function when parsing
+   * @returns {Parser<T>} A new parser that evaluates the function when parsing
    * @template T The type of value produced by the parser
    *
    * @example
@@ -468,7 +468,7 @@ export class Parser<T> {
    * as a tuple containing both parsed values.
    *
    * @param parserB - The second parser to run after this one
-   * @returns A parser that produces a tuple of both results
+   * @returns {Parser<[T, B]>} A parser that produces a tuple of both results
    * @template B The type of value produced by the second parser
    *
    * @example
@@ -517,7 +517,7 @@ export class Parser<T> {
    * its result is discarded.
    *
    * @param parserB - The parser whose result will be kept
-   * @returns A parser that produces only the second result
+   * @returns {Parser<B>} A parser that produces only the second result
    * @template B The type of value produced by the second parser
    *
    * @example
@@ -556,7 +556,7 @@ export class Parser<T> {
    * or terminators.
    *
    * @param parserB - The parser to run but whose result will be discarded
-   * @returns A parser that produces only the first result
+   * @returns {Parser<T>} A parser that produces only the first result
    * @template B The type of value produced by the second parser (discarded)
    *
    * @example
@@ -593,7 +593,7 @@ export class Parser<T> {
    * generator functions, enabling a more imperative style of parser composition
    * that can be easier to read for complex sequential parsing.
    *
-   * @returns A generator that yields this parser and returns its result
+   * @returns {Generator<Parser<T>, T, any>} A generator that yields this parser and returns its result
    * @internal
    */
   *[Symbol.iterator](): Generator<Parser<T>, T, any> {
@@ -618,7 +618,7 @@ export class Parser<T> {
    * ```
    *
    * @param callback - Function called with current state and result
-   * @returns The same parser with the tap point added
+   * @returns {Parser<T>} The same parser with the tap point added
    */
   tap(
     callback: (args: { state: ParserState; result: ParserOutput<T> }) => void
@@ -667,7 +667,7 @@ export class Parser<T> {
   /**
    * Adds a label to this parser for better error messages
    * @param name - The label name to add to the context stack
-   * @returns A new parser with the label added
+   * @returns {Parser<T>} A new parser with the label added
    */
   label(name: string): Parser<T> {
     return new Parser(state => {
@@ -708,7 +708,7 @@ export class Parser<T> {
   /**
    * Helper for creating semantic expectations with both label and error message
    * @param description - The description for both the label and error message
-   * @returns A new parser with both labeling and error message
+   * @returns {Parser<T>} A new parser with both labeling and error message
    */
   expect(description: string): Parser<T> {
     return new Parser<T>(state => {
@@ -729,7 +729,7 @@ export class Parser<T> {
    * Helper for creating semantic expectations with both label and error message
    * @param errorBundle - The error bundle containing the errors to be displayed
    * @param state - The current parser state
-   * @returns A parser output with the error bundle and the current state
+   * @returns {ParserOutput<never>} A parser output with the error bundle and the current state
    * @internal
    */
   static failRich(
@@ -752,7 +752,7 @@ export class Parser<T> {
    * backtrack to try other alternatives in a `choice` or `or` combinator. This leads
    * to more specific error messages instead of generic "expected one of" errors.
    *
-   * @returns A new parser that sets the commit flag after successful parsing
+   * @returns {Parser<T>} A new parser that sets the commit flag after successful parsing
    *
    * @example
    * ```ts
@@ -811,7 +811,7 @@ export class Parser<T> {
    * parser but not consume any input if it fails. The parser acts as a transaction -
    * if any part fails, the entire parse is rolled back.
    *
-   * @returns A new parser that resets state on failure
+   * @returns {Parser<T>} A new parser that resets state on failure
    *
    * @example
    * ```ts
