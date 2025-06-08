@@ -58,9 +58,30 @@ jobs:
       - name: Configure npm registry
         run: |
           echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+          echo "registry=https://registry.npmjs.org/" >> ~/.npmrc
+          # Also create .npmrc in project root for bun
+          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > .npmrc
+          echo "registry=https://registry.npmjs.org/" >> .npmrc
+          # Debug: Check if token is set (masked)
+          echo "NPM_TOKEN is set: ${{ secrets.NPM_TOKEN != '' }}"
+          # Debug: Check .npmrc contents (token will be masked)
+          echo "Contents of ~/.npmrc:"
+          cat ~/.npmrc
+          echo "Contents of .npmrc:"
+          cat .npmrc
 
       - name: Publish to npm
-        run: bun publish --access public
+        run: |
+          # Try with explicit token in environment as fallback
+          export NPM_TOKEN="${{ secrets.NPM_TOKEN }}"
+          # First try bun publish
+          bun publish --access public || {
+            echo "Bun publish failed, trying npm publish as fallback"
+            npm publish --access public
+          }
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   # build-docs:
   #   runs-on: ubuntu-latest
