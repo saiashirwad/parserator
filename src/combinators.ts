@@ -104,9 +104,8 @@ export const string = (str: string): Parser<string> =>
  * parser.run("goodbye") // Left(error)
  * ```
  */
-export function narrowedString<const T extends string>(str: T): Parser<T> {
-  return string(str) as any;
-}
+export const narrowedString = <const T extends string>(str: T): Parser<T> =>
+  string(str) as any;
 
 /**
  * Creates a parser that matches a single character.
@@ -322,7 +321,9 @@ export function anyChar(): Parser<string> {
  * @param count - Minimum number of repetitions required
  * @returns {(parser: Parser<T>, separator?: Parser<S>) => Parser<T[]>} A function that creates a parser matching multiple occurrences
  */
-function many_<S, T>(count: number): (parser: Parser<T>, separator?: Parser<S>) => Parser<T[]> {
+function many_<S, T>(
+  count: number
+): (parser: Parser<T>, separator?: Parser<S>) => Parser<T[]> {
   return (parser: Parser<T>, separator?: Parser<S>): Parser<T[]> => {
     return new Parser(state => {
       const results: T[] = [];
@@ -393,8 +394,10 @@ function many_<S, T>(count: number): (parser: Parser<T>, separator?: Parser<S>) 
  * @param parser - The parser to repeat
  * @returns {Parser<T[]>} A parser that produces an array of all matches
  */
-export const many0 = <S, T>(parser: Parser<T>, separator?: Parser<S>) =>
-  many_<S, T>(0)(parser, separator);
+export const many0 = <S, T>(
+  parser: Parser<T>,
+  separator?: Parser<S>
+): Parser<T[]> => many_<S, T>(0)(parser, separator);
 
 /**
  * Parses zero or more occurrences of a parser (alias for many0).
@@ -402,7 +405,7 @@ export const many0 = <S, T>(parser: Parser<T>, separator?: Parser<S>) =>
  * @param parser - The parser to repeat
  * @returns {Parser<T[]>} A parser that produces an array of parsed elements
  */
-export const many = <T>(parser: Parser<T>) => many0(parser);
+export const many = <T>(parser: Parser<T>): Parser<T[]> => many0(parser);
 
 /**
  * Creates a parser that matches one or more occurrences of the input parser.
@@ -410,8 +413,10 @@ export const many = <T>(parser: Parser<T>) => many0(parser);
  * @param parser - The parser to repeat
  * @returns {Parser<T[]>} A parser that produces an array of all matches (at least one)
  */
-export const many1 = <S, T>(parser: Parser<T>, separator?: Parser<S>) =>
-  many_<S, T>(1)(parser, separator);
+export const many1 = <S, T>(
+  parser: Parser<T>,
+  separator?: Parser<S>
+): Parser<T[]> => many_<S, T>(1)(parser, separator);
 
 /**
  * Creates a parser that matches at least n occurrences of the input parser.
@@ -424,7 +429,7 @@ export const manyN = <S, T>(
   parser: Parser<T>,
   n: number,
   separator?: Parser<S>
-) => many_<S, T>(n)(parser, separator);
+): Parser<T[]> => many_<S, T>(n)(parser, separator);
 
 /**
  * Creates a parser that matches exactly n occurrences of the input parser.
@@ -439,7 +444,7 @@ export const manyNExact = <S, T>(
   par: Parser<T>,
   n: number,
   separator?: Parser<S>
-) =>
+): Parser<T[]> =>
   parser(function* () {
     const results = yield* manyN(par, n, separator);
     if (results.length !== n) {
@@ -455,9 +460,10 @@ export const manyNExact = <S, T>(
  * @param count - Minimum number of repetitions required
  * @returns {(parser: Parser<T>) => Parser<undefined>} A function that creates a parser skipping multiple occurrences
  */
-function skipMany_<T>(count: number) {
-  return (parser: Parser<T>): Parser<undefined> => {
-    return new Parser(state => {
+const skipMany_ =
+  <T>(count: number): ((parser: Parser<T>) => Parser<undefined>) =>
+  (parser: Parser<T>): Parser<undefined> =>
+    new Parser(state => {
       let currentState = state;
       let successes = 0;
 
@@ -482,8 +488,6 @@ function skipMany_<T>(count: number) {
       const message = `Expected at least ${count} occurrences, but only found ${successes}`;
       return Parser.fail({ message, expected: [] }, state);
     });
-  };
-}
 
 /**
  * Creates a parser that skips zero or more occurrences of the input parser.
@@ -491,7 +495,8 @@ function skipMany_<T>(count: number) {
  * @param parser - The parser to skip
  * @returns {Parser<undefined>} A parser that skips all matches
  */
-export const skipMany0 = <T>(parser: Parser<T>) => skipMany_<T>(0)(parser);
+export const skipMany0 = <T>(parser: Parser<T>): Parser<undefined> =>
+  skipMany_<T>(0)(parser);
 
 /**
  * Creates a parser that skips one or more occurrences of the input parser.
@@ -499,7 +504,8 @@ export const skipMany0 = <T>(parser: Parser<T>) => skipMany_<T>(0)(parser);
  * @param parser - The parser to skip
  * @returns {Parser<undefined>} A parser that skips all matches (requires at least one)
  */
-export const skipMany1 = <T>(parser: Parser<T>) => skipMany_<T>(1)(parser);
+export const skipMany1 = <T>(parser: Parser<T>): Parser<undefined> =>
+  skipMany_<T>(1)(parser);
 
 /**
  * Creates a parser that skips exactly n occurrences of the input parser.
@@ -690,7 +696,7 @@ export function or<Parsers extends Parser<any>[]>(
  * @param parser - The parser to make optional
  * @returns {Parser<T | undefined>} A parser that either succeeds with a value or undefined
  */
-export function optional<T>(parser: Parser<T>) {
+export function optional<T>(parser: Parser<T>): Parser<T | undefined> {
   return new Parser((state: ParserState) => {
     const { result, state: newState } = parser.run(state);
     if (Either.isLeft(result)) {

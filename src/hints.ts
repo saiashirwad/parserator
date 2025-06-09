@@ -1,5 +1,5 @@
 import { Parser } from "./parser";
-import { type ParseError, createSpan } from "./errors";
+import { type ParseError, Span } from "./errors";
 import { State } from "./state";
 
 /**
@@ -81,28 +81,30 @@ export function generateHints(
  * const result = lambdaParser.parse("lamdba")
  * ```
  */
-export const keywordWithHints = (keywords: string[]) => (keyword: string) =>
-  new Parser(state => {
-    if (state.remaining.startsWith(keyword)) {
-      return Parser.succeed(keyword, State.consume(state, keyword.length));
-    }
+export const keywordWithHints =
+  (keywords: string[]): ((keyword: string) => Parser<string>) =>
+  (keyword: string) =>
+    new Parser(state => {
+      if (state.remaining.startsWith(keyword)) {
+        return Parser.succeed(keyword, State.consume(state, keyword.length));
+      }
 
-    // Try to extract what the user actually typed
-    const match = state.remaining.match(/^[a-zA-Z_][a-zA-Z0-9_]*/);
-    const found = match ? match[0] : state.remaining[0] || "end of input";
+      // Try to extract what the user actually typed
+      const match = state.remaining.match(/^[a-zA-Z_][a-zA-Z0-9_]*/);
+      const found = match ? match[0] : state.remaining[0] || "end of input";
 
-    const hints = generateHints(found, keywords);
+      const hints = generateHints(found, keywords);
 
-    const error: ParseError = {
-      tag: "Unexpected",
-      span: createSpan(state, found.length),
-      found,
-      context: state.labelStack || [],
-      ...(hints.length > 0 && { hints })
-    };
+      const error: ParseError = {
+        tag: "Unexpected",
+        span: Span(state, found.length),
+        found,
+        context: state.labelStack || [],
+        ...(hints.length > 0 && { hints })
+      };
 
-    return Parser.failRich({ errors: [error] }, state);
-  });
+      return Parser.failRich({ errors: [error] }, state);
+    });
 
 /**
  * Creates a parser that matches any of the provided keywords with hint generation.
@@ -136,7 +138,7 @@ export function anyKeywordWithHints(keywords: string[]): Parser<string> {
 
     const error: ParseError = {
       tag: "Unexpected",
-      span: createSpan(state, found.length),
+      span: Span(state, found.length),
       found,
       context: state.labelStack || [],
       ...(hints.length > 0 && { hints })
@@ -166,7 +168,7 @@ export function stringWithHints(validStrings: string[]): Parser<string> {
     if (!state.remaining.startsWith('"')) {
       const error: ParseError = {
         tag: "Expected",
-        span: createSpan(state, 1),
+        span: Span(state, 1),
         items: ["string literal"],
         context: state.labelStack || []
       };
@@ -184,7 +186,7 @@ export function stringWithHints(validStrings: string[]): Parser<string> {
     if (i >= state.remaining.length) {
       const error: ParseError = {
         tag: "Expected",
-        span: createSpan(state, i),
+        span: Span(state, i),
         items: ["closing quote"],
         context: state.labelStack || []
       };
@@ -201,7 +203,7 @@ export function stringWithHints(validStrings: string[]): Parser<string> {
 
     const error: ParseError = {
       tag: "Unexpected",
-      span: createSpan(state, i + 1),
+      span: Span(state, i + 1),
       found: `"${content}"`,
       context: state.labelStack || [],
       ...(hints.length > 0 && { hints: hints.map(h => `"${h}"`) })

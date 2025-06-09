@@ -1,6 +1,6 @@
 // import { debug } from "./debug";
 import { Either } from "./either";
-import { ParseError, ParseErrorBundle, createSpan } from "./errors";
+import { ParseError, ParseErrorBundle, Span } from "./errors";
 import { ParserOutput, type ParserState, State } from "./state";
 
 /**
@@ -168,7 +168,7 @@ export class Parser<T> {
     error: { message: string; expected?: string[]; found?: string },
     state: ParserState
   ): ParserOutput<never> {
-    const span = createSpan({
+    const span = Span({
       pos: {
         offset: state.pos.offset,
         line: state.pos.line,
@@ -218,7 +218,7 @@ export class Parser<T> {
           new ParseErrorBundle(
             [
               ParseError.fatal({
-                span: createSpan(state),
+                span: Span(state),
                 message,
                 context: state?.labelStack ?? []
               })
@@ -690,7 +690,7 @@ export class Parser<T> {
                 // Convert generic errors to labeled expectations
                 {
                   tag: "Expected",
-                  span: createSpan(state),
+                  span: Span(state),
                   items: [name],
                   context: newState.labelStack || []
                 }
