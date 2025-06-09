@@ -1,11 +1,39 @@
 import type { Either } from "./either";
 import type { ParseErrorBundle } from "./errors";
 
+/**
+ * Represents the output of a parser operation, containing both the updated state
+ * and the parsing result (either success or error).
+ * @template T - The type of the successfully parsed value
+ * @example
+ * ```typescript
+ * const output: ParserOutput<string> = {
+ *   state: newState,
+ *   result: Either.right("parsed value")
+ * };
+ * ```
+ */
 export type ParserOutput<T> = {
+  /** The parser state after the operation */
   state: ParserState;
+  /** Either a successful result of type T or a ParseErrorBundle */
   result: Either<T, ParseErrorBundle>;
 };
 
+/**
+ * Factory function for creating ParserOutput objects.
+ * @template T - The type of the successfully parsed value
+ * @param state - The parser state after the operation
+ * @param result - Either a successful result or error bundle
+ * @returns A new ParserOutput object
+ * @example
+ * ```typescript
+ * import { Either } from "./either";
+ * 
+ * const successOutput = ParserOutput(newState, Either.right("success"));
+ * const errorOutput = ParserOutput(oldState, Either.left(errorBundle));
+ * ```
+ */
 export const ParserOutput = <T>(
   state: ParserState,
   result: Either<T, ParseErrorBundle>
@@ -14,18 +42,54 @@ export const ParserOutput = <T>(
   result
 });
 
+/**
+ * Represents a position within source code with line, column, and byte offset.
+ * All values are 1-indexed for human readability.
+ * @example
+ * ```typescript
+ * const position: SourcePosition = {
+ *   line: 3,      // Third line
+ *   column: 15,   // 15th character on that line
+ *   offset: 42    // 42nd character from start of input
+ * };
+ * ```
+ */
 export type SourcePosition = {
+  /** Line number (1-indexed) */
   line: number;
+  /** Column number (1-indexed) */
   column: number;
+  /** Byte offset from start of input (0-indexed) */
   offset: number;
 };
 
+/**
+ * Represents the complete state of a parser at any point during parsing.
+ * Contains the input being parsed, current position, and optional debugging/context information.
+ * @example
+ * ```typescript
+ * const state: ParserState = {
+ *   remaining: "hello world",
+ *   pos: { line: 1, column: 1, offset: 0 },
+ *   source: "hello world",
+ *   debug: true,
+ *   labelStack: ["expression", "identifier"],
+ *   committed: false
+ * };
+ * ```
+ */
 export type ParserState = {
+  /** The portion of input that hasn't been consumed yet */
   remaining: string;
+  /** Current position in the source code */
   pos: SourcePosition;
+  /** The complete original input string */
   source: string;
+  /** Whether debug mode is enabled for detailed error reporting */
   debug?: boolean;
+  /** Stack of parsing context labels for error reporting */
   labelStack?: string[];
+  /** Whether the parser has committed to this parse path */
   committed?: boolean;
 };
 
@@ -98,6 +162,13 @@ export const State = {
     return State.consume(state, str.length);
   },
 
+  /**
+   * Creates a new state by moving to a specific offset position in the source.
+   * Resets to the beginning and then consumes to the target position.
+   * @param state - The current parser state
+   * @param moveBy - Number of characters to move forward from current position
+   * @returns A new state at the target position
+   */
   move(state: ParserState, moveBy: number) {
     return State.consume(
       {
@@ -148,6 +219,16 @@ export const State = {
     return state.remaining.length === 0;
   },
 
+  /**
+   * Creates a human-readable string representation of the current parser position.
+   * @param state - The current parser state
+   * @returns A formatted string showing line, column, and offset
+   * @example
+   * ```typescript
+   * const posStr = State.printPosition(state);
+   * // Returns: "line 5, column 12, offset 89"
+   * ```
+   */
   printPosition(state: ParserState): string {
     return `line ${state.pos.line}, column ${state.pos.column}, offset ${state.pos.offset}`;
   }
