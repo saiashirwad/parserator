@@ -65,14 +65,6 @@ export type SourcePosition = {
   offset: number;
 };
 
-export class SourcePosition_ {
-  constructor(
-    public line: number,
-    public column: number,
-    public offset: number
-  ) {}
-}
-
 /**
  * Represents the complete state of a parser at any point during parsing.
  * Contains the input being parsed, current position, and optional debugging/context information.

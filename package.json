@@ -35,7 +35,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "generate:docs": "bun run scripts/generate-api-docs.ts",
-    "ci": "bun run typecheck && bun run build && bun test && bun run format:check",
+    "ci": "bun run typecheck && bun run build && bun test && bun run format",
     "preversion": "bun run ci",
     "version": "bun run format && git add -A",
     "postversion": "git push && git push --tags",

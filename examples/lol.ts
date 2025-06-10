@@ -7,7 +7,7 @@ const something = parser(function* () {
     .spanned();
   const [b, bSpan] = yield* char("b").spanned();
 
-  return narrow({ a, b: [b, bSpan] });
+  return narrow({ a, b: [b, bSpan], pos: [pos] });
 });
 
 const result = something.parse("aaaab");
