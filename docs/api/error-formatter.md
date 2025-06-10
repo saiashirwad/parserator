@@ -61,4 +61,3 @@ Convenience functions for quick formatting.
 
 - `bundle` (`ParseErrorBundle`)
 - `options?` (`ErrorFormatterOptions`)
-

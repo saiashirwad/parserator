@@ -5,7 +5,7 @@
 ### levenshteinDistance
 
 ```typescript
-export function levenshteinDistance(a: string, b: string): number
+export function levenshteinDistance(a: string, b: string): number;
 ```
 
 Calculate the Levenshtein distance between two strings. This measures the minimum number of single-character edits (insertions, deletions, or substitutions) required to change one string into another.
@@ -25,7 +25,7 @@ export function generateHints(
   expected: string[],
   maxDistance: number = 2,
   maxHints: number = 3
-): string[]
+): string[];
 ```
 
 Generate helpful hints for a user's input based on a list of expected values. Uses edit distance to find the closest matches and suggests them as "Did you mean..." options.
@@ -54,17 +54,17 @@ Enhanced keyword parser that provides intelligent hints when the user types some
 **Examples:**
 
 ```typescript
-const schemeKeywords = ["lambda", "let", "if", "cond", "define", "quote"]
-const lambdaParser = keywordWithHints(schemeKeywords)("lambda")
+const schemeKeywords = ["lambda", "let", "if", "cond", "define", "quote"];
+const lambdaParser = keywordWithHints(schemeKeywords)("lambda");
 
 // Parsing "lamdba" will suggest "lambda" as a hint
-const result = lambdaParser.parse("lamdba")
+const result = lambdaParser.parse("lamdba");
 ```
 
 ### anyKeywordWithHints
 
 ```typescript
-export function anyKeywordWithHints(keywords: string[]): Parser<string>
+export function anyKeywordWithHints(keywords: string[]): Parser<string>;
 ```
 
 Creates a parser that matches any of the provided keywords with hint generation.
@@ -78,17 +78,17 @@ Creates a parser that matches any of the provided keywords with hint generation.
 **Examples:**
 
 ```typescript
-const jsKeywords = ["function", "const", "let", "var", "class", "if", "else"]
-const keywordParser = anyKeywordWithHints(jsKeywords)
+const jsKeywords = ["function", "const", "let", "var", "class", "if", "else"];
+const keywordParser = anyKeywordWithHints(jsKeywords);
 
 // Parsing "functoin" will suggest "function"
-const result = keywordParser.parse("functoin")
+const result = keywordParser.parse("functoin");
 ```
 
 ### stringWithHints
 
 ```typescript
-export function stringWithHints(validStrings: string[]): Parser<string>
+export function stringWithHints(validStrings: string[]): Parser<string>;
 ```
 
 Creates a parser for string literals with hint generation for common mistakes.
@@ -102,9 +102,8 @@ Creates a parser for string literals with hint generation for common mistakes.
 **Examples:**
 
 ```typescript
-const colorParser = stringWithHints(["red", "green", "blue", "yellow"])
+const colorParser = stringWithHints(["red", "green", "blue", "yellow"]);
 
 // Parsing '"gren"' will suggest "green"
-const result = colorParser.parse('"gren"')
+const result = colorParser.parse('"gren"');
 ```
-

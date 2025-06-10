@@ -14,7 +14,7 @@ Creates a parser that looks ahead in the input stream without consuming any inpu
 
 - `par` (`Parser<T>`) - The parser to look ahead with
 
-**Returns:** `Parser<T | undefined>` - A new parser that peeks at the input without consuming it ```ts const parser = lookahead(char('a')) parser.run('abc') // Right(['a', {...}]) // Input position remains at 'abc', 'a' is not consumed ```
+**Returns:** `Parser<T | undefined>` - A new parser that peeks at the input without consuming it `ts const parser = lookahead(char('a')) parser.run('abc') // Right(['a', {...}]) // Input position remains at 'abc', 'a' is not consumed `
 
 ### string
 
@@ -28,7 +28,7 @@ Creates a parser that matches an exact string in the input.
 
 - `str` (`string`) - The string to match
 
-**Returns:** `Parser<string>` - A parser that matches and consumes the exact string ```ts const parser = string("hello") parser.run("hello world") // Right(["hello", {...}]) parser.run("goodbye") // Left(error) ```
+**Returns:** `Parser<string>` - A parser that matches and consumes the exact string `ts const parser = string("hello") parser.run("hello world") // Right(["hello", {...}]) parser.run("goodbye") // Left(error) `
 
 ### char
 
@@ -42,7 +42,7 @@ Creates a parser that matches a single character.
 
 - `ch` (`T`) - The character to match
 
-**Returns:** `Parser<T>` - A parser that matches and consumes a single character ```ts const parser = char("a") parser.run("abc") // Right(["a", {...}]) parser.run("xyz") // Left(error) ```
+**Returns:** `Parser<T>` - A parser that matches and consumes a single character `ts const parser = char("a") parser.run("abc") // Right(["a", {...}]) parser.run("xyz") // Left(error) `
 
 ### alphabet
 
@@ -50,7 +50,7 @@ Creates a parser that matches a single character.
 export const alphabet = new Parser(state => ...
 ```
 
-A parser that matches any single alphabetic character (a-z, A-Z). ```ts const parser = alphabet parser.run("abc") // Right(["a", {...}]) parser.run("123") // Left(error) ```
+A parser that matches any single alphabetic character (a-z, A-Z). `ts const parser = alphabet parser.run("abc") // Right(["a", {...}]) parser.run("123") // Left(error) `
 
 ### digit
 
@@ -58,7 +58,7 @@ A parser that matches any single alphabetic character (a-z, A-Z). ```ts const pa
 export const digit = new Parser(state => ...
 ```
 
-A parser that matches any single digit character (0-9). ```ts const parser = digit parser.run("123") // Right(["1", {...}]) parser.run("abc") // Left(error) ```
+A parser that matches any single digit character (0-9). `ts const parser = digit parser.run("123") // Right(["1", {...}]) parser.run("abc") // Left(error) `
 
 ### many0
 
@@ -174,7 +174,7 @@ Creates a parser that skips exactly n occurrences of the input parser.
 ### parseUntilChar
 
 ```typescript
-export function parseUntilChar(char: string): Parser<string>
+export function parseUntilChar(char: string): Parser<string>;
 ```
 
 Creates a parser that takes input until the given character is found.
@@ -212,8 +212,8 @@ Creates a parser that runs multiple parsers in sequence and returns all results.
 **Examples:**
 
 ```typescript
-const parser = sequence([digit, char('-'), digit])
-parser.run('1-2') // Right([['1', '-', '2'], {...}])
+const parser = sequence([digit, char("-"), digit]);
+parser.run("1-2"); // Right([['1', '-', '2'], {...}])
 ```
 
 ### regex
@@ -233,7 +233,7 @@ Creates a parser that matches input against a regular expression. The regex must
 ### commit
 
 ```typescript
-export function commit(): Parser<void>
+export function commit(): Parser<void>;
 ```
 
 Creates a parser that commits to the current parsing path, preventing backtracking. After calling `commit()`, if parsing fails later in the sequence, the parser won't backtrack to try alternatives in a `choice` or `or` combinator. This results in more specific, helpful error messages instead of generic "expected one of" errors.
@@ -245,32 +245,32 @@ Creates a parser that commits to the current parsing path, preventing backtracki
 ```typescript
 // Use commit after identifying the type of construct
 const ifStatement = parser(function* () {
-  yield* keyword("if")
-  yield* commit()  // No backtracking after this point
-  yield* char('(').expect("opening parenthesis after 'if'")
-  const condition = yield* expression
-  yield* char(')').expect("closing parenthesis")
-  const body = yield* block
-  return { type: "if", condition, body }
-})
+  yield* keyword("if");
+  yield* commit(); // No backtracking after this point
+  yield* char("(").expect("opening parenthesis after 'if'");
+  const condition = yield* expression;
+  yield* char(")").expect("closing parenthesis");
+  const body = yield* block;
+  return { type: "if", condition, body };
+});
 ```
 
 ```typescript
 // Commit in different parsing contexts
 const jsonParser = parser(function* () {
-  const firstChar = yield* peekChar
+  const firstChar = yield* peekChar;
 
-  if (firstChar === '{') {
-    yield* char('{')
-    yield* commit()  // Definitely parsing an object
-    return yield* jsonObject
-  } else if (firstChar === '[') {
-    yield* char('[')
-    yield* commit()  // Definitely parsing an array
-    return yield* jsonArray
+  if (firstChar === "{") {
+    yield* char("{");
+    yield* commit(); // Definitely parsing an object
+    return yield* jsonObject;
+  } else if (firstChar === "[") {
+    yield* char("[");
+    yield* commit(); // Definitely parsing an array
+    return yield* jsonArray;
   }
   // ...
-})
+});
 ```
 
 ```typescript
@@ -301,17 +301,17 @@ Alias for {@link commit} using Prolog-style naming. The cut operator (!) in Prol
 
 ```typescript
 const prologStyleIf = parser(function* () {
-  yield* keyword("if")
-  yield* cut()  // Using Prolog-style naming
-  yield* char('(')
+  yield* keyword("if");
+  yield* cut(); // Using Prolog-style naming
+  yield* char("(");
   // ...
-})
+});
 ```
 
 ### notChar
 
 ```typescript
-export function notChar(ch: string): Parser<string>
+export function notChar(ch: string): Parser<string>;
 ```
 
 Parses any character except the specified one.
@@ -325,9 +325,9 @@ Parses any character except the specified one.
 **Examples:**
 
 ```typescript
-const notQuote = notChar('"')
-notQuote.parse('a') // Success: 'a'
-notQuote.parse('"') // Error: Expected any character except '"'
+const notQuote = notChar('"');
+notQuote.parse("a"); // Success: 'a'
+notQuote.parse('"'); // Error: Expected any character except '"'
 ```
 
 ### eof
@@ -341,8 +341,7 @@ Parser that succeeds only at the end of input.
 **Examples:**
 
 ```typescript
-const parser = string("hello").then(eof)
-parser.parse("hello") // Success
-parser.parse("hello world") // Error: Expected end of input
+const parser = string("hello").then(eof);
+parser.parse("hello"); // Success
+parser.parse("hello world"); // Error: Expected end of input
 ```
-

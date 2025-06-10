@@ -103,4 +103,3 @@ Checks if the parser has reached the end of input.
 - `state` (`ParserState`) - The current parser state
 
 **Returns:** `boolean` - True if at end of input, false otherwise
-

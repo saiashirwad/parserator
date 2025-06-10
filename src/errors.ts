@@ -106,7 +106,7 @@ export type ParseError =
  * @example
  * ```typescript
  * const span = Span(state);
- * 
+ *
  * // Create an expected error
  * const expectedError = ParseError.expected({
  *   span,
@@ -114,7 +114,7 @@ export type ParseError =
  *   context: ["function declaration"],
  *   found: "number"
  * });
- * 
+ *
  * // Create a custom error
  * const customError = ParseError.custom({
  *   span,
@@ -159,7 +159,7 @@ export const ParseError = {
  *   ParseError.unexpected({ span: spanAt15, found: ")", context: [] })
  * ];
  * const bundle = new ParseErrorBundle(errors, sourceCode);
- * 
+ *
  * console.log(bundle.toString()); // Shows the furthest error
  * console.log(bundle.format("ansi")); // Formatted with colors
  * ```

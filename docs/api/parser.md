@@ -20,9 +20,9 @@ Creates a new Parser instance.
 
 **Parameters:**
 
-- `/**
-     * @internal
-     */
+- `/\*\*
+  - @internal
+    \*/
     public run` (`(state: ParserState`)
 
 ### parse
@@ -120,7 +120,7 @@ Adds a tap point to observe the current state and result during parsing. Useful 
 ```typescript
 const parser = parser(function* () {
   const name = yield* identifier();
-  yield* char(':');
+  yield* char(":");
   const value = yield* number();
   return { name, value };
 });
@@ -172,15 +172,15 @@ Creates an atomic parser that either fully succeeds or resets to the original st
 ```typescript
 // Without atomic - partial consumption on failure
 const badParser = parser(function* () {
-  yield* string("foo")
-  yield* string("bar")  // If this fails, "foo" is already consumed
-})
+  yield* string("foo");
+  yield* string("bar"); // If this fails, "foo" is already consumed
+});
 
 // With atomic - no consumption on failure
 const goodParser = parser(function* () {
-  yield* string("foo")
-  yield* string("bar")  // If this fails, we reset to before "foo"
-}).atomic()
+  yield* string("foo");
+  yield* string("bar"); // If this fails, we reset to before "foo"
+}).atomic();
 ```
 
 ```typescript
@@ -190,7 +190,7 @@ const value = or(
   expression.atomic(),
   // If that fails completely, try as a simple literal
   literal
-)
+);
 ```
 
 ```typescript
@@ -204,4 +204,3 @@ const startsWithKeyword = or(
 
 @see {@link atomic} - Standalone function version
 ```
-
