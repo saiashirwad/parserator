@@ -29,3 +29,12 @@ export const peekUntil = (ch: string) =>
     const index = s.remaining.indexOf(ch);
     return Parser.succeed(s.remaining.slice(0, index), s);
   });
+
+type Narrowed<T> =
+  T extends readonly any[] ? [...T]
+  : T extends Record<string, any> ? { -readonly [K in keyof T]: Narrowed<T[K]> }
+  : T;
+
+export function narrow<const T>(value: T): Narrowed<T> {
+  return value as any;
+}

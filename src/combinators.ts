@@ -3,9 +3,14 @@
  */
 
 import { Either } from "./either";
-import type { ParseError, ParseErrorBundle } from "./errors";
+import { type ParseError, type ParseErrorBundle } from "./errors";
 import { Parser, parser } from "./parser";
-import { type ParserState, State } from "./state";
+import {
+  ParserOutput,
+  State,
+  type ParserState,
+  type SourcePosition
+} from "./state";
 
 /**
  * Creates a parser that looks ahead in the input stream without consuming any input.
@@ -1050,13 +1055,16 @@ export function count<T>(n: number, par: Parser<T>): Parser<T[]> {
  * list.parse("1,2,3,") // Success: [1, 2, 3] (trailing comma OK)
  * ```
  */
-export function sepEndBy<S, T>(par: Parser<T>, sep: Parser<S>): Parser<T[]> {
-  return or(
-    parser<T[]>(function* () {
+export const sepEndBy = <S, T>(par: Parser<T>, sep: Parser<S>): Parser<T[]> =>
+  or(
+    parser(function* () {
       const elements = yield* sepBy(par, sep);
       yield* optional(sep); // Allow trailing separator
       return elements;
     }),
-    Parser.pure<T[]>([])
+    Parser.pure([])
   );
-}
+
+export const position: Parser<SourcePosition> = new Parser(state => {
+  return ParserOutput(state, Either.right(state.pos));
+});

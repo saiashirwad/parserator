@@ -1,7 +1,7 @@
 // import { debug } from "./debug";
 import { Either } from "./either";
 import { ParseError, ParseErrorBundle, Span } from "./errors";
-import { ParserOutput, type ParserState, State } from "./state";
+import { ParserOutput, type ParserState, type Spanned, State } from "./state";
 
 /**
  * Parser is the core type that represents a parser combinator.
@@ -859,6 +859,26 @@ export class Parser<T> {
         return ParserOutput(state, result.result);
       }
       return result;
+    });
+  }
+
+  spanned(): Parser<Spanned<T>> {
+    return new Parser(state => {
+      const startState = state;
+      const result = this.run(state);
+
+      if (result.result._tag === "Right") {
+        const span = Span(
+          startState,
+          result.state.pos.offset - startState.pos.offset
+        );
+        return ParserOutput(
+          result.state,
+          Either.right([result.result.right, span])
+        );
+      }
+
+      return result as ParserOutput<Spanned<T>>;
     });
   }
 }

@@ -1,5 +1,7 @@
 import type { Either } from "./either";
-import type { ParseErrorBundle } from "./errors";
+import type { ParseErrorBundle, Span } from "./errors";
+
+export type Spanned<T> = [value: T, span: Span];
 
 /**
  * Represents the output of a parser operation, containing both the updated state
@@ -29,7 +31,7 @@ export type ParserOutput<T> = {
  * @example
  * ```typescript
  * import { Either } from "./either";
- * 
+ *
  * const successOutput = ParserOutput(newState, Either.right("success"));
  * const errorOutput = ParserOutput(oldState, Either.left(errorBundle));
  * ```
@@ -62,6 +64,14 @@ export type SourcePosition = {
   /** Byte offset from start of input (0-indexed) */
   offset: number;
 };
+
+export class SourcePosition_ {
+  constructor(
+    public line: number,
+    public column: number,
+    public offset: number
+  ) {}
+}
 
 /**
  * Represents the complete state of a parser at any point during parsing.
