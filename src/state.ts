@@ -15,9 +15,9 @@ export type Spanned<T> = [value: T, span: Span];
  * };
  * ```
  */
-export type ParserOutput<T> = {
+export type ParserOutput<T, Ctx = unknown> = {
   /** The parser state after the operation */
-  state: ParserState;
+  state: ParserState<Ctx>;
   /** Either a successful result of type T or a ParseErrorBundle */
   result: Either<T, ParseErrorBundle>;
 };
@@ -36,10 +36,10 @@ export type ParserOutput<T> = {
  * const errorOutput = ParserOutput(oldState, Either.left(errorBundle));
  * ```
  */
-export const ParserOutput = <T>(
-  state: ParserState,
+export const ParserOutput = <T, Ctx = unknown>(
+  state: ParserState<Ctx>,
   result: Either<T, ParseErrorBundle>
-): ParserOutput<T> => ({
+): ParserOutput<T, Ctx> => ({
   state,
   result
 });
@@ -80,7 +80,7 @@ export type SourcePosition = {
  * };
  * ```
  */
-export type ParserState = {
+export type ParserState<Ctx = unknown> = {
   /** The portion of input that hasn't been consumed yet */
   remaining: string;
   /** Current position in the source code */
@@ -93,6 +93,8 @@ export type ParserState = {
   labelStack?: string[];
   /** Whether the parser has committed to this parse path */
   committed?: boolean;
+  /** Additional context information */
+  ctx: Ctx;
 };
 
 /**
@@ -105,11 +107,12 @@ export const State = {
    * @param input - The input string to parse
    * @returns A new parser state initialized at the start of the input
    */
-  fromInput(input: string): ParserState {
+  fromInput<Ctx = unknown>(input: string, ctx?: Ctx): ParserState<Ctx> {
     return {
       remaining: input,
       source: input,
-      pos: { line: 1, column: 1, offset: 0 }
+      pos: { line: 1, column: 1, offset: 0 },
+      ctx: (ctx ?? {}) as Ctx
     };
   },
 
@@ -121,7 +124,7 @@ export const State = {
    * @returns A new state with n characters consumed and position updated
    * @throws Error if attempting to consume more characters than remaining
    */
-  consume(state: ParserState, n: number): ParserState {
+  consume<Ctx = unknown>(state: ParserState<Ctx>, n: number): ParserState<Ctx> {
     if (n === 0) return state;
     if (n > state.remaining.length) {
       throw new Error("Cannot consume more characters than remaining");
@@ -155,7 +158,10 @@ export const State = {
    * @returns A new state with the string consumed and position updated
    * @throws Error if the input doesn't start with the specified string
    */
-  consumeString(state: ParserState, str: string): ParserState {
+  consumeString<Ctx = unknown>(
+    state: ParserState<Ctx>,
+    str: string
+  ): ParserState<Ctx> {
     if (!state.remaining.startsWith(str)) {
       throw new Error(
         `Cannot consume "${str}" - input "${state.remaining}" doesn't start with it`
@@ -171,7 +177,10 @@ export const State = {
    * @param moveBy - Number of characters to move forward from current position
    * @returns A new state at the target position
    */
-  move(state: ParserState, moveBy: number) {
+  moveTo<Ctx = unknown>(
+    state: ParserState<Ctx>,
+    moveBy: number
+  ): ParserState<Ctx> {
     return State.consume(
       {
         ...state,
@@ -189,10 +198,10 @@ export const State = {
    * @param predicate - Function that tests each character
    * @returns A new state with matching characters consumed
    */
-  consumeWhile(
-    state: ParserState,
+  consumeWhile<Ctx = unknown>(
+    state: ParserState<Ctx>,
     predicate: (char: string) => boolean
-  ): ParserState {
+  ): ParserState<Ctx> {
     let i = 0;
     while (i < state.remaining.length && predicate(state.remaining[i])) {
       i++;
@@ -207,7 +216,7 @@ export const State = {
    * @param n - Number of characters to peek (default: 1)
    * @returns The next n characters as a string
    */
-  peek(state: ParserState, n: number = 1): string {
+  peek<Ctx = unknown>(state: ParserState<Ctx>, n: number = 1): string {
     return state.remaining.slice(0, n);
   },
 
@@ -217,7 +226,7 @@ export const State = {
    * @param state - The current parser state
    * @returns True if at end of input, false otherwise
    */
-  isAtEnd(state: ParserState): boolean {
+  isAtEnd<Ctx = unknown>(state: ParserState<Ctx>): boolean {
     return state.remaining.length === 0;
   },
 
@@ -231,7 +240,7 @@ export const State = {
    * // Returns: "line 5, column 12, offset 89"
    * ```
    */
-  printPosition(state: ParserState): string {
+  printPosition<Ctx = unknown>(state: ParserState<Ctx>): string {
     return `line ${state.pos.line}, column ${state.pos.column}, offset ${state.pos.offset}`;
   }
 };
