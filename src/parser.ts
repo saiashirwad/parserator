@@ -1,4 +1,3 @@
-// import { debug } from "./debug";
 import { Either } from "./either";
 import { ParseError, ParseErrorBundle, Span } from "./errors";
 import { ParserOutput, type ParserState, type Spanned, State } from "./state";
@@ -862,16 +861,13 @@ export class Parser<T> {
     });
   }
 
-  spanned(): Parser<Spanned<T>> {
-    return new Parser(state => {
-      const startState = state;
+  spanned = (): Parser<Spanned<T>> =>
+    new Parser(state => {
       const result = this.run(state);
 
+      const span = Span(state, result.state.pos.offset - state.pos.offset);
       if (result.result._tag === "Right") {
-        const span = Span(
-          startState,
-          result.state.pos.offset - startState.pos.offset
-        );
+        // const span = Span(state, result.state.pos.offset - state.pos.offset);
         return ParserOutput(
           result.state,
           Either.right([result.result.right, span])
@@ -880,7 +876,6 @@ export class Parser<T> {
 
       return result as ParserOutput<Spanned<T>>;
     });
-  }
 }
 
 export const parser = Parser.gen;
