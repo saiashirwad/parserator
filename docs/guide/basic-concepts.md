@@ -1,81 +1,157 @@
 # Basic Concepts
 
-## What is a Parser?
+This guide covers the fundamental types and concepts you'll need to understand to build effective parsers with Parserator.
 
-A parser is a function that takes an input string and tries to extract structured data from it. In Parserator, every parser is an instance of the `Parser<T>` class, where `T` is the type of value the parser produces when successful.
+## 1. What is a Parser?
+
+A parser is a function that:
+
+- Takes a string input.
+- Tries to extract structured data from it.
+- Returns success with a value, or failure with detailed errors.
+
+In Parserator, every parser is an instance of the `Parser<T>` class.
 
 ```typescript
-import { string, digit } from "parserator";
+import { string } from "parserator";
 
 const hello = string("hello");
-const num = digit;
+// hello has type Parser<string>
 
-// Both are Parser instances
-console.log(hello.parse("hello world")); // Success: "hello"
-console.log(num.parse("123")); // Success: "1"
+const result = hello.parse("hello world");
+// result.result is Either.right("hello")
+// result.state.remaining is " world"
 ```
 
-## Parser Results
+## 2. The Parser\<T> Type
 
-Parsers return results wrapped in an `Either` type:
-
-- `Right(value)` for successful parsing
-- `Left(error)` for parsing failures
+`Parser<T>` is the core type. The generic parameter `T` represents the type of data the parser produces on success.
 
 ```typescript
-const result = string("hello").parse("hello world");
-if (result.isRight()) {
-  console.log("Parsed:", result.value); // "hello"
+import { digit, number, point } from "./my-parsers";
+
+const digitParser: Parser<string> = digit; // produces "0"-"9"
+const numberParser: Parser<number> = number; // produces numbers
+const pointParser: Parser<{ x: number; y: number }> = point; // produces objects
+```
+
+## 3. ParserOutput and Either
+
+When you call `parser.parse(input)`, you receive a `ParserOutput<T>` object:
+
+```typescript
+type ParserOutput<T> = {
+  result: Either<ParseErrorBundle, T>; // Success or failure
+  state: ParserState; // Where we are in the input
+};
+```
+
+The `result` field uses the `Either` type, which has two variants:
+
+- `Either.right(value)` - Represents success.
+- `Either.left(errors)` - Represents failure.
+
+```typescript
+import { Either, digit } from "parserator";
+
+const result = digit.parse("5");
+
+if (Either.isRight(result.result)) {
+  // Access the successful value
+  console.log("Parsed:", result.result.right); // "5"
 } else {
-  console.log("Error:", result.error);
+  // Access the error bundle
+  console.log("Error:", result.result.left);
 }
 ```
 
-## Parser State
+## 4. ParserState
 
-Each parser maintains state information including:
-
-- Current position in the input
-- Remaining input to parse
-- Line and column numbers for error reporting
+The `ParserState` tracks the parser's progress through the input string:
 
 ```typescript
-const output = string("hello").parse("hello world");
-console.log(output.state.remaining); // " world"
-console.log(output.state.pos.offset); // 5
+type ParserState = {
+  source: string; // Original input
+  remaining: string; // What's left to parse
+  pos: {
+    offset: number; // Character offset from start (0-indexed)
+    line: number; // 1-indexed line number
+    column: number; // 1-indexed column number
+  };
+};
 ```
 
-## Composition
+After successfully parsing `"hello"` from the input `"hello world"`:
 
-Parsers are designed to be composed together to build complex parsers from simple ones:
+- `remaining` will be `" world"`.
+- `offset` will be `5`.
+- `line` will be `1`, and `column` will be `6`.
+
+## 5. Three Ways to Run a Parser
+
+Parserator provides different methods depending on how you want to handle the results:
 
 ```typescript
-import { string, char, parser } from "parserator";
+// 1. parse() - Full control
+// Returns ParserOutput<T> with result and state.
+const output = parser.parse(input);
 
-const greeting = parser(function* () {
-  yield* string("hello");
-  yield* char(" ");
-  const name = yield* string("world");
-  return `Hello, ${name}!`;
-});
+// 2. parseOrThrow() - For quick scripts and tests
+// Returns T directly, throws ParseErrorBundle on failure.
+const value = parser.parseOrThrow(input);
 
-console.log(greeting.parse("hello world")); // Success: "Hello, world!"
+// 3. parseOrError() - The middle ground
+// Returns T | ParseErrorBundle (no throwing).
+const valueOrError = parser.parseOrError(input);
 ```
 
-## Error Handling
+## 6. ParseErrorBundle
 
-Parserator provides detailed error information with context:
+When parsing fails, you receive a `ParseErrorBundle`. This isn't just a simple string; it's a collection of errors encountered during the parsing process.
+
+It contains:
+
+- All errors encountered at the furthest position reached.
+- The **primary error** (the error at the furthest offset).
+- The original source code for context.
 
 ```typescript
-const result = string("hello").parse("goodbye");
-// Error includes:
-// - Expected vs actual input
-// - Position information
-// - Helpful error messages
+try {
+  parser.parseOrThrow("invalid input");
+} catch (bundle) {
+  // Format the error for the terminal with ANSI colors
+  console.error(bundle.format("ansi"));
+
+  // Or access the underlying errors
+  console.log(bundle.errors);
+  console.log(bundle.primary); // The most relevant error
+}
 ```
 
-## Next Steps
+## 7. Composing Parsers
 
-- Learn about [Parser Combinators](./parser-combinators.md)
-- Explore [Error Handling](./error-handling.md)
-- Try [Advanced Patterns](./advanced-patterns.md)
+The real power of Parserator comes from combining simple parsers into complex ones using built-in methods:
+
+```typescript
+import { many1, digit, string, or } from "parserator";
+
+// .map() - Transform the result
+const number = many1(digit).map(d => parseInt(d.join("")));
+
+// .then() - Sequence two parsers, keep the second result
+const greeting = string("hello").then(string(" world"));
+
+// .zip() - Sequence two parsers, keep both results as a tuple
+const pair = digit.zip(digit); // Parser<[string, string]>
+
+// or() - Try alternatives in order
+const bool = or(string("true"), string("false"));
+```
+
+## 8. Next Steps
+
+Now that you understand the basics, you're ready to dive deeper:
+
+- [Generator Syntax](/guide/generator-syntax) - Use the `parser(function*() {})` pattern for complex logic.
+- [Combinators](/guide/parser-combinators) - Explore all the built-in building blocks.
+- [Error Handling](/guide/error-handling) - Learn how to provide better error messages using `.expect()`.
