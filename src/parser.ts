@@ -175,7 +175,8 @@ export class Parser<T> {
     const span = Span({
       offset: state.offset,
       line: state.line,
-      column: state.column
+      column: state.column,
+      source: state.source
     });
 
     const parseErr = ParseError.custom({
@@ -185,11 +186,7 @@ export class Parser<T> {
       hints: []
     });
 
-    const bundle = new ParseErrorBundle(
-      [parseErr],
-      // state?.source ?? state.remaining
-      state.source
-    );
+    const bundle = new ParseErrorBundle([parseErr], state.source);
 
     return ParserOutput(state, Either.left(bundle));
   }
@@ -215,7 +212,7 @@ export class Parser<T> {
   static fatal = (message: string): Parser<never> =>
     new Parser(state =>
       ParserOutput(
-        state,
+        { ...state, committed: true },
         Either.left(
           new ParseErrorBundle(
             [
@@ -225,7 +222,6 @@ export class Parser<T> {
                 context: state?.labelStack ?? []
               })
             ],
-            // state?.source ?? state.remaining
             state.source
           )
         )
@@ -980,11 +976,22 @@ export class Parser<T> {
     return new Parser<T>(state => {
       const output = this.run(state);
       if (output.result._tag === "Left") {
+        const primaryError = output.result.left.primary;
+        // If the inner parser produced a Fatal error, preserve it
+        if (primaryError.tag === "Fatal") {
+          return output;
+        }
+        // Use the furthest position from the error bundle for accurate error location
+        const errorState = {
+          ...state,
+          offset: primaryError.span.offset,
+          committed: output.state.committed || state.committed
+        };
         return Parser.fail(
           {
             message: `Expected ${description}`
           },
-          output.state
+          errorState
         );
       }
       return output;

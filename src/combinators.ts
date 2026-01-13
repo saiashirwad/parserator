@@ -389,12 +389,12 @@ function many_<S, T>(
         let currentState = state;
 
         while (true) {
-          const itemResult = parser.run(currentState);
+          const itemResult = parser.run({
+            ...currentState,
+            committed: false
+          });
           if (itemResult.result._tag === "Left") {
-            const isCommitted =
-              itemResult.state?.committed && !currentState?.committed;
-
-            if (isCommitted) {
+            if (itemResult.state?.committed) {
               return itemResult as unknown as typeof itemResult & {
                 result: Either<T[], ParseErrorBundle>;
               };
@@ -912,12 +912,17 @@ export function optional<T>(parser: Parser<T>): Parser<T | undefined> {
     (state: ParserState) => {
       const { result, state: newState } = parser.run(state);
       if (result._tag === "Left") {
+        // If the parser committed before failing, propagate the error
+        if (newState.committed && !state.committed) {
+          return ParserOutput(newState, result);
+        }
         return Parser.succeed(undefined, state);
       }
       return Parser.succeed(result.right, newState);
     },
     ctx => {
       const snapshot = ctx.snapshot();
+      const wasCommitted = ctx.committed;
       const result =
         parser.runFast ?
           parser.runFast(ctx)
@@ -932,6 +937,16 @@ export function optional<T>(parser: Parser<T>): Parser<T | undefined> {
             });
 
             if (output.result._tag === "Left") {
+              // Check if committed during parse
+              if (output.state.committed && !wasCommitted) {
+                // Update ctx to reflect the error state
+                ctx.offset = output.state.offset;
+                ctx.committed = true;
+                if (output.result.left.errors[0]) {
+                  ctx.error = output.result.left.errors[0];
+                  ctx.errorOffset = output.state.offset;
+                }
+              }
               return PARSE_FAILED;
             }
 
@@ -944,6 +959,10 @@ export function optional<T>(parser: Parser<T>): Parser<T | undefined> {
           })();
 
       if (result === PARSE_FAILED) {
+        // If committed during the failed parse, propagate the failure
+        if (ctx.committed && !wasCommitted) {
+          return PARSE_FAILED;
+        }
         ctx.restore(snapshot);
         return undefined;
       }
