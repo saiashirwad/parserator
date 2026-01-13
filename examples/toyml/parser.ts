@@ -188,7 +188,7 @@ const literal: Parser<Literal> = or(
   unitLiteral
 );
 
-let pattern: Parser<Pattern>;
+const pattern: Parser<Pattern> = Parser.lazy(() => annotatedPattern);
 
 const wildcardPattern: Parser<Pattern> = token(char("_")).map(() =>
   Pattern.wildcard()
@@ -200,18 +200,18 @@ const litPattern: Parser<Pattern> = literal.map(Pattern.lit);
 
 const constructorPattern: Parser<Pattern> = parser(function* () {
   const name = yield* uppercaseIdent;
-  const args = yield* many(Parser.lazy(() => simplePattern));
+  const args = yield* many(simplePattern);
   return Pattern.constructor(name, args);
 });
 
 const tupleOrParenPattern: Parser<Pattern> = parser(function* () {
   yield* token(char("("));
-  const first = yield* optional(Parser.lazy(() => pattern));
+  const first = yield* optional(pattern);
   if (first === undefined) {
     yield* token(char(")")).expect("closing paren");
     return Pattern.lit(Literal.unit());
   }
-  const rest = yield* many(token(char(",")).then(Parser.lazy(() => pattern)));
+  const rest = yield* many(token(char(",")).then(pattern));
   yield* token(char(")")).expect("closing paren for pattern");
   if (rest.length === 0) return first;
   return Pattern.tuple([first, ...rest]);
@@ -220,21 +220,20 @@ const tupleOrParenPattern: Parser<Pattern> = parser(function* () {
 const listPattern: Parser<Pattern> = parser(function* () {
   yield* token(char("["));
   yield* commit();
-  const elements = yield* sepBy(
-    Parser.lazy(() => pattern),
-    token(char(","))
-  );
+  const elements = yield* sepBy(pattern, token(char(",")));
   yield* token(char("]")).expect("closing bracket for list pattern");
   return Pattern.list(elements);
 });
 
-const simplePattern: Parser<Pattern> = or(
-  wildcardPattern,
-  litPattern,
-  tupleOrParenPattern,
-  listPattern,
-  constructorPattern,
-  varPattern
+const simplePattern: Parser<Pattern> = Parser.lazy(() =>
+  or(
+    wildcardPattern,
+    litPattern,
+    tupleOrParenPattern,
+    listPattern,
+    constructorPattern,
+    varPattern
+  )
 );
 
 const consPattern: Parser<Pattern> = parser(function* () {
@@ -267,16 +266,14 @@ const annotatedPattern: Parser<Pattern> = parser(function* () {
   const annotation = yield* optional(
     parser(function* () {
       yield* token(char(":"));
-      return yield* Parser.lazy(() => typeExpr);
+      return yield* typeExpr;
     })
   );
   if (annotation) return Pattern.annotated(pat, annotation);
   return pat;
 });
 
-pattern = annotatedPattern;
-
-let typeExpr: Parser<Type>;
+const typeExpr: Parser<Type> = Parser.lazy(() => arrowType);
 
 const typeConst: Parser<Type> = lowercaseIdent.map(Type.const);
 
@@ -284,8 +281,8 @@ const typeVarP: Parser<Type> = typeVar.map(name => Type.var(name.slice(1)));
 
 const typeParens: Parser<Type> = parser(function* () {
   yield* token(char("("));
-  const first = yield* Parser.lazy(() => typeExpr);
-  const rest = yield* many(token(char("*")).then(Parser.lazy(() => typeExpr)));
+  const first = yield* typeExpr;
+  const rest = yield* many(token(char("*")).then(typeExpr));
   yield* token(char(")")).expect("closing paren for type");
   if (rest.length === 0) return first;
   return Type.tuple([first, ...rest]);
@@ -320,10 +317,8 @@ const arrowType: Parser<Type> = parser(function* () {
   );
 });
 
-typeExpr = arrowType;
-
-let expr: Parser<Expr>;
-let nonSequenceExpr: Parser<Expr>;
+const expr: Parser<Expr> = Parser.lazy(() => sequenceExpr);
+const nonSequenceExpr: Parser<Expr> = Parser.lazy(() => simpleAnnotatedExpr);
 
 const litExpr: Parser<Expr> = literal.map(Expr.lit);
 
@@ -333,7 +328,7 @@ const constructorExpr: Parser<Expr> = uppercaseIdent.map(Expr.constructor);
 
 const tupleOrParenExpr: Parser<Expr> = parser(function* () {
   yield* token(char("("));
-  const first = yield* optional(Parser.lazy(() => expr));
+  const first = yield* optional(expr);
   if (first === undefined) {
     yield* token(char(")")).expect("closing paren");
     return Expr.unit();
@@ -345,7 +340,7 @@ const tupleOrParenExpr: Parser<Expr> = parser(function* () {
     return Expr.var(hasOp);
   }
 
-  const rest = yield* many(token(char(",")).then(Parser.lazy(() => expr)));
+  const rest = yield* many(token(char(",")).then(expr));
   yield* token(char(")")).expect("closing paren");
   if (rest.length === 0) return first;
   return Expr.tuple([first, ...rest]);
@@ -354,10 +349,7 @@ const tupleOrParenExpr: Parser<Expr> = parser(function* () {
 const listExpr: Parser<Expr> = parser(function* () {
   yield* token(char("["));
   yield* commit();
-  const elements = yield* sepBy(
-    Parser.lazy(() => nonSequenceExpr),
-    token(char(";"))
-  );
+  const elements = yield* sepBy(nonSequenceExpr, token(char(";")));
   yield* optional(token(char(";")));
   yield* token(char("]")).expect("closing bracket for list");
   return Expr.list(elements);
@@ -371,9 +363,7 @@ const recordExpr: Parser<Expr> = atomic(
       parser(function* () {
         const label = yield* lowercaseIdent;
         yield* token(char("=")).expect("'=' in record field");
-        const value = yield* Parser.lazy(() => nonSequenceExpr).expect(
-          "value for record field"
-        );
+        const value = yield* nonSequenceExpr.expect("value for record field");
         return { label, value };
       }),
       token(char(";"))
@@ -387,7 +377,7 @@ const recordExpr: Parser<Expr> = atomic(
 const beginEndExpr: Parser<Expr> = parser(function* () {
   yield* keyword("begin");
   yield* commit();
-  const body = yield* Parser.lazy(() => expr);
+  const body = yield* expr;
   yield* keyword("end").expect("'end' to close 'begin'");
   return body;
 });
@@ -395,15 +385,11 @@ const beginEndExpr: Parser<Expr> = parser(function* () {
 const ifExpr: Parser<Expr> = parser(function* () {
   yield* keyword("if");
   yield* commit();
-  const cond = yield* Parser.lazy(() => expr).expect("condition after 'if'");
+  const cond = yield* expr.expect("condition after 'if'");
   yield* keyword("then").expect("'then' after condition");
-  const thenBranch = yield* Parser.lazy(() => expr).expect(
-    "expression after 'then'"
-  );
+  const thenBranch = yield* expr.expect("expression after 'then'");
   yield* keyword("else").expect("'else' after 'then' branch");
-  const elseBranch = yield* Parser.lazy(() => expr).expect(
-    "expression after 'else'"
-  );
+  const elseBranch = yield* expr.expect("expression after 'else'");
   return Expr.if(cond, thenBranch, elseBranch);
 });
 
@@ -414,13 +400,13 @@ const matchCaseBody: Parser<Expr> = parser(function* () {
       "empty match case body (found '|' instead of expression)"
     );
   }
-  return yield* Parser.lazy(() => expr);
+  return yield* expr;
 });
 
 const matchCase: Parser<MatchCase> = parser(function* () {
   yield* optional(token(char("|")));
   const pat = yield* pattern;
-  const guard = yield* optional(keyword("when").then(Parser.lazy(() => expr)));
+  const guard = yield* optional(keyword("when").then(expr));
   yield* token(string("->")).expect("'->' in match case");
   const body = yield* matchCaseBody.expect("expression in match case");
   return { pattern: pat, guard, body };
@@ -429,9 +415,7 @@ const matchCase: Parser<MatchCase> = parser(function* () {
 const matchExpr: Parser<Expr> = parser(function* () {
   yield* keyword("match");
   yield* commit();
-  const scrutinee = yield* Parser.lazy(() => expr).expect(
-    "expression after 'match'"
-  );
+  const scrutinee = yield* expr.expect("expression after 'match'");
   yield* keyword("with").expect("'with' after match expression");
   const cases = yield* many1(matchCase).expect("at least one match case");
   return Expr.match(scrutinee, cases);
@@ -442,7 +426,7 @@ const funExpr: Parser<Expr> = parser(function* () {
   yield* commit();
   const params = yield* many1(simplePattern).expect("parameters after 'fun'");
   yield* token(string("->")).expect("'->' after fun parameters");
-  const body = yield* Parser.lazy(() => expr).expect("body of fun expression");
+  const body = yield* expr.expect("body of fun expression");
   return Expr.fun(params, body);
 });
 
@@ -459,9 +443,7 @@ const letBinding: Parser<LetBinding> = parser(function* () {
   const params = yield* many(simplePattern);
   const annotation = yield* optional(token(char(":")).then(typeExpr));
   yield* token(char("=")).expect("'=' in let binding");
-  const value = yield* Parser.lazy(() => expr).expect(
-    "expression in let binding"
-  );
+  const value = yield* expr.expect("expression in let binding");
   return { pattern: pat, params, annotation, value };
 });
 
@@ -473,7 +455,7 @@ const letExpr: Parser<Expr> = parser(function* () {
   const moreBindings = yield* many(keyword("and").then(letBinding));
   const bindings = [firstBinding, ...moreBindings];
   yield* keyword("in").expect("'in' after let bindings");
-  const body = yield* Parser.lazy(() => expr).expect("body after 'in'");
+  const body = yield* expr.expect("body after 'in'");
   if (isRec) return Expr.letRec(bindings, body);
   if (bindings.length === 1) return Expr.let(bindings[0], body);
   return bindings.reduceRight((acc, binding) => Expr.let(binding, acc), body);
@@ -591,9 +573,6 @@ const sequenceExpr: Parser<Expr> = parser(function* () {
   if (rest.length === 0) return first;
   return rest.reduce((acc, e) => Expr.sequence(acc, e), first);
 });
-
-nonSequenceExpr = simpleAnnotatedExpr;
-expr = sequenceExpr;
 
 const typeParams: Parser<TypeParam[]> = or(
   parser(function* () {
