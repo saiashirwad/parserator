@@ -1,105 +1,85 @@
 # State
 
-## Functions
+## ParserState Type
 
-### State
-
-```typescript
-export const State =
-```
-
-Utility object containing static methods for creating and manipulating parser state.
-
-**Parameters:**
-
-- `input` (`string`)
-
-**Returns:** `ParserState`
-
-### fromInput
+The `ParserState` object represents the complete state of a parser at any point during execution. It is an immutable structure that tracks the source, current position, and parsing context.
 
 ```typescript
-fromInput(input: string): ParserState
+type ParserState = {
+  source: string;      // Original input string
+  offset: number;      // 0-indexed byte offset from start
+  line: number;        // 1-indexed line number
+  column: number;      // 1-indexed column number
+  committed?: boolean; // Whether commit() was called in current branch
+  labelStack?: string[]; // Stack of labels for context-aware errors
+  debug?: boolean;     // Whether debug mode is enabled
+};
 ```
 
-Creates a new parser state from an input string.
+### SourcePosition
 
-**Parameters:**
-
-- `input` (`string`) - The input string to parse
-
-**Returns:** `ParserState` - A new parser state initialized at the start of the input
-
-### consume
+A simplified view of the parser's location in the source.
 
 ```typescript
-consume(state: ParserState, n: number): ParserState
+type SourcePosition = {
+  offset: number; // 0-indexed byte offset
+  line: number;   // 1-indexed line
+  column: number; // 1-indexed column
+};
 ```
 
-Creates a new state by consuming n characters from the current state.
+## State Utilities
 
-**Parameters:**
+The `State` object provides low-level functions for creating and manipulating `ParserState`. These are typically used when implementing custom parsers.
 
-- `state` (`ParserState`) - The current parser state
-- `n` (`number`) - Number of characters to consume
-
-**Returns:** `ParserState` - A new state with n characters consumed and position updated
-
-### consumeString
+### State.fromInput()
+Creates an initial `ParserState` from an input string, initialized at line 1, column 1, offset 0.
 
 ```typescript
-consumeString(state: ParserState, str: string): ParserState
+State.fromInput(input: string): ParserState
 ```
 
-Creates a new state by consuming a specific string from the current state.
-
-**Parameters:**
-
-- `state` (`ParserState`) - The current parser state
-- `str` (`string`) - The string to consume
-
-**Returns:** `ParserState` - A new state with the string consumed and position updated
-
-### consumeWhile
+### State.consume()
+Advances the parser state by `n` characters. It updates the `offset` but leaves `line` and `column` as-is (they are computed lazily or by `State.computePosition` when needed for errors).
 
 ```typescript
-consumeWhile(
-    state: ParserState,
-    predicate: (char: string) => ...
+State.consume(state: ParserState, n: number): ParserState
 ```
 
-Creates a new state by consuming characters while a predicate is true.
-
-**Parameters:**
-
-- `state` (`ParserState`) - The current parser state
-- `predicate` (`(char: string`) - Function that tests each character
-
-### peek
+### State.consumeString()
+Consumes a specific string from the current position. Throws an error if the remaining input does not start with the specified string.
 
 ```typescript
-peek(state: ParserState, n: number = 1): string
+State.consumeString(state: ParserState, str: string): ParserState
 ```
 
-Gets the next n characters from the input without consuming them.
-
-**Parameters:**
-
-- `state` (`ParserState`) - The current parser state
-- `n?` (`number`) - Number of characters to peek (default: 1)
-
-**Returns:** `string` - The next n characters as a string
-
-### isAtEnd
+### State.consumeWhile()
+Consumes characters while the provided predicate function returns `true`. Returns a new `ParserState` updated to the position after the last matching character.
 
 ```typescript
-isAtEnd(state: ParserState): boolean
+State.consumeWhile(
+  state: ParserState, 
+  predicate: (char: string) => boolean
+): ParserState
 ```
 
-Checks if the parser has reached the end of input.
+### State.peek()
+Looks at the next `n` characters (default: 1) without advancing the parser state.
 
-**Parameters:**
+```typescript
+State.peek(state: ParserState, n?: number): string
+```
 
-- `state` (`ParserState`) - The current parser state
+### State.isAtEnd()
+Returns `true` if the current offset has reached or exceeded the length of the source string.
 
-**Returns:** `boolean` - True if at end of input, false otherwise
+```typescript
+State.isAtEnd(state: ParserState): boolean
+```
+
+### State.remaining()
+Returns the unparsed portion of the source string starting from the current offset.
+
+```typescript
+State.remaining(state: ParserState): string
+```

@@ -1,26 +1,19 @@
 # Hints
 
-## Functions
+API for providing intelligent typo suggestions and distance-based matching.
 
-### levenshteinDistance
+## levenshteinDistance
 
 ```typescript
-export function levenshteinDistance(a: string, b: string): number;
+function levenshteinDistance(a: string, b: string): number;
 ```
 
-Calculate the Levenshtein distance between two strings. This measures the minimum number of single-character edits (insertions, deletions, or substitutions) required to change one string into another.
+Calculates the edit distance between two strings using the Levenshtein algorithm. This measures the minimum number of single-character edits (insertions, deletions, or substitutions) required to transform one string into another.
 
-**Parameters:**
-
-- `a` (`string`) - The first string
-- `b` (`string`) - The second string
-
-**Returns:** `number` - The edit distance between the strings
-
-### generateHints
+## generateHints
 
 ```typescript
-export function generateHints(
+function generateHints(
   found: string,
   expected: string[],
   maxDistance: number = 2,
@@ -28,82 +21,73 @@ export function generateHints(
 ): string[];
 ```
 
-Generate helpful hints for a user's input based on a list of expected values. Uses edit distance to find the closest matches and suggests them as "Did you mean..." options.
+Generates helpful "Did you mean..." suggestions by finding the closest matches from a list of expected values.
 
-**Parameters:**
+- **found**: The actual input string
+- **expected**: List of valid/allowed strings
+- **maxDistance**: Maximum edit distance to consider (default: 2)
+- **maxHints**: Maximum number of suggestions to return (default: 3)
 
-- `found` (`string`) - The string the user actually typed
-- `expected` (`string[]`) - Array of valid/expected strings
-- `maxDistance?` (`number`) - Maximum edit distance to consider (default: 2)
-- `maxHints?` (`number`) - Maximum number of hints to return (default: 3)
-
-**Returns:** `string[]` - Array of suggested strings, sorted by edit distance
-
-### keywordWithHints
+## keywordWithHints
 
 ```typescript
-export const keywordWithHints = (keywords: string[])
+function keywordWithHints(keywords: string[]): (keyword: string) => Parser<string>;
 ```
 
-Enhanced keyword parser that provides intelligent hints when the user types something similar.
-
-**Parameters:**
-
-- `keywords` (`string[]`) - Array of valid keywords to match against
-
-**Examples:**
+Creates a factory for keyword parsers that provide hints when an unknown but similar identifier is encountered.
 
 ```typescript
-const schemeKeywords = ["lambda", "let", "if", "cond", "define", "quote"];
-const lambdaParser = keywordWithHints(schemeKeywords)("lambda");
+const keywords = ["select", "from", "where"];
+const select = keywordWithHints(keywords)("select");
 
-// Parsing "lamdba" will suggest "lambda" as a hint
-const result = lambdaParser.parse("lamdba");
+// Parsing "selct" will throw an error suggesting "select"
 ```
 
-### anyKeywordWithHints
+## anyKeywordWithHints
 
 ```typescript
-export function anyKeywordWithHints(keywords: string[]): Parser<string>;
+function anyKeywordWithHints(keywords: string[]): Parser<string>;
 ```
 
-Creates a parser that matches any of the provided keywords with hint generation.
-
-**Parameters:**
-
-- `keywords` (`string[]`) - Array of valid keywords
-
-**Returns:** `Parser<string>` - A parser that matches any keyword and provides hints for typos
-
-**Examples:**
+A parser that matches any keyword from the provided list. If no exact match is found, it attempts to extract an identifier and provides hints from the keyword list.
 
 ```typescript
-const jsKeywords = ["function", "const", "let", "var", "class", "if", "else"];
-const keywordParser = anyKeywordWithHints(jsKeywords);
-
-// Parsing "functoin" will suggest "function"
-const result = keywordParser.parse("functoin");
+const op = anyKeywordWithHints(["add", "sub", "mul", "div"]);
 ```
 
-### stringWithHints
+## stringWithHints
 
 ```typescript
-export function stringWithHints(validStrings: string[]): Parser<string>;
+function stringWithHints(validStrings: string[]): Parser<string>;
 ```
 
-Creates a parser for string literals with hint generation for common mistakes.
-
-**Parameters:**
-
-- `validStrings` (`string[]`) - Array of valid string values
-
-**Returns:** `Parser<string>` - A parser that matches quoted strings and provides hints for typos
-
-**Examples:**
+Parses a quoted string literal and validates its content against a list of allowed values. Provides hints if the quoted content is similar to one of the valid strings.
 
 ```typescript
-const colorParser = stringWithHints(["red", "green", "blue", "yellow"]);
+const color = stringWithHints(["red", "green", "blue"]);
+// Matches "red", "green", "blue"
+// On "gren", suggests "green"
+```
 
-// Parsing '"gren"' will suggest "green"
-const result = colorParser.parse('"gren"');
+## Examples
+
+### Typo Correction in Action
+
+```typescript
+import { anyKeywordWithHints, errorFormatter } from "parserator";
+
+const parser = anyKeywordWithHints(["function", "const", "class"]);
+
+try {
+  parser.parseOrThrow("functoin");
+} catch (e) {
+  const formatted = errorFormatter.formatAnsi(e, "functoin");
+  console.log(formatted);
+  /*
+  Unexpected "functoin" at 1:1
+  1 | functoin
+    | ^^^^^^^^
+  Did you mean: function?
+  */
+}
 ```

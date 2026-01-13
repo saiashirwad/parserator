@@ -1,281 +1,174 @@
 # Error Handling
 
-Parserator provides comprehensive error handling with detailed error messages, position tracking, and recovery mechanisms.
+Parser error messages are crucial for user experience. Parserator provides tools to make errors helpful, actionable, and visually clear.
 
-## Error Types
+## Basic Error Structure
 
-### ParseError
-
-Individual parsing errors contain:
-
-- `message`: Human-readable error description
-- `expected`: Array of what was expected
-- `found`: What was actually found
-- `pos`: Position in the input where error occurred
-
-### ParseErrorBundle
-
-Collections of related errors, useful for accumulating multiple error sources.
-
-## Basic Error Handling
-
-### Checking for Success/Failure
+When a parser fails, it returns a `ParseErrorBundle` containing detailed information about the failure.
 
 ```typescript
-import { string } from "parserator";
+// ParseError types (simplified)
+type ParseError =
+  | ExpectedParseError // Expected X, found Y
+  | UnexpectedParseError // Unexpected X (often with hints)
+  | CustomParseError // Custom message using .expect()
+  | FatalParseError; // Unrecoverable error using Parser.fatal()
 
-const result = string("hello").parse("goodbye");
-
-if (result.isLeft()) {
-  console.log("Parse failed:", result.error.message);
-  console.log("At position:", result.error.pos);
-} else {
-  console.log("Success:", result.value);
-}
+// ParseErrorBundle contains:
+// - errors: ParseError[]    All errors encountered during parsing
+// - primary: ParseError     The "furthest" error (most likely the relevant one)
+// - source: string          The original input string
 ```
 
-### Using parseOrThrow
+The `primary` error is determined by the highest offset in the input, which usually points to where the syntax actually diverged from the grammar.
 
-For cases where you want exceptions instead of Either types:
+## Adding Context with `label()`
 
-```typescript
-try {
-  const result = string("hello").parseOrThrow("goodbye");
-  console.log("Success:", result);
-} catch (error) {
-  console.log("Parse error:", error.message);
-}
-```
-
-## Error Context and Position
-
-### Position Information
-
-Errors include detailed position information:
+Use `.label()` to group small parsers into logical concepts. This makes error messages much more readable by replacing raw expectations with descriptive names.
 
 ```typescript
-const parser = string("expected");
-const result = parser.parse("actual input here");
-
-if (result.isLeft()) {
-  const pos = result.error.pos;
-  console.log(`Error at line ${pos.line}, column ${pos.column}`);
-  console.log(`Character offset: ${pos.offset}`);
-}
-```
-
-### Custom Error Messages
-
-#### Using `expect`
-
-Add custom error messages for better user experience:
-
-```typescript
-import { char, string } from "parserator";
-
-const openParen = char("(").expect("opening parenthesis");
-const closeParen = char(")").expect("closing parenthesis");
-
-const result = openParen.parse("x");
-// Error: "Expected opening parenthesis"
-```
-
-#### Using `label`
-
-Label parsers for better error reporting:
-
-```typescript
-import { many1, alphabet } from "parserator";
-
 const identifier = many1(alphabet).label("identifier");
-const result = identifier.parse("123");
-// Error includes "identifier" in the context
+const digitValue = many1(digit).label("number");
+
+// Without label: "Expected [a-z] or [A-Z]"
+// With label: "Expected identifier"
 ```
 
-## Error Recovery
+Labels also form a **context stack** that shows up in formatted error messages, helping users understand where they are in a complex grammar.
 
-### Using `or` for Alternatives
+## Custom Messages with `expect()`
 
-Try multiple alternatives and accumulate errors:
+The `.expect(message)` method allows you to provide a specific error message if a parser fails. This is particularly useful for mandatory syntax elements like delimiters.
 
 ```typescript
-import { or, string } from "parserator";
+const point = parser(function* () {
+  yield* char("(").expect("opening parenthesis");
+  const x = yield* number;
+  yield* char(",").expect("comma between coordinates");
+  const y = yield* number;
+  yield* char(")").expect("closing parenthesis");
+  return { x, y };
+});
 
-const keyword = or(
-  string("if").label("if statement"),
-  string("while").label("while loop"),
-  string("for").label("for loop")
-);
-
-const result = keyword.parse("function");
-// Error: "Expected if statement, while loop, or for loop"
+// Error on input "(10 20)":
+// "Expected comma between coordinates at line 1, column 5"
 ```
 
-### Commit and Cut
+## Commit for Better Errors
 
-Use commit to prevent backtracking for better error messages:
+By default, the `or()` combinator tries every branch. If all fail, it might report a generic error listing every possibility. Use `commit()` once you've successfully identified which branch the input _should_ be.
+
+### Without Commit
 
 ```typescript
-import { parser, string, commit, char } from "parserator";
+const statement = or(ifStatement, whileStatement, assignment);
+// Error on "if (x > 5":
+// "Expected if, while, or assignment" (generic)
+```
 
+### With Commit
+
+```typescript
 const ifStatement = parser(function* () {
   yield* string("if");
-  yield* commit(); // No backtracking after this
+  yield* commit(); // Once we see 'if', we are committed to this branch
   yield* char("(").expect("opening parenthesis after 'if'");
-  // ... rest of parser
+  // ...
 });
+
+// Error on "if (x > 5":
+// "Expected opening parenthesis after 'if'" (specific)
 ```
 
-### Optional and Default Values
+## Formatting Errors
 
-Handle optional parts gracefully:
-
-```typescript
-import { optional, string, char } from "parserator";
-
-const greeting = parser(function* () {
-  yield* string("hello");
-  const name = yield* optional(char(" ").then(identifier));
-  return name ? `Hello, ${name}!` : "Hello!";
-});
-```
-
-## Advanced Error Handling
-
-### Error Transformation
-
-Transform error messages for better user experience:
-
-```typescript
-const parser = string("function").mapError(err => ({
-  ...err,
-  message: "Expected function declaration",
-  hint: "Try: function myFunction() { ... }"
-}));
-```
-
-### Error Accumulation
-
-Collect multiple errors instead of failing on the first:
-
-```typescript
-import { parser, or, many0 } from "parserator";
-
-const statement = or(ifStatement, whileStatement, assignment).mapError(err => ({
-  ...err,
-  context: "statement"
-}));
-
-const program = many0(statement);
-// Continues parsing even if individual statements fail
-```
-
-### Fatal Errors
-
-Use fatal errors to immediately stop parsing:
-
-```typescript
-import { parser, string, char, Parser } from "parserator";
-
-const dangerousParser = parser(function* () {
-  yield* string("delete");
-  yield* char(" ");
-
-  // This error cannot be recovered from
-  return yield* Parser.fatal("Delete operations are not allowed");
-});
-```
-
-## Error Formatting
-
-### Pretty Error Messages
-
-Parserator includes utilities for formatting errors nicely:
+Parserator includes a powerful `ErrorFormatter` that supports multiple output formats.
 
 ```typescript
 import { formatError } from "parserator";
 
-const result = parser.parse(input);
-if (result.isLeft()) {
-  const formatted = formatError(input, result.error);
-  console.log(formatted);
-  // Outputs:
-  // Error at line 2, column 5:
-  //   if x > 5 {
-  //       ^
-  // Expected closing parenthesis
-}
+// Convenience functions for different formats
+const plain = formatError.plain(bundle); // Clean text
+const ansi = formatError.ansi(bundle); // Terminal colors & snippets
+const html = formatError.html(bundle); // Styled HTML markup
+const json = formatError.json(bundle); // Programmatic structure
 ```
 
-### Custom Error Formatters
+### ANSI Output Example
 
-Create your own error formatting:
+The `ansi` formatter provides a visual snippet of the source code with a pointer to the error location:
+
+```text
+Error at line 2, column 15:
+  1 | function foo() {
+> 2 |   return x +
+               ^
+  3 | }
+
+  Expected: expression after '+'
+```
+
+## Typo Suggestions with Hints
+
+Parserator can suggest corrections for typos using Levenshtein distance. This is built into special keyword parsers.
 
 ```typescript
-function myErrorFormatter(input: string, error: ParseError): string {
-  const lines = input.split("\n");
-  const line = lines[error.pos.line - 1];
-  const pointer = " ".repeat(error.pos.column - 1) + "^";
+import { anyKeywordWithHints } from "parserator";
 
-  return [
-    `Parse Error: ${error.message}`,
-    `At line ${error.pos.line}, column ${error.pos.column}:`,
-    line,
-    pointer
-  ].join("\n");
-}
+const keywords = ["function", "const", "let", "var", "class"];
+const keywordParser = anyKeywordWithHints(keywords);
+
+// Input: "functoin"
+// Error: Unexpected functoin
+// Hint: Did you mean: function?
+```
+
+## Error Recovery Patterns
+
+### Strategic Fallbacks
+
+You can provide recovery points by matching "bad" input and returning an error node in your AST.
+
+```typescript
+const statement = or(
+  validStatement,
+  // Error recovery: skip until semicolon to stay in sync
+  takeUntil(char(";")).map(() => ({ type: "error" }))
+);
+```
+
+### Collecting All Options
+
+When using `or()`, giving each branch a label ensures that the user sees all valid options if everything fails.
+
+```typescript
+const value = or(
+  number.label("number"),
+  stringLiteral.label("string"),
+  identifier.label("identifier")
+);
+// Error: "Expected number, string, or identifier"
+```
+
+## Fatal Errors
+
+Sometimes you encounter a state where parsing should stop immediately, even if this parser is inside an `or()` or `optional()`. Use `Parser.fatal()` for these cases.
+
+```typescript
+const config = parser(function* () {
+  const version = yield* number;
+  if (version > 3) {
+    // This cannot be recovered from by backtracking
+    return yield* Parser.fatal("Unsupported config version");
+  }
+  // ...
+});
 ```
 
 ## Best Practices
 
-### 1. Use Descriptive Labels
-
-```typescript
-const number = many1(digit).label("number");
-const identifier = many1(alphabet).label("identifier");
-```
-
-### 2. Add Context with expect
-
-```typescript
-const functionCall = parser(function* () {
-  const name = yield* identifier;
-  yield* char("(").expect("opening parenthesis for function call");
-  const args = yield* sepBy(expression, char(","));
-  yield* char(")").expect("closing parenthesis for function call");
-  return { name, args };
-});
-```
-
-### 3. Use Commit Strategically
-
-```typescript
-const statement = or(
-  parser(function* () {
-    yield* keyword("if");
-    yield* commit(); // Committed to parsing if-statement
-    // ... rest of if parsing
-  }),
-  parser(function* () {
-    yield* keyword("while");
-    yield* commit(); // Committed to parsing while-loop
-    // ... rest of while parsing
-  }),
-  expression // Fallback without commit
-);
-```
-
-### 4. Provide Recovery Hints
-
-```typescript
-const parser = string("expected").mapError(err => ({
-  ...err,
-  hint: "Did you mean 'expected' instead of '" + err.found + "'?"
-}));
-```
-
-## Next Steps
-
-- Explore [Advanced Patterns](./advanced-patterns.md)
-- Check the [API Reference](/api/) for complete error handling methods
-- See [Examples](/examples/) for real-world error handling patterns
+1.  **Label your atoms**: Give names like "identifier" or "number" to your base parsers.
+2.  **Use `expect()` on delimiters**: Closing braces, semicolons, and commas should have descriptive error messages.
+3.  **Commit early**: Once a keyword or unique starting character is matched, use `commit()` to lock in that branch.
+4.  **Use hint-enabled parsers**: Especially for keyword-heavy languages, hint parsers significantly improve DX.
+5.  **Test your errors**: Assert on the error messages produced by invalid inputs to ensure they are helpful.

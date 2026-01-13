@@ -1,123 +1,53 @@
-# Expression Parser Example
+# Expression Parser
 
-This example shows how to build a mathematical expression parser with proper operator precedence, associativity, and support for functions and variables.
+This example demonstrates how to build a math expression parser with support for operator precedence and associativity using **Parserator**.
 
-## Grammar
+## Overview
 
-Our expression language supports:
+We will build a parser that can handle:
 
-- Numbers: `42`, `3.14`, `-17`
-- Variables: `x`, `foo`, `PI`
-- Binary operators: `+`, `-`, `*`, `/`, `^` (power)
-- Unary operators: `-`, `+`
-- Function calls: `sin(x)`, `max(a, b, c)`
-- Parentheses for grouping: `(2 + 3) * 4`
+- Numbers (integers and decimals)
+- Basic arithmetic: `+`, `-`, `*`, `/`
+- Exponentiation: `^`
+- Parentheses: `(...)`
+- Correct operator precedence (BODMAS/PEMDAS)
+- Correct associativity (left-associative for most, right-associative for `^`)
 
-## Implementation
+## The AST (Abstract Syntax Tree)
+
+First, let's define the types for our expression tree:
 
 ```typescript
-import {
-  parser,
-  char,
-  string,
-  or,
-  many0,
-  many1,
-  between,
-  sepBy,
-  optional,
-  digit,
-  alphabet,
-  regex,
-  skipSpaces
-} from "parserator";
-
-// Whitespace handling
-const ws = regex(/\s*/);
-const lexeme = <T>(p: Parser<T>) => p.thenDiscard(ws);
-
-// Numbers
-const number = parser(function* () {
-  const sign = yield* optional(or(char("-"), char("+")));
-  const integer = yield* many1(digit);
-  const decimal = yield* optional(char(".").then(many1(digit)));
-
-  const numStr =
-    (sign === "-" ? "-" : "") +
-    integer.join("") +
-    (decimal ? "." + decimal.join("") : "");
-
-  return parseFloat(numStr);
-});
-
-// Variables and function names
-const identifier = many1(or(alphabet, char("_"))).map(chars => chars.join(""));
-
-// Forward declaration for recursive expressions
-let expression: Parser<Expression>;
-
-// Expression AST types
-type Expression =
+type Expr =
   | { type: "number"; value: number }
-  | { type: "variable"; name: string }
-  | { type: "unary"; operator: string; operand: Expression }
-  | { type: "binary"; operator: string; left: Expression; right: Expression }
-  | { type: "call"; name: string; args: Expression[] };
+  | { type: "binary"; op: string; left: Expr; right: Expr };
+```
 
-// Primary expressions (highest precedence)
-const primary: Parser<Expression> = or(
-  // Numbers
-  lexeme(number).map(value => ({ type: "number", value })),
+## Associativity Helpers
 
-  // Function calls or variables
-  parser(function* () {
-    const name = yield* lexeme(identifier);
+In arithmetic, operator associativity determines how operators of the same precedence are grouped.
 
-    // Check if it's a function call
-    const openParen = yield* optional(lexeme(char("(")));
-    if (openParen) {
-      const args = yield* sepBy(() => expression, lexeme(char(",")));
-      yield* lexeme(char(")"));
-      return { type: "call", name, args };
-    }
+### Left Associativity
 
-    // It's a variable
-    return { type: "variable", name };
-  }),
+For operators like `+` or `-`, `1 - 2 - 3` should be parsed as `(1 - 2) - 3`. This is called **left associativity**.
 
-  // Parenthesized expressions
-  between(lexeme(char("(")), lexeme(char(")")), () => expression)
-);
+```typescript
+import { parser, many, Parser } from "parserator";
 
-// Unary expressions
-const unary: Parser<Expression> = or(
-  parser(function* () {
-    const operator = yield* lexeme(or(char("-"), char("+")));
-    const operand = yield* unary;
-    return { type: "unary", operator, operand };
-  }),
-  primary
-);
-
-// Helper for left-associative binary operators
-function leftAssoc(
-  operandParser: Parser<Expression>,
-  operatorParser: Parser<string>
-): Parser<Expression> {
+function leftAssoc(operand: Parser<Expr>, op: Parser<string>): Parser<Expr> {
   return parser(function* () {
-    const first = yield* operandParser;
-    const rest = yield* many0(
+    const first = yield* operand;
+    const rest = yield* many(
       parser(function* () {
-        const op = yield* operatorParser;
-        const right = yield* operandParser;
-        return { op, right };
+        const operator = yield* op;
+        const right = yield* operand;
+        return { operator, right };
       })
     );
-
     return rest.reduce(
-      (left, { op, right }) => ({
+      (left, { operator, right }) => ({
         type: "binary",
-        operator: op,
+        op: operator,
         left,
         right
       }),
@@ -125,332 +55,132 @@ function leftAssoc(
     );
   });
 }
+```
 
-// Helper for right-associative binary operators
-function rightAssoc(
-  operandParser: Parser<Expression>,
-  operatorParser: Parser<string>
-): Parser<Expression> {
+### Right Associativity
+
+For exponentiation `^`, `2 ^ 3 ^ 4` should be parsed as `2 ^ (3 ^ 4)`. This is called **right associativity**. We can implement this recursively.
+
+```typescript
+function rightAssoc(operand: Parser<Expr>, op: Parser<string>): Parser<Expr> {
   return parser(function* () {
-    const first = yield* operandParser;
-    const rest = yield* optional(
+    const left = yield* operand;
+    return yield* or(
       parser(function* () {
-        const op = yield* operatorParser;
-        const right = yield* rightAssoc(operandParser, operatorParser);
-        return { op, right };
-      })
+        const operator = yield* op;
+        const right = yield* rightAssoc(operand, op);
+        return { type: "binary", op: operator, left, right } as Expr;
+      }),
+      Parser.pure(left)
     );
-
-    if (rest) {
-      return {
-        type: "binary",
-        operator: rest.op,
-        left: first,
-        right: rest.right
-      };
-    }
-
-    return first;
   });
 }
+```
 
-// Power (right-associative: 2^3^4 = 2^(3^4))
-const power = rightAssoc(unary, lexeme(char("^")));
+## Token Parsers
 
-// Multiplication and division (left-associative)
-const term = leftAssoc(power, lexeme(or(char("*"), char("/"))));
+Let's define our basic building blocks: numbers and operators.
 
-// Addition and subtraction (left-associative)
-expression = leftAssoc(term, lexeme(or(char("+"), char("-"))));
+```typescript
+import { char, regex, or, between, commit } from "parserator";
 
-// Main parser
-export const expressionParser = lexeme(expression).thenDiscard(eof);
+// Match a number (integer or decimal)
+const number = regex(/[0-9]+(\.[0-9]+)?/).map(
+  n => ({ type: "number", value: parseFloat(n) }) as Expr
+);
+
+// Whitespace-insensitive character parser
+const symbol = (s: string) => char(s).trim(regex(/\s*/));
+```
+
+## Building the Parser with Precedence
+
+To handle precedence, we define parsers in levels from highest to lowest precedence. Each level calls the level above it.
+
+1.  **Factor**: Atoms (numbers or parenthesized expressions)
+2.  **Power**: Exponentiation (`^`, right-associative)
+3.  **Term**: Multiplication and Division (`*`, `/`, left-associative)
+4.  **Expression**: Addition and Subtraction (`+`, `-`, left-associative)
+
+```typescript
+// level 1: atoms
+const factor: Parser<Expr> = or(
+  number,
+  between(
+    symbol("("),
+    symbol(")"),
+    Parser.lazy(() => expression)
+  )
+);
+
+// level 2: exponentiation (highest precedence)
+const power = rightAssoc(factor, symbol("^"));
+
+// level 3: multiplication and division
+const term = leftAssoc(power, or(symbol("*"), symbol("/")));
+
+// level 4: addition and subtraction (lowest precedence)
+const expression: Parser<Expr> = leftAssoc(term, or(symbol("+"), symbol("-")));
+```
+
+## Error Handling with `commit()`
+
+To provide better error messages, we can use `commit()`. Once we see an opening parenthesis, we "commit" to parsing a parenthesized expression.
+
+```typescript
+const parenthesized = parser(function* () {
+  yield* symbol("(");
+  yield* commit(); // No backtracking after '('
+  const expr = yield* expression;
+  yield* symbol(")").expect("closing parenthesis");
+  return expr;
+});
+
+// Update factor to use our improved parenthesized parser
+const factor: Parser<Expr> = or(number, parenthesized);
 ```
 
 ## Evaluation
 
+Once we have the AST, evaluating it is a simple recursive function:
+
 ```typescript
-// Environment for variables and functions
-type Environment = {
-  variables: Record<string, number>;
-  functions: Record<string, (...args: number[]) => number>;
-};
+function evaluate(expr: Expr): number {
+  if (expr.type === "number") return expr.value;
 
-const defaultEnv: Environment = {
-  variables: {
-    PI: Math.PI,
-    E: Math.E
-  },
-  functions: {
-    sin: Math.sin,
-    cos: Math.cos,
-    tan: Math.tan,
-    sqrt: Math.sqrt,
-    abs: Math.abs,
-    log: Math.log,
-    exp: Math.exp,
-    max: Math.max,
-    min: Math.min,
-    pow: Math.pow,
-    floor: Math.floor,
-    ceil: Math.ceil,
-    round: Math.round
-  }
-};
+  const left = evaluate(expr.left);
+  const right = evaluate(expr.right);
 
-function evaluate(expr: Expression, env: Environment = defaultEnv): number {
-  switch (expr.type) {
-    case "number":
-      return expr.value;
-
-    case "variable":
-      if (!(expr.name in env.variables)) {
-        throw new Error(`Undefined variable: ${expr.name}`);
-      }
-      return env.variables[expr.name];
-
-    case "unary":
-      const operand = evaluate(expr.operand, env);
-      switch (expr.operator) {
-        case "+":
-          return operand;
-        case "-":
-          return -operand;
-        default:
-          throw new Error(`Unknown unary operator: ${expr.operator}`);
-      }
-
-    case "binary":
-      const left = evaluate(expr.left, env);
-      const right = evaluate(expr.right, env);
-      switch (expr.operator) {
-        case "+":
-          return left + right;
-        case "-":
-          return left - right;
-        case "*":
-          return left * right;
-        case "/":
-          if (right === 0) throw new Error("Division by zero");
-          return left / right;
-        case "^":
-          return Math.pow(left, right);
-        default:
-          throw new Error(`Unknown binary operator: ${expr.operator}`);
-      }
-
-    case "call":
-      if (!(expr.name in env.functions)) {
-        throw new Error(`Undefined function: ${expr.name}`);
-      }
-      const args = expr.args.map(arg => evaluate(arg, env));
-      return env.functions[expr.name](...args);
-
+  switch (expr.op) {
+    case "+":
+      return left + right;
+    case "-":
+      return left - right;
+    case "*":
+      return left * right;
+    case "/":
+      return left / right;
+    case "^":
+      return Math.pow(left, right);
     default:
-      throw new Error("Unknown expression type");
+      throw new Error(`Unknown operator: ${expr.op}`);
   }
 }
 ```
 
 ## Usage Examples
 
-### Basic Arithmetic
-
 ```typescript
-const calc = (input: string) => {
-  const result = expressionParser.parse(input);
-  if (result.isLeft()) {
-    throw new Error(result.error.message);
-  }
-  return evaluate(result.value);
+const mathParser = expression.thenDiscard(eof);
+
+const run = (input: string) => {
+  const ast = mathParser.parseOrThrow(input);
+  return evaluate(ast);
 };
 
-calc("2 + 3 * 4"); // 14
-calc("(2 + 3) * 4"); // 20
-calc("2^3^2"); // 512 (right-associative: 2^(3^2))
-calc("-3 + 4"); // 1
-calc("10 / 2 / 5"); // 1 (left-associative: (10/2)/5)
+console.log(run("2 + 3 * 4")); // 14  (3 * 4 first)
+console.log(run("(2 + 3) * 4")); // 20  (parentheses first)
+console.log(run("2 ^ 3 ^ 2")); // 512 (2 ^ 9, right-associative)
+console.log(run("10 / 2 / 2")); // 2.5 (5 / 2, left-associative)
+console.log(run("2 * (3 + 4) ^ 2")); // 98  (2 * 49)
 ```
-
-### Variables and Functions
-
-```typescript
-calc("PI * 2"); // ~6.28
-calc("sin(PI/2)"); // 1
-calc("max(1, 2, 3)"); // 3
-calc("sqrt(16)"); // 4
-calc("abs(-42)"); // 42
-```
-
-### Complex Expressions
-
-```typescript
-calc("sin(PI/4) * cos(PI/4)"); // ~0.5
-calc("sqrt(3^2 + 4^2)"); // 5
-calc("(1 + sqrt(5)) / 2"); // Golden ratio: ~1.618
-calc("log(E^3)"); // 3
-calc("pow(2, 8)"); // 256
-```
-
-## Error Handling
-
-The parser provides detailed error messages:
-
-```typescript
-// Syntax errors
-expressionParser.parse("2 +");
-// Error: Expected expression after '+' at line 1, column 4
-
-expressionParser.parse("2 * * 3");
-// Error: Expected expression at line 1, column 5
-
-expressionParser.parse("sin()");
-// Error: Function 'sin' expects at least 1 argument
-
-// Runtime errors during evaluation
-evaluate(parse("x + 1").value);
-// Error: Undefined variable: x
-
-evaluate(parse("unknownFunc(1)").value);
-// Error: Undefined function: unknownFunc
-
-evaluate(parse("10 / 0").value);
-// Error: Division by zero
-```
-
-## Extensions
-
-### Comparison Operators
-
-```typescript
-// Add to binary operators
-const comparison = leftAssoc(
-  expression,
-  lexeme(or(
-    string('<='), string('>='), string('!='), string('=='),
-    char('<'), char('>')
-  ))
-)
-
-// Update evaluation
-case 'binary':
-  // ... existing operators ...
-  case '<': return left < right ? 1 : 0
-  case '>': return left > right ? 1 : 0
-  case '<=': return left <= right ? 1 : 0
-  case '>=': return left >= right ? 1 : 0
-  case '==': return left === right ? 1 : 0
-  case '!=': return left !== right ? 1 : 0
-```
-
-### Conditional Expressions
-
-```typescript
-// Ternary operator: condition ? true_expr : false_expr
-const conditional = parser(function* () {
-  const condition = yield* comparison;
-  const ternary = yield* optional(
-    parser(function* () {
-      yield* lexeme(char("?"));
-      const trueExpr = yield* expression;
-      yield* lexeme(char(":"));
-      const falseExpr = yield* expression;
-      return { trueExpr, falseExpr };
-    })
-  );
-
-  if (ternary) {
-    return {
-      type: "conditional",
-      condition,
-      trueExpr: ternary.trueExpr,
-      falseExpr: ternary.falseExpr
-    };
-  }
-
-  return condition;
-});
-```
-
-### Constants and Units
-
-```typescript
-const constant = or(
-  string("PI").map(() => ({ type: "number", value: Math.PI })),
-  string("E").map(() => ({ type: "number", value: Math.E })),
-  string("GOLDEN_RATIO").map(() => ({
-    type: "number",
-    value: (1 + Math.sqrt(5)) / 2
-  }))
-);
-
-// Units: 5m, 10kg, 3.14rad
-const numberWithUnit = parser(function* () {
-  const value = yield* number;
-  const unit = yield* optional(identifier);
-  return { type: "measurement", value, unit: unit || "scalar" };
-});
-```
-
-### Variable Assignment
-
-```typescript
-const assignment = parser(function* () {
-  const name = yield* lexeme(identifier);
-  yield* lexeme(char("="));
-  const value = yield* expression;
-  return { type: "assignment", name, value };
-});
-
-const statement = or(assignment, expression);
-```
-
-## REPL Implementation
-
-```typescript
-class Calculator {
-  private env: Environment = { ...defaultEnv };
-
-  evaluate(input: string): number | void {
-    try {
-      const result = expressionParser.parse(input);
-      if (result.isLeft()) {
-        throw new Error(result.error.message);
-      }
-
-      const ast = result.value;
-
-      // Handle assignments
-      if (ast.type === "assignment") {
-        const value = evaluate(ast.value, this.env);
-        this.env.variables[ast.name] = value;
-        console.log(`${ast.name} = ${value}`);
-        return;
-      }
-
-      // Evaluate expression
-      const value = evaluate(ast, this.env);
-      console.log(value);
-      return value;
-    } catch (error) {
-      console.error("Error:", error.message);
-    }
-  }
-
-  setVariable(name: string, value: number) {
-    this.env.variables[name] = value;
-  }
-
-  setFunction(name: string, fn: (...args: number[]) => number) {
-    this.env.functions[name] = fn;
-  }
-}
-
-// Usage
-const calc = new Calculator();
-calc.evaluate("x = 10"); // x = 10
-calc.evaluate("y = x * 2"); // y = 20
-calc.evaluate("sqrt(x^2 + y^2)"); // 22.36...
-```
-
-This expression parser demonstrates operator precedence handling, AST construction, and evaluation. It's a complete implementation that can be extended with additional operators, functions, and language features.

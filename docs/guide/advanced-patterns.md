@@ -1,447 +1,256 @@
 # Advanced Patterns
 
-This guide covers advanced parsing patterns and techniques for building robust, efficient parsers with Parserator.
+Advanced patterns for complex parsing scenarios. This guide covers recursive grammars, operator precedence, context-sensitive parsing, and more.
 
-## Recursive Parsers
+## Recursive Grammars
 
-### Left Recursion Elimination
-
-Handle left-recursive grammars by transforming them:
+For grammars that refer to themselves (like nested parentheses or expressions), use the forward declaration pattern with `Parser.lazy()`. This avoids issues with circular references during initialization.
 
 ```typescript
-import { parser, many0, string, char, alphabet, many1 } from "parserator";
+import {
+  Parser,
+  or,
+  between,
+  char,
+  many1,
+  digit,
+  identifier
+} from "parserator";
 
-// Instead of: expr = expr '+' term | term (left recursive)
-// Use: expr = term ('+' term)*
+// 1. Forward declare the variable
+let expression: Parser<any>;
 
-const identifier = many1(alphabet).map(chars => chars.join(""));
-const number = many1(digit).map(digits => parseInt(digits.join("")));
+const number = many1(digit).map(d => ({
+  type: "number",
+  value: parseInt(d.join(""))
+}));
+const ident = identifier.map(name => ({ type: "identifier", name }));
 
-const term = or(number, identifier);
-
-const expression = parser(function* () {
-  const first = yield* term;
-  const rest = yield* many0(
-    parser(function* () {
-      yield* char("+");
-      return yield* term;
-    })
-  );
-
-  return rest.reduce(
-    (acc, val) => ({ type: "add", left: acc, right: val }),
-    first
-  );
-});
-```
-
-### Operator Precedence
-
-Build expression parsers with proper precedence:
-
-```typescript
-const factor = or(
-  number,
-  between(char("("), char(")"), () => expression) // Forward reference
+// 2. Use Parser.lazy() for recursive references
+const parenthesized = between(
+  char("("),
+  char(")"),
+  Parser.lazy(() => expression)
 );
 
-const term = parser(function* () {
-  const first = yield* factor;
-  const rest = yield* many0(
-    parser(function* () {
-      const op = yield* or(char("*"), char("/"));
-      const right = yield* factor;
-      return { op, right };
-    })
-  );
+const atom = or(number, ident, parenthesized);
 
-  return rest.reduce(
-    (left, { op, right }) => ({
-      type: op === "*" ? "mul" : "div",
-      left,
-      right
-    }),
-    first
-  );
-});
+// 3. Now define the actual expression
+expression = atom;
+```
 
-const expression = parser(function* () {
-  const first = yield* term;
-  const rest = yield* many0(
-    parser(function* () {
-      const op = yield* or(char("+"), char("-"));
-      const right = yield* term;
-      return { op, right };
-    })
-  );
+## Operator Precedence
 
-  return rest.reduce(
-    (left, { op, right }) => ({
-      type: op === "+" ? "add" : "sub",
-      left,
-      right
-    }),
-    first
-  );
-});
+Handling operator precedence and associativity is a common requirement for expression parsers.
+
+### Left-Associative Operators
+
+Standard math operations like `1 + 2 + 3` are usually left-associative, meaning they are grouped as `(1 + 2) + 3`.
+
+```typescript
+import { parser, many, char, or, Parser } from "parserator";
+
+function leftAssoc<T, Op>(
+  operand: Parser<T>,
+  operator: Parser<Op>,
+  combine: (left: T, op: Op, right: T) => T
+): Parser<T> {
+  return parser(function* () {
+    const first = yield* operand;
+    const rest = yield* many(
+      parser(function* () {
+        const op = yield* operator;
+        const right = yield* operand;
+        return { op, right };
+      })
+    );
+    return rest.reduce(
+      (left, { op, right }) => combine(left, op, right),
+      first
+    );
+  });
+}
+
+// Usage: Grouping * and / before + and -
+const factor = or(number, parenthesized);
+const term = leftAssoc(factor, or(char("*"), char("/")), (left, op, right) => ({
+  type: "binary",
+  op,
+  left,
+  right
+}));
+const expression = leftAssoc(
+  term,
+  or(char("+"), char("-")),
+  (left, op, right) => ({
+    type: "binary",
+    op,
+    left,
+    right
+  })
+);
+```
+
+### Right-Associative Operators
+
+Exponentiation (like `2^3^4`) is right-associative, meaning it's grouped as `2^(3^4)`.
+
+```typescript
+function rightAssoc<T, Op>(
+  operand: Parser<T>,
+  operator: Parser<Op>,
+  combine: (left: T, op: Op, right: T) => T
+): Parser<T> {
+  const rec: Parser<T> = parser(function* () {
+    const left = yield* operand;
+    const opAndRight = yield* optional(
+      parser(function* () {
+        const op = yield* operator;
+        const right = yield* rec; // Recursive call
+        return { op, right };
+      })
+    );
+    if (opAndRight) {
+      return combine(left, opAndRight.op, opAndRight.right);
+    }
+    return left;
+  });
+  return rec;
+}
 ```
 
 ## Context-Sensitive Parsing
 
-### Stateful Parsers
-
-Maintain state across parsing operations:
+Sometimes the grammar depends on previously parsed information, such as indentation levels in Python or YAML. You can track state during parsing using a class-based approach.
 
 ```typescript
-class IndentationParser {
-  private indentStack: number[] = [0];
+class IndentParser {
+  private indent = 0;
 
-  indent() {
-    return parser<"INDENT" | "DEDENT" | null>(state => {
-      const currentIndent = this.measureIndent(state.remaining);
-      const lastIndent = this.indentStack[this.indentStack.length - 1];
+  block(): Parser<any> {
+    return parser(
+      function* () {
+        const currentIndent = yield* this.parseIndent();
+        if (currentIndent <= this.indent) {
+          return yield* Parser.fail("Expected increased indentation");
+        }
 
-      if (currentIndent > lastIndent) {
-        this.indentStack.push(currentIndent);
-        return Parser.succeed("INDENT", state);
-      } else if (currentIndent < lastIndent) {
-        this.indentStack.pop();
-        return Parser.succeed("DEDENT", state);
-      }
+        const prevIndent = this.indent;
+        this.indent = currentIndent;
 
-      return Parser.succeed(null, state);
-    });
-  }
+        const statements = yield* many(this.statement());
 
-  private measureIndent(input: string): number {
-    const match = input.match(/^( *)/);
-    return match ? match[1].length : 0;
-  }
-}
-```
-
-### Symbol Tables
-
-Track variable declarations and usage:
-
-```typescript
-class ScopeParser {
-  private scopes: Set<string>[] = [new Set()];
-
-  declare(name: string) {
-    this.scopes[this.scopes.length - 1].add(name);
-  }
-
-  isDeclared(name: string): boolean {
-    return this.scopes.some(scope => scope.has(name));
-  }
-
-  enterScope() {
-    this.scopes.push(new Set());
-  }
-  exitScope() {
-    this.scopes.pop();
-  }
-
-  variable() {
-    return identifier.filter(name => {
-      if (!this.isDeclared(name)) {
-        throw new Error(`Undefined variable: ${name}`);
-      }
-      return true;
-    });
-  }
-}
-```
-
-## Performance Optimization
-
-### Memoization
-
-Cache parser results for expensive operations:
-
-```typescript
-class MemoizedParser<T> extends Parser<T> {
-  private cache = new Map<string, any>();
-
-  constructor(
-    private baseParser: Parser<T>,
-    private name: string
-  ) {
-    super(state => this.runMemoized(state));
-  }
-
-  private runMemoized(state: ParserState) {
-    const key = `${this.name}:${state.pos.offset}`;
-
-    if (this.cache.has(key)) {
-      return this.cache.get(key);
-    }
-
-    const result = this.baseParser.run(state);
-    this.cache.set(key, result);
-    return result;
-  }
-}
-
-const memoize = <T>(parser: Parser<T>, name: string) =>
-  new MemoizedParser(parser, name);
-```
-
-### Atomic Parsing
-
-Use atomic parsers to reduce backtracking:
-
-```typescript
-import { atomic, or, string } from "parserator";
-
-// Without atomic: tries "function" fully, backtracks, tries "fun"
-const keyword = or(string("function"), string("fun"));
-
-// With atomic: either matches "function" completely or fails immediately
-const atomicKeyword = or(atomic(string("function")), atomic(string("fun")));
-```
-
-## Error Recovery
-
-### Synchronization Points
-
-Add recovery points in your grammar:
-
-```typescript
-const statement = or(
-  ifStatement,
-  whileStatement,
-  assignment,
-  errorRecovery // Fallback parser
-);
-
-const errorRecovery = parser(function* () {
-  // Skip until we find a semicolon or newline
-  yield* skipUntil(or(char(";"), char("\n")));
-  yield* optional(or(char(";"), char("\n")));
-
-  return { type: "error", recovered: true };
-});
-
-const program = many0(statement).map(statements =>
-  statements.filter(stmt => stmt.type !== "error")
-);
-```
-
-### Partial Results
-
-Return partial results even when parsing fails:
-
-```typescript
-const robustObjectParser = parser(function* () {
-  yield* char("{");
-  const properties: any[] = [];
-
-  while (true) {
-    const result = yield* optional(property);
-    if (!result) break;
-
-    properties.push(result);
-
-    const separator = yield* optional(char(","));
-    if (!separator) break;
-  }
-
-  yield* char("}").optional(); // Don't fail if missing closing brace
-
-  return { type: "object", properties, complete: true };
-});
-```
-
-## Streaming and Incremental Parsing
-
-### Chunk Processing
-
-Handle large inputs by processing in chunks:
-
-```typescript
-class StreamingParser<T> {
-  private buffer = "";
-  private results: T[] = [];
-
-  feed(chunk: string): T[] {
-    this.buffer += chunk;
-    const newResults: T[] = [];
-
-    while (this.buffer.length > 0) {
-      const result = this.parser.parse(this.buffer);
-
-      if (result.isLeft()) {
-        break; // Need more input
-      }
-
-      newResults.push(result.value);
-      this.buffer = result.state.remaining;
-    }
-
-    this.results.push(...newResults);
-    return newResults;
-  }
-
-  constructor(private parser: Parser<T>) {}
-}
-```
-
-### Incremental Updates
-
-Parse only changed portions of input:
-
-```typescript
-class IncrementalParser {
-  private parseTree: any[] = [];
-  private input = "";
-
-  update(newInput: string, changeStart: number, changeEnd: number) {
-    this.input = newInput;
-
-    // Find affected nodes
-    const affectedStart = this.findNodeAt(changeStart);
-    const affectedEnd = this.findNodeAt(changeEnd);
-
-    // Reparse only the affected region
-    const reparsedSection = this.parseRange(affectedStart, affectedEnd);
-
-    // Update parse tree
-    this.parseTree.splice(
-      affectedStart,
-      affectedEnd - affectedStart + 1,
-      ...reparsedSection
+        this.indent = prevIndent;
+        return { type: "block", statements };
+      }.bind(this)
     );
   }
 
-  private findNodeAt(position: number): number {
-    // Implementation to find parse tree node at position
+  private parseIndent() {
+    /* ... implementation ... */
   }
-
-  private parseRange(start: number, end: number): any[] {
-    // Implementation to reparse a specific range
+  private statement() {
+    /* ... implementation ... */
   }
 }
 ```
 
-## Testing Patterns
+## Whitespace Handling
 
-### Property-Based Testing
-
-Test parser properties rather than specific cases:
+Instead of manually skipping whitespace everywhere, use a "token" helper pattern to automatically consume trailing whitespace after every terminal symbol.
 
 ```typescript
-import { property, fc } from "fast-check";
+import {
+  skipWhitespace,
+  many1,
+  digit,
+  alphabet,
+  string,
+  char,
+  Parser
+} from "parserator";
 
-// Test that parsing then stringifying gives original input
-property(
-  fc.string().filter(s => isValidInput(s)),
-  input => {
-    const result = myParser.parse(input);
-    if (result.isRight()) {
-      const stringified = stringify(result.value);
-      return stringified === input;
-    }
-    return true; // Ignore parse failures for this property
-  }
-);
+const ws = skipWhitespace();
 
-// Test parser composition properties
-property(fc.array(fc.string()), strings => {
-  const concatenated = strings.join("");
-  const individualResults = strings.map(s => myParser.parse(s));
-  const combinedResult = myParser.parse(concatenated);
+function token<T>(p: Parser<T>): Parser<T> {
+  return p.thenDiscard(ws);
+}
 
-  // Property: parsing concatenated should equal parsing individually
-  // (for some parsers)
+// Usage
+const number = token(many1(digit).map(d => parseInt(d.join(""))));
+const identifier = token(many1(alphabet).map(a => a.join("")));
+const keyword = (kw: string) => token(string(kw));
+const op = (s: string) => token(char(s));
+```
+
+## DSL Patterns
+
+Parserator is ideal for building Domain Specific Languages (DSLs) or configuration formats.
+
+```typescript
+const configEntry = parser(function* () {
+  const key = yield* identifier;
+  yield* token(char("="));
+  yield* commit(); // Once we see '=', we must finish this entry
+  const value = yield* or(stringLiteral, number, boolean);
+  return { key, value };
 });
-```
 
-### Fuzzing
-
-Test with random inputs to find edge cases:
-
-```typescript
-function fuzzTest(parser: Parser<any>, iterations = 1000) {
-  for (let i = 0; i < iterations; i++) {
-    const randomInput = generateRandomInput();
-
-    try {
-      const result = parser.parse(randomInput);
-      // Parser should either succeed or fail gracefully
-      if (result.isLeft()) {
-        // Verify error is well-formed
-        assert(result.error.message.length > 0);
-        assert(result.error.pos.offset >= 0);
-      }
-    } catch (error) {
-      // Parser should never throw unexpected exceptions
-      console.error(`Parser threw on input: ${randomInput}`);
-      throw error;
-    }
-  }
-}
-```
-
-## Domain-Specific Languages
-
-### Configuration Languages
-
-Build parsers for config files:
-
-```typescript
-const configParser = parser(function* () {
-  const entries = yield* many0(
-    parser(function* () {
-      yield* skipSpaces;
-      const key = yield* identifier;
-      yield* skipSpaces;
-      yield* char("=");
-      yield* skipSpaces;
-      const value = yield* or(stringLiteral, numberLiteral, booleanLiteral);
-      yield* skipSpaces;
-      yield* optional(char("\n"));
-      return { key, value };
-    })
-  );
-
+const config = parser(function* () {
+  yield* ws;
+  const entries = yield* many(configEntry);
+  yield* eof;
   return Object.fromEntries(entries.map(e => [e.key, e.value]));
 });
 ```
 
-### Template Languages
+## Error Recovery
 
-Parse template syntax:
+Robust parsers should be able to recover from errors and continue parsing the rest of the file. This is often done by skipping to a "synchronization point" like a semicolon.
 
 ```typescript
-const templateParser = parser(function* () {
-  const parts = yield* many0(
-    or(
-      // Text content
-      takeUntil(string("{{")).map(text => ({ type: "text", content: text })),
+import { takeUntil, or, char, many } from "parserator";
 
-      // Variables
-      parser(function* () {
-        yield* string("{{");
-        yield* skipSpaces;
-        const name = yield* identifier;
-        yield* skipSpaces;
-        yield* string("}}");
-        return { type: "variable", name };
-      }),
+const statement = or(
+  validStatement,
+  // Recovery: skip to semicolon
+  parser(function* () {
+    const skipped = yield* takeUntil(char(";"));
+    yield* char(";");
+    return { type: "error", skipped };
+  })
+);
 
-      // Any remaining character
-      anyChar().map(char => ({ type: "text", content: char }))
-    )
-  );
-
-  return parts;
-});
+const program = many(statement).map(stmts =>
+  stmts.filter(s => s.type !== "error")
+);
 ```
 
-## Next Steps
+## Testing Parsers
 
-- Explore the [Examples](/examples/) for complete implementations
-- Check the [API Reference](/api/) for all available combinators
-- See the source code for advanced usage patterns
+Use standard testing frameworks like `bun:test` to verify your parsers. Check both success and error cases.
+
+```typescript
+import { describe, it, expect } from "bun:test";
+import { Either } from "parserator";
+
+describe("expression parser", () => {
+  it("parses addition", () => {
+    const result = expression.parse("1+2");
+    expect(Either.isRight(result.result)).toBe(true);
+    expect(result.result.right).toEqual({
+      type: "binary",
+      op: "+",
+      left: { type: "number", value: 1 },
+      right: { type: "number", value: 2 }
+    });
+  });
+
+  it("reports errors clearly", () => {
+    const result = expression.parse("1+");
+    expect(Either.isLeft(result.result)).toBe(true);
+    // Verify the error occurred at the expected position
+    expect(result.result.left.primary.span.offset).toBe(2);
+  });
+});
+```

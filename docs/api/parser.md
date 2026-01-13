@@ -1,206 +1,292 @@
 # Parser
 
-## Parser
+The `Parser<T>` class is the core of Parserator. It wraps a parsing function and provides a rich set of methods for transformation, sequencing, and error handling.
 
-Parser is the core type that represents a parser combinator. A parser is a function that takes an input state and produces either: - A successful parse result with the remaining input state - An error describing why the parse failed Parsers can be composed using various combinators to build complex parsers from simple building blocks.
+## Running Parsers
 
-## Functions
-
-### constructor
-
-```typescript
-constructor(
-    /**
-     * @internal
-     */
-    public run: (state: ParserState) => ...
-```
-
-Creates a new Parser instance.
-
-**Parameters:**
-
-- `/\*\*
-  - @internal
-    \*/
-    public run` (`(state: ParserState`)
-
-### parse
+### parse()
 
 ```typescript
 parse(input: string): ParserOutput<T>
 ```
 
-Runs the parser on the given input string and returns the full parser output. This method provides access to both the parse result and the final parser state, which includes information about the remaining unparsed input and position.
-
-**Parameters:**
-
-- `input` (`string`) - The string to parse
-
-**Returns:** `ParserOutput<T>` - A parser output containing both the result (success or error) and final state
-
-**Examples:**
+Runs the parser and returns the full `ParserOutput`, which contains both the `result` (an `Either` of `ParseErrorBundle` or `T`) and the final `ParserState`.
 
 ```typescript
-const parser = string("hello");
-const output = parser.parse("hello world");
-// output.result contains Either.right("hello")
-// output.state contains remaining input " world" and position info
-```
-
-### parseOrError
-
-```typescript
-parseOrError(input: string): T | ParseErrorBundle
-```
-
-Runs the parser on the given input and returns either the parsed value or error bundle. This is a convenience method that unwraps the Either result, making it easier to handle the common case where you just need the value or error without the full parser state information.
-
-**Parameters:**
-
-- `input` (`string`) - The string to parse
-
-**Returns:** `T | ParseErrorBundle` - The successfully parsed value of type T, or a ParseErrorBundle on failure
-
-**Examples:**
-
-```typescript
-const parser = number();
-const result = parser.parseOrError("42");
-if (result instanceof ParseErrorBundle) {
-  console.error(result.format());
-} else {
-  console.log(result); // 42
+const output = parser.parse("hello");
+if (output.result._tag === "Right") {
+  console.log(output.result.right); // Parsed value
 }
 ```
 
-### parseOrThrow
+### parseOrThrow()
 
 ```typescript
 parseOrThrow(input: string): T
 ```
 
-Runs the parser on the given input and returns the parsed value or throws an error. This method is useful when you're confident the parse will succeed or want to handle parse errors as exceptions. The thrown error is a ParseErrorBundle which contains detailed information about what went wrong.
-
-**Parameters:**
-
-- `input` (`string`) - The string to parse
-
-**Returns:** `T` - The successfully parsed value of type T
-
-**Examples:**
+Returns the parsed value directly if successful. Throws a `ParseErrorBundle` if parsing fails.
 
 ```typescript
-const parser = number();
 try {
-  const value = parser.parseOrThrow("42");
-  console.log(value); // 42
-} catch (error) {
-  if (error instanceof ParseErrorBundle) {
-    console.error(error.format());
+  const value = parser.parseOrThrow("hello");
+} catch (e) {
+  if (e instanceof ParseErrorBundle) {
+    console.error(e.format("ansi"));
   }
 }
 ```
 
-### tap
+### parseOrError()
 
 ```typescript
-tap(
-    callback: (args: { state: ParserState; result: ParserOutput<T> }) => ...
+parseOrError(input: string): T | ParseErrorBundle
 ```
 
-Adds a tap point to observe the current state and result during parsing. Useful for debugging parser behavior.
+Returns the parsed value or a `ParseErrorBundle` on failure. This is a non-throwing alternative to `parseOrThrow`.
 
-**Parameters:**
-
-- `callback` (`(args: { state: ParserState; result: ParserOutput<T> }`) - Function called with current state and result
-
-**Examples:**
+### parseFast()
 
 ```typescript
-const parser = parser(function* () {
-  const name = yield* identifier();
-  yield* char(":");
-  const value = yield* number();
-  return { name, value };
-});
-parser.tap(({ state, result }) => {
-  console.log(`Parsed ${result} at position ${state.pos}`);
-});
+parseFast(input: string): ParserOutput<T>
 ```
 
-### label
+An optimized version of `parse()` that uses a mutable context internally to reduce allocations. It returns the same `ParserOutput` format.
+
+---
+
+## Transformation
+
+### map()
+
+```typescript
+map<U>(fn: (value: T) => U): Parser<U>
+```
+
+Transforms the successful result of a parser using the provided function.
+
+```typescript
+const number = many1(digit).map(d => parseInt(d.join("")));
+```
+
+### flatMap()
+
+```typescript
+flatMap<U>(fn: (value: T) => Parser<U>): Parser<U>
+```
+
+Chains parsers where the next parser depends on the result of the current one. This is the monadic `bind` operation.
+
+```typescript
+const sized = digit.flatMap(d => {
+  const n = parseInt(d);
+  return manyNExact(char("x"), n);
+});
+// "3xxx" -> ["x", "x", "x"]
+```
+
+---
+
+## Sequencing
+
+### then()
+
+```typescript
+then<U>(next: Parser<U>): Parser<U>
+```
+
+Runs the current parser followed by the next parser. If both succeed, it returns the result of the **second** parser.
+
+```typescript
+string("hello").then(string(" world")); // -> " world"
+```
+
+### thenDiscard()
+
+```typescript
+thenDiscard<U>(next: Parser<U>): Parser<T>
+```
+
+Runs the current parser followed by the next parser. If both succeed, it returns the result of the **first** parser.
+
+```typescript
+identifier.thenDiscard(char(";")); // -> identifier value
+```
+
+### zip()
+
+```typescript
+zip<U>(other: Parser<U>): Parser<[T, U]>
+```
+
+Runs both parsers in sequence and returns their results as a tuple.
+
+```typescript
+digit.zip(digit); // Parser<[string, string]>
+```
+
+---
+
+## Error Handling
+
+### expect()
+
+```typescript
+expect(message: string): Parser<T>
+```
+
+Provides a custom error message that will be used if the parser fails.
+
+```typescript
+char(")").expect("closing parenthesis");
+// Error: "Expected closing parenthesis"
+```
+
+### label()
 
 ```typescript
 label(name: string): Parser<T>
 ```
 
-Adds a label to this parser for better error messages
-
-**Parameters:**
-
-- `name` (`string`) - The label name to add to the context stack
-
-**Returns:** `Parser<T>` - A new parser with the label added
-
-### expect
+Adds a name to the context stack for error reporting. This helps identify which part of a complex grammar failed.
 
 ```typescript
-expect(description: string): Parser<T>
+const id = many1(alphabet).label("identifier");
 ```
 
-Helper for creating semantic expectations with both label and error message
+---
 
-**Parameters:**
+## Control Flow
 
-- `description` (`string`) - The description for both the label and error message
-
-**Returns:** `Parser<T>` - A new parser with both labeling and error message
-
-### atomic
+### atomic()
 
 ```typescript
 atomic(): Parser<T>
 ```
 
-Creates an atomic parser that either fully succeeds or resets to the original state. This is useful for "all-or-nothing" parsing where you want to try a complex parser but not consume any input if it fails. The parser acts as a transaction - if any part fails, the entire parse is rolled back.
-
-**Returns:** `Parser<T>` - A new parser that resets state on failure
-
-**Examples:**
+Creates an "all-or-nothing" version of the parser. If the parser fails, it resets the input position to where it started, as if no input was consumed.
 
 ```typescript
-// Without atomic - partial consumption on failure
-const badParser = parser(function* () {
-  yield* string("foo");
-  yield* string("bar"); // If this fails, "foo" is already consumed
+const keyword = string("function").atomic();
+```
+
+### commit()
+
+```typescript
+commit(): Parser<T>
+```
+
+Prevents backtracking after this parser succeeds. If a subsequent parser in a sequence fails, Parserator will not backtrack to try other alternatives in an `or()` or `choice()` block.
+
+```typescript
+const ifStmt = parser(function* () {
+  yield* string("if");
+  yield* commit(); // Once "if" is seen, we must parse an if-statement
+  // ...
 });
-
-// With atomic - no consumption on failure
-const goodParser = parser(function* () {
-  yield* string("foo");
-  yield* string("bar"); // If this fails, we reset to before "foo"
-}).atomic();
 ```
 
+---
+
+## Utilities
+
+### tap()
+
 ```typescript
-// Useful for trying complex alternatives
-const value = or(
-  // Try to parse as a complex expression
-  expression.atomic(),
-  // If that fails completely, try as a simple literal
-  literal
-);
+tap(fn: (args: { state: ParserState, result: ParserOutput<T> }) => void): Parser<T>
 ```
 
+Allows inspecting the parser state and result during execution without modifying them. Useful for debugging.
+
+### trimLeft()
+
 ```typescript
-// Lookahead parsing without consumption
-const startsWithKeyword = or(
-  string("function").atomic(),
-  string("const").atomic(),
-  string("let").atomic()
-).map(() => true).or(Parser.succeed(false))
+trimLeft(ws: Parser<any>): Parser<T>
+```
 
+Skips input matched by `ws` before running the current parser.
 
-@see {@link atomic} - Standalone function version
+### trimRight()
+
+```typescript
+trimRight(ws: Parser<any>): Parser<T>
+```
+
+Skips input matched by `ws` after running the current parser.
+
+### trim()
+
+```typescript
+trim(ws: Parser<any>): Parser<T>
+```
+
+Skips input matched by `ws` both before and after running the current parser.
+
+---
+
+## Static Methods
+
+### Parser.pure()
+
+```typescript
+static pure<T>(value: T): Parser<T>
+```
+
+Creates a parser that always succeeds with the given value without consuming any input. (Also available as `Parser.lift`).
+
+### Parser.fail()
+
+```typescript
+static fail(error: { message: string }): Parser<never>
+```
+
+Creates a parser that always fails with the specified error message.
+
+### Parser.fatal()
+
+```typescript
+static fatal(message: string): Parser<never>
+```
+
+Creates a parser that fails with a fatal error, which immediately stops parsing and prevents any backtracking.
+
+### Parser.lazy()
+
+```typescript
+static lazy<T>(fn: () => Parser<T>): Parser<T>
+```
+
+Defers the creation of a parser until it is actually run. Essential for defining recursive grammars.
+
+```typescript
+const expr = Parser.lazy(() => or(atom, compound));
+```
+
+### Parser.gen()
+
+```typescript
+static gen<T>(genFn: () => Generator<Parser<any>, T>): Parser<T>
+```
+
+Creates a parser from a generator function. This is the primary way to build complex, readable parsers in Parserator.
+
+---
+
+## The parser() Function
+
+```typescript
+function parser<T>(genFn: () => Generator<Parser<any>, T>): Parser<T>;
+```
+
+A convenient alias for `Parser.gen`. It allows using `yield*` to sequence parsers and capture their results as variables.
+
+```typescript
+const point = parser(function* () {
+  yield* char("(");
+  const x = yield* number;
+  yield* char(",");
+  const y = yield* number;
+  yield* char(")");
+  return { x, y };
+});
 ```

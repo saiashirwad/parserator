@@ -1,89 +1,76 @@
 ---
-# https://vitepress.dev/reference/default-theme-home-page
 layout: home
-
 hero:
   name: "Parserator"
-  text: "Elegant Parser Combinators for TypeScript"
-  tagline: Build powerful parsers with composable, type-safe combinators
+  text: "Type-safe Parser Combinators"
+  tagline: Build parsers by composing small functions. No grammar files, no code generation.
   actions:
     - theme: brand
       text: Get Started
       link: /guide/getting-started
     - theme: alt
-      text: View on GitHub
-      link: https://github.com/saiashirwad/parserator
-    - theme: alt
       text: API Reference
       link: /api/
+    - theme: alt
+      text: GitHub
+      link: https://github.com/saiashirwad/parserator
 
 features:
-  - icon: 🧩
-    title: Composable
-    details: Build complex parsers by combining simple, reusable pieces. Start small and compose your way to powerful parsing solutions.
+  - icon: ⚙️
+    title: Generator Syntax
+    details: Write parsers with yield* for natural sequencing and readable logic.
   - icon: 🛡️
     title: Type-Safe
-    details: Full TypeScript support with excellent type inference. Get compile-time guarantees and rich IDE support.
-  - icon: ⚡
-    title: Performant
-    details: Optimized for real-world use cases with minimal overhead. Parse large inputs efficiently.
+    details: Full TypeScript inference from input to output. No more "any" in your AST.
   - icon: 🎯
-    title: Developer Friendly
-    details: Clear error messages, intuitive API, and comprehensive documentation make parsing accessible to everyone.
+    title: Great Errors
+    details: Automatic position tracking, context stacks, and typo suggestions.
+  - icon: 📦
+    title: Zero Dependencies
+    details: Small bundle size with no runtime overhead. Just pure TypeScript.
 ---
 
 ## Quick Example
 
+Showcase how easy it is to build complex parsers using generator syntax.
+
 ```typescript
-import { string, number, sequence, many, map } from "parserator";
+import { parser, char, many1, digit, string, or, commit } from "parserator";
 
-// Parse a simple arithmetic expression
-const digit = number();
-const operator = string("+").or(string("-"));
-const expression = sequence(digit, many(sequence(operator, digit)));
+// Parse a simple expression like "add(1, 2)" or "mul(3, 4)"
+const number = many1(digit).map(d => parseInt(d.join("")));
 
-const result = expression.parse("1+2-3+4");
-console.log(result); // Success with parsed AST
-```
+const expr = parser(function* () {
+  const op = yield* or(string("add"), string("mul"));
+  yield* commit(); // Better errors after this point
+  yield* char("(");
+  const a = yield* number;
+  yield* char(",");
+  const b = yield* number;
+  yield* char(")");
+  return op === "add" ? a + b : a * b;
+});
 
-## Installation
-
-```bash
-# Using npm
-npm install parserator
-
-# Using yarn
-yarn add parserator
-
-# Using pnpm
-pnpm add parserator
-
-# Using bun
-bun add parserator
+expr.parseOrThrow("add(1, 2)"); // 3
+expr.parseOrThrow("mul(3, 4)"); // 12
 ```
 
 ## Why Parserator?
 
-### Simple Yet Powerful
+Parserator bridges the gap between the simplicity of Regex and the power of formal grammar tools.
 
-Start with basic parsers and combine them to handle complex grammars. No need to learn a separate grammar syntax - it's just TypeScript.
+| Approach          | Nested Structures | Type Safety | Debugging            |
+| ----------------- | ----------------- | ----------- | -------------------- |
+| **Regex**         | No                | No          | Hard                 |
+| **Grammar Tools** | Yes               | Limited     | Generated code       |
+| **Parserator**    | **Yes**           | **Full**    | **Normal debugging** |
 
-### Battle-Tested Patterns
+## Installation
 
-Based on proven parser combinator techniques used in functional programming languages, adapted for the TypeScript ecosystem.
+Get started with your favorite package manager.
 
-### Excellent Error Recovery
-
-Get helpful error messages that point to exactly where parsing failed, with context about what was expected.
-
-### Zero Dependencies
-
-Parserator has no runtime dependencies, keeping your bundle size small and your builds fast.
-
-## Ready to Start?
-
-Check out the [Getting Started guide](/guide/getting-started) to begin building your first parser, or explore the [API Reference](/api/) to see all available combinators.
-
-<div style="margin-top: 4rem; text-align: center; color: var(--vp-c-text-2);">
-  Made with ❤️ by <a href="https://bsky.app/profile/texoport.in" target="_blank">Sai</a>
-</div>
+```bash
+npm install parserator
+# or
+bun add parserator
+```

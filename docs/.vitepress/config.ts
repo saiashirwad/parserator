@@ -3,7 +3,7 @@ import { defineConfig } from "vitepress";
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
   title: "Parserator",
-  description: "An elegant parser combinators library for TypeScript",
+  description: "Type-safe parser combinators for TypeScript",
 
   base: "/parserator/",
 
@@ -12,7 +12,8 @@ export default defineConfig({
     nav: [
       { text: "Home", link: "/" },
       { text: "Guide", link: "/guide/getting-started" },
-      { text: "API", link: "/api/" }
+      { text: "API", link: "/api/" },
+      { text: "Examples", link: "/examples/json-parser" }
     ],
 
     sidebar: [
@@ -30,8 +31,10 @@ export default defineConfig({
         text: "Guide",
         items: [
           { text: "Basic Concepts", link: "/guide/basic-concepts" },
-          { text: "Parser Combinators", link: "/guide/parser-combinators" },
+          { text: "Generator Syntax", link: "/guide/generator-syntax" },
+          { text: "Combinators", link: "/guide/parser-combinators" },
           { text: "Error Handling", link: "/guide/error-handling" },
+          { text: "Performance", link: "/guide/performance" },
           { text: "Advanced Patterns", link: "/guide/advanced-patterns" }
         ]
       },
@@ -41,9 +44,13 @@ export default defineConfig({
           { text: "Overview", link: "/api/" },
           { text: "Parser", link: "/api/parser" },
           { text: "Combinators", link: "/api/combinators" },
+          { text: "Optimized Combinators", link: "/api/optimized" },
+          { text: "Fast Path", link: "/api/fastpath" },
           { text: "State", link: "/api/state" },
+          { text: "Errors", link: "/api/errors" },
           { text: "Error Formatter", link: "/api/error-formatter" },
-          { text: "Hints", link: "/api/hints" }
+          { text: "Hints", link: "/api/hints" },
+          { text: "Either", link: "/api/either" }
         ]
       },
       {
@@ -51,7 +58,9 @@ export default defineConfig({
         items: [
           { text: "JSON Parser", link: "/examples/json-parser" },
           { text: "Expression Parser", link: "/examples/expression-parser" },
-          { text: "CSV Parser", link: "/examples/csv-parser" }
+          { text: "CSV Parser", link: "/examples/csv-parser" },
+          { text: "INI Parser", link: "/examples/ini-parser" },
+          { text: "Scheme Parser", link: "/examples/scheme-parser" }
         ]
       }
     ],

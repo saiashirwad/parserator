@@ -1,163 +1,73 @@
 # What is Parserator?
 
-Parserator is an elegant and powerful parser combinators library for TypeScript. It provides a functional approach to building parsers by composing small, reusable parsing functions into complex parsers.
+Parserator is a library for building powerful, type-safe parsers by composing small, reusable functions—allowing you to handle complex data formats with the ease of writing standard TypeScript.
 
-## Why Parser Combinators?
+## The Problem
 
-Traditional parsing approaches often involve:
+Parsing data is a common task, but traditional tools often force trade-offs between readability, maintainability, and power.
 
-- Complex grammar files and code generation
-- Steep learning curves
-- Limited composability and reusability
-- Difficulty handling errors gracefully
+**Regex** is the go-to for simple patterns, but it quickly becomes a "write-only" language as complexity grows. It cannot handle nested or recursive structures (like JSON or HTML) and offers no type safety for its matches.
 
-Parser combinators offer a different approach:
+**Grammar Generators** (like ANTLR or PEG.js) are powerful but come with heavy baggage. They require learning a separate DSL, involve complex code-generation build steps, and often result in poor TypeScript integration where types are either "any" or manually maintained.
 
-- **Composable**: Build complex parsers from simple building blocks
-- **Type-safe**: Full TypeScript support with excellent type inference
-- **Functional**: Pure functions that are easy to test and reason about
-- **Flexible**: Handle any grammar, including context-sensitive ones
-- **Error-friendly**: Rich error reporting with position tracking
+**Manual Parsing** involves writing custom loops and state management. While flexible, it is incredibly tedious, error-prone, and difficult to maintain or extend as requirements change.
 
-## Key Features
+## The Solution
 
-### 🎯 **Type Safety**
+Parserator uses **Parser Combinators**. You start with tiny functions that parse a single thing (a digit, a character, a string) and "combine" them into larger structures.
+
+By using **TypeScript Generators**, Parserator allows you to write parsers that look and feel like standard imperative code, but with the power of a formal grammar.
 
 ```typescript
-const parser: Parser<number> = many1(digit).map(digits =>
-  parseInt(digits.join(""))
-);
-// TypeScript knows the result is a number
-```
+import { parser, char, many1, digit, string, or } from "parserator";
 
-### 🔧 **Composability**
+// 1. Define small, reusable parsers
+const number = many1(digit).map(d => parseInt(d.join("")));
 
-```typescript
-const identifier = many1(alphabet);
-const assignment = sequence([identifier, char("="), expression]);
-const program = many0(assignment);
-```
+// 2. Compose them into larger structures
+const operator = or(string("+"), string("-"), string("*"), string("/"));
 
-### 🚀 **Monadic Interface**
-
-```typescript
-const jsonObject = parser(function* () {
-  yield* char("{");
-  const properties = yield* sepBy(property, char(","));
-  yield* char("}");
-  return Object.fromEntries(properties);
+// 3. Use generator syntax for complex logic
+const expression = parser(function* () {
+  const left = yield* number;
+  const op = yield* operator;
+  const right = yield* number;
+  return { left, op, right };
 });
+
+// 4. Run the parser
+const result = expression.parseOrThrow("10+20");
+console.log(result); // { left: 10, op: "+", right: 20 }
 ```
 
-### 📍 **Rich Error Reporting**
+## Key Benefits
 
-```typescript
-// Input: "if x > 5 {"
-// Error: "Expected closing parenthesis at line 1, column 9"
-//        "if x > 5 {"
-//                 ^
-```
-
-### ⚡ **Performance Optimized**
-
-- Minimal backtracking with commit/cut operations
-- Atomic parsers for better performance
-- Optional memoization for recursive grammars
+- **Type-safe**: Results are automatically inferred by TypeScript. No more `any` types or manual casting.
+- **Composable**: Build complex languages by nesting simple, testable building blocks.
+- **Readable**: Generator syntax (`yield*`) mirrors the structure of your grammar, making it easy to follow.
+- **Debuggable**: Since parsers are just standard functions, you can use your browser or IDE's debugger to step through them.
+- **Zero dependencies**: A lightweight library with no external runtime requirements.
 
 ## Use Cases
 
-Parserator is perfect for:
+Parserator excels in scenarios where data has a structured, nested, or recursive nature:
 
-### **Configuration Files**
+- **Configuration Formats**: Build parsers for custom INI, TOML-like, or environment files.
+- **Domain-Specific Languages (DSLs)**: Create your own mini-languages for business logic, search queries, or styling.
+- **Data Formats**: Handle CSV, JSON, or custom proprietary data formats with ease.
+- **Template Engines**: Parse and transform template strings into structured ASTs.
+- **Protocol Parsing**: Decode structured messages from network streams or file headers.
 
-```typescript
-const config = parser(function* () {
-  const entries = yield* many0(configEntry);
-  return Object.fromEntries(entries);
-});
-```
+## When NOT to Use
 
-### **Domain Specific Languages**
+While powerful, Parserator isn't always the right tool for every job:
 
-```typescript
-const sqlQuery = parser(function* () {
-  yield* keyword("SELECT");
-  const columns = yield* sepBy1(identifier, char(","));
-  yield* keyword("FROM");
-  const table = yield* identifier;
-  return { type: "select", columns, table };
-});
-```
+- **Simple String Patterns**: If you just need to check if a string looks like an email or an IP address, a simple **Regex** is faster and more concise.
+- **Performance-Critical Hot Paths**: For extremely high-performance needs (parsing gigabytes of JSON per second), a highly optimized, handwritten state machine may outperform combinators.
+- **Binary Formats**: Parserator is currently optimized for string-based parsing. For binary data, specialized binary parsing libraries are recommended.
 
-### **Data Formats**
+## Next Steps
 
-```typescript
-const csvParser = parser(function* () {
-  const header = yield* csvRow;
-  const rows = yield* many0(csvRow);
-  return { header, rows };
-});
-```
+Ready to build your first parser?
 
-### **Template Languages**
-
-```typescript
-const template = many0(
-  or(
-    variable, // {{name}}
-    conditional, // {{#if condition}}
-    text // literal text
-  )
-);
-```
-
-## Comparison with Alternatives
-
-| Feature        | Parserator         | Regex          | PEG.js      | ANTLR            |
-| -------------- | ------------------ | -------------- | ----------- | ---------------- |
-| Type Safety    | ✅ Full TypeScript | ❌ String only | ⚠️ Limited  | ⚠️ Generated     |
-| Composability  | ✅ Excellent       | ❌ Poor        | ⚠️ Limited  | ❌ Grammar-bound |
-| Error Messages | ✅ Rich context    | ❌ Basic       | ⚠️ Basic    | ✅ Good          |
-| Learning Curve | ⚠️ Moderate        | ✅ Low         | ⚠️ Moderate | ❌ Steep         |
-| Runtime Deps   | ✅ Zero            | ✅ Zero        | ❌ Runtime  | ❌ Runtime       |
-| Bundle Size    | ✅ Small           | ✅ Zero        | ⚠️ Medium   | ❌ Large         |
-
-## Philosophy
-
-Parserator follows these principles:
-
-### **Simplicity**
-
-Start with simple parsers and compose them into complex ones. Every parser is just a function.
-
-### **Predictability**
-
-Parsers behave consistently. No hidden state or surprising behaviors.
-
-### **Expressiveness**
-
-The API maps naturally to how you think about parsing problems.
-
-### **Performance**
-
-Fast parsing with minimal overhead, while maintaining readability.
-
-### **Developer Experience**
-
-Excellent TypeScript integration, clear error messages, and helpful debugging tools.
-
-## Getting Started
-
-Ready to try Parserator? Check out the [Getting Started Guide](../guide/getting-started.md) to begin building your first parser.
-
-Or jump straight into the [Basic Concepts](../guide/basic-concepts.md) to understand the fundamentals.
-
-## Community
-
-- **GitHub**: [saiashirwad/parserator](https://github.com/saiashirwad/parserator)
-- **Issues**: Report bugs and request features
-- **Discussions**: Ask questions and share your parsers
-
----
-
-_Parserator: Parse with confidence, compose with elegance._
+[Getting Started Guide](../guide/getting-started.md)

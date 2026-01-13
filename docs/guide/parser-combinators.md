@@ -1,207 +1,223 @@
-# Parser Combinators
+# Combinators
 
-Parser combinators are functions that take one or more parsers and return a new parser. They allow you to build complex parsers from simple building blocks.
+Combinators are functions that take one or more parsers as input and return a new parser as output. They are the building blocks used to compose complex grammars from simple literal matchers.
 
-## Core Combinators
+## Decision Table (Choose a Combinator)
 
-### Sequence Operations
+| I want to...             | Use                                 |
+| ------------------------ | ----------------------------------- |
+| Match exact character    | `char(c)`                           |
+| Match exact string       | `string(s)`                         |
+| Match regex pattern      | `regex(re)`                         |
+| Match any digit          | `digit`                             |
+| Match any letter         | `alphabet`                          |
+| Match zero or more       | `many(p)`                           |
+| Match one or more        | `many1(p)`                          |
+| Match exactly N times    | `manyNExact(p, n)` or `count(n, p)` |
+| Match at least N times   | `manyN(p, n)`                       |
+| Match separated list     | `sepBy(p, sep)`                     |
+| Try alternatives         | `or(a, b, c)`                       |
+| Make optional            | `optional(p)`                       |
+| Match between delimiters | `between(open, close, p)`           |
+| Peek without consuming   | `lookahead(p)`                      |
+| Fail if matches          | `notFollowedBy(p)`                  |
+| Check end of input       | `eof`                               |
+| Get current position     | `position`                          |
 
-#### `then` - Sequential Parsing
+## Literal Matchers
 
-Runs parsers in sequence, keeping only the result of the second parser:
-
-```typescript
-import { string, char } from "parserator";
-
-const parser = string("hello").then(char(" ")).then(string("world"));
-parser.parse("hello world"); // Success: "world"
-```
-
-#### `zip` - Combine Results
-
-Runs parsers in sequence and combines their results into a tuple:
-
-```typescript
-const parser = string("hello").zip(char(" ")).zip(string("world"));
-parser.parse("hello world"); // Success: ["hello", " ", "world"]
-```
-
-#### `sequence` - Multiple Parsers
-
-Runs multiple parsers in sequence:
+Literal matchers are the most basic parsers that match specific characters or strings in the input.
 
 ```typescript
-import { sequence, string, char } from "parserator";
+// Single character
+char("("); // Parser<"(">
 
-const parser = sequence([string("hello"), char(" "), string("world")]);
-parser.parse("hello world"); // Success: ["hello", " ", "world"]
+// Exact string
+string("hello"); // Parser<string>
+
+// Regular expression
+regex(/[a-z]+/); // Parser<string>
+
+// Built-in character classes
+digit; // Parser<string> - matches 0-9
+alphabet; // Parser<string> - matches a-z, A-Z
+anyChar(); // Parser<string> - matches any single character
 ```
 
-### Choice Operations
+- `char(c)`: Matches a single character `c`.
+- `string(s)`: Matches the exact string `s`.
+- `regex(re)`: Matches the regular expression `re` at the current position.
+- `digit`: Matches any single digit (0-9).
+- `alphabet`: Matches any single alphabetic character (a-z, A-Z).
+- `anyChar()`: Matches any single character.
 
-#### `or` - Try Alternatives
+## Repetition
 
-Tries parsers in order until one succeeds:
+Repetition combinators allow you to match a parser multiple times.
 
 ```typescript
-import { or, string } from "parserator";
+// Zero or more
+many(digit); // Parser<string[]>
 
-const greeting = or(string("hello"), string("hi"), string("hey"));
-greeting.parse("hi there"); // Success: "hi"
+// One or more
+many1(digit); // Parser<string[]>
+
+// At least N
+manyN(digit, 3); // Parser<string[]> - 3+
+
+// Exactly N
+manyNExact(digit, 3); // Parser<string[]> - exactly 3
+count(3, digit); // Parser<string[]> - exactly 3 (alternative)
+
+// With separator
+sepBy(number, char(",")); // Parser<number[]> - "1,2,3" or ""
+sepBy1(number, char(",")); // Parser<number[]> - "1,2,3" (requires at least 1)
+sepEndBy(number, char(",")); // Parser<number[]> - "1,2,3" or "1,2,3," (allows trailing)
 ```
 
-#### `optional` - Maybe Parse
+- `many(p)` / `many0(p)`: Matches zero or more occurrences of `p`.
+- `many1(p)`: Matches one or more occurrences of `p`.
+- `manyN(p, n)`: Matches at least `n` occurrences of `p`.
+- `manyNExact(p, n)`: Matches exactly `n` occurrences of `p`.
+- `count(n, p)`: Matches exactly `n` occurrences of `p`.
+- `sepBy(p, sep)`: Matches zero or more occurrences of `p` separated by `sep`.
+- `sepBy1(p, sep)`: Matches one or more occurrences of `p` separated by `sep`.
+- `sepEndBy(p, sep)`: Matches zero or more occurrences of `p` separated by `sep`, allowing an optional trailing separator.
 
-Makes a parser optional, returning `undefined` if it fails:
+## Alternatives
+
+Alternatives allow you to try multiple parsers in order until one succeeds.
 
 ```typescript
-import { optional, string } from "parserator";
+// Try in order until one succeeds
+or(string("true"), string("false"));
 
-const parser = string("hello").then(optional(string(" world")));
-parser.parse("hello"); // Success: undefined (for optional part)
+// With commit for better errors
+const keyword = or(
+  parser(function* () {
+    yield* string("if");
+    yield* commit();
+    return "if";
+  }),
+  parser(function* () {
+    yield* string("while");
+    yield* commit();
+    return "while";
+  })
+);
 ```
 
-### Repetition Combinators
+- `or(...ps)`: Tries each parser in `ps` one by one. If one succeeds, its result is returned. If a parser fails after `commit()`, the whole `or` fails immediately without trying further alternatives.
 
-#### `many0` - Zero or More
+## Optional
 
-Parses zero or more occurrences:
+The optional combinator allows a parser to fail without failing the entire parsing process.
 
 ```typescript
-import { many0, digit } from "parserator";
+// Returns T | undefined
+optional(char("-"));
 
-const digits = many0(digit);
-digits.parse("123abc"); // Success: ["1", "2", "3"]
-digits.parse("abc"); // Success: []
+// With default value
+optional(char("-")).map(sign => sign ?? "+");
 ```
 
-#### `many1` - One or More
+- `optional(p)`: Tries to match `p`. If it succeeds, returns the result. If it fails (and hasn't committed), returns `undefined` without consuming input.
 
-Parses one or more occurrences:
+## Sequencing
+
+Sequencing allows you to run parsers one after another.
 
 ```typescript
-import { many1, digit } from "parserator";
+// Method chaining
+string("hello").then(string(" world")); // Parser<string> - keeps " world"
+string("hello").thenDiscard(char(" ")); // Parser<string> - keeps "hello"
+string("hello").zip(string(" world")); // Parser<[string, string]> - keeps both
 
-const digits = many1(digit);
-digits.parse("123abc"); // Success: ["1", "2", "3"]
-digits.parse("abc"); // Error: Expected at least one digit
+// sequence() for multiple
+sequence([char("("), number, char(")")]);
+// Parser<["(", number, ")"]>
 ```
 
-#### `sepBy` - Separated Lists
+- `p1.then(p2)`: Runs `p1` then `p2`, returning the result of `p2`.
+- `p1.thenDiscard(p2)`: Runs `p1` then `p2`, returning the result of `p1`.
+- `p1.zip(p2)`: Runs `p1` then `p2`, returning both results as a tuple `[R1, R2]`.
+- `sequence([p1, p2, ...])`: Runs a list of parsers in order and returns their results as a tuple.
 
-Parses elements separated by a delimiter:
+## Delimited Content
+
+Use these to parse content surrounded by other tokens, like parentheses or quotes.
 
 ```typescript
-import { sepBy, digit, char } from "parserator";
-
-const list = sepBy(digit, char(","));
-list.parse("1,2,3"); // Success: ["1", "2", "3"]
-list.parse(""); // Success: []
+// Content between delimiters
+between(char("("), char(")"), number);
+// Parser<number> - parses "(123)"
 ```
 
-#### `sepBy1` - Non-empty Separated Lists
+- `between(open, close, p)`: Runs `open`, then `p`, then `close`. Returns the result of `p`.
 
-Like `sepBy` but requires at least one element:
+## Lookahead
+
+Lookahead allows you to check the future input without consuming it.
 
 ```typescript
-import { sepBy1, digit, char } from "parserator";
+// Peek without consuming
+lookahead(char("("));
+// Parser<"(" | undefined>
 
-const list = sepBy1(digit, char(","));
-list.parse("1,2,3"); // Success: ["1", "2", "3"]
-list.parse(""); // Error: Expected at least one element
+// Negative lookahead
+notFollowedBy(digit);
+// Succeeds if next char is NOT a digit
 ```
 
-### Lookahead and Boundaries
+- `lookahead(p)`: Tries to match `p`. If it succeeds, returns the result but resets the input position to where it was before `lookahead`.
+- `notFollowedBy(p)`: Succeeds if `p` fails to match at the current position. Does not consume input.
 
-#### `lookahead` - Peek Without Consuming
+## Position and Control
 
-Checks if a parser would succeed without consuming input:
+These parsers provide metadata about the parsing state or control the flow of execution.
 
 ```typescript
-import { lookahead, string } from "parserator";
+// End of input
+eof; // Parser<void> - succeeds only at end
 
-const parser = lookahead(string("hello"));
-const result = parser.parse("hello world");
-// Success: "hello", but input position unchanged
+// Get position
+position; // Parser<{ offset, line, column }>
+
+// Prevent backtracking
+commit(); // Parser<void>
+cut(); // Alias for commit()
+
+// All-or-nothing
+atomic(p); // Reset to original state on failure
 ```
 
-#### `notFollowedBy` - Negative Lookahead
+- `eof`: Succeeds only if there is no more input to consume.
+- `position`: Returns the current source position (offset, line, column).
+- `commit()` / `cut()`: Marks the current branch as "committed". If parsing fails after this point, the parser will not backtrack to try other alternatives in an `or()` block.
+- `atomic(p)`: Runs `p`. If `p` fails, it resets the input position and committed state to what they were before `atomic`, even if `p` had called `commit()`.
 
-Succeeds only if the given parser would fail:
+## Take/Skip Variants
+
+These are useful for efficiently consuming parts of the input.
 
 ```typescript
-import { notFollowedBy, char, alphabet } from "parserator";
+// Take until parser matches
+takeUntil(char("\n")); // Takes chars until newline (consumes newline)
 
-const identifier = many1(alphabet).thenDiscard(notFollowedBy(digit));
-identifier.parse("abc123"); // Error: identifier can't be followed by digit
+// Take until before parser matches
+takeUpto(string("*/")); // Takes until "*/" found (does NOT consume "*/")
+
+// Skip variants (discard result)
+skipMany0(whitespace);
+skipMany1(whitespace);
+skipUntil(string("END"));
+skipSpaces; // Skips ' ' characters
 ```
 
-#### `between` - Delimited Content
-
-Parses content between two delimiters:
-
-```typescript
-import { between, char, many1, alphabet } from "parserator";
-
-const quoted = between(char('"'), char('"'), many1(alphabet));
-quoted.parse('"hello"'); // Success: ["h", "e", "l", "l", "o"]
-```
-
-### Transformation
-
-#### `map` - Transform Results
-
-Transforms the result of a successful parse:
-
-```typescript
-import { many1, digit } from "parserator";
-
-const number = many1(digit).map(digits => parseInt(digits.join("")));
-number.parse("123"); // Success: 123 (number, not string)
-```
-
-#### `mapError` - Transform Errors
-
-Transforms error messages:
-
-```typescript
-const parser = string("hello").mapError(err => "Custom error: " + err.message);
-```
-
-## Building Complex Parsers
-
-You can combine these combinators to build sophisticated parsers:
-
-```typescript
-import {
-  parser,
-  string,
-  char,
-  many1,
-  alphabet,
-  digit,
-  or,
-  optional
-} from "parserator";
-
-const identifier = many1(alphabet);
-const number = many1(digit).map(digits => parseInt(digits.join("")));
-
-const value = or(number, identifier);
-
-const assignment = parser(function* () {
-  const name = yield* identifier;
-  yield* char("=");
-  const val = yield* value;
-  return { name: name.join(""), value: val };
-});
-
-assignment.parse("x=42"); // Success: { name: "x", value: 42 }
-assignment.parse("name=abc"); // Success: { name: "name", value: ["a","b","c"] }
-```
-
-## Next Steps
-
-- Learn about [Error Handling](./error-handling.md)
-- Explore [Advanced Patterns](./advanced-patterns.md)
-- Check the [API Reference](/api/) for complete details
+- `takeUntil(p)`: Consumes input until `p` matches. Returns the consumed input as a string. `p` is also consumed.
+- `takeUpto(p)`: Consumes input until `p` matches. Returns the consumed input as a string. `p` is NOT consumed.
+- `skipMany0(p)` / `skipMany1(p)`: Matches zero/one or more occurrences of `p` and discards the result.
+- `skipUntil(p)`: Consumes and discards input until `p` matches.
+- `skipSpaces`: Discards any number of space characters (' ').
+- `parseUntilChar(c)`: Consumes input until character `c` is found.
+- `notChar(c)`: Matches any single character except `c`.

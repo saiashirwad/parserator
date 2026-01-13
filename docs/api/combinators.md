@@ -1,347 +1,599 @@
 # Combinators
 
-## Functions
+This page provides a comprehensive reference for the built-in combinators in Parserator. Combinators are higher-order functions that either match primitive input or combine existing parsers into more complex ones.
 
-### lookahead
-
-```typescript
-export const lookahead = <T>(par: Parser<T>): Parser<T | undefined> => ...
-```
-
-Creates a parser that looks ahead in the input stream without consuming any input. The parser will succeed with the result of the given parser but won't advance the input position.
-
-**Parameters:**
-
-- `par` (`Parser<T>`) - The parser to look ahead with
-
-**Returns:** `Parser<T | undefined>` - A new parser that peeks at the input without consuming it `ts const parser = lookahead(char('a')) parser.run('abc') // Right(['a', {...}]) // Input position remains at 'abc', 'a' is not consumed `
-
-### string
-
-```typescript
-export const string = (str: string): Parser<string> => ...
-```
-
-Creates a parser that matches an exact string in the input.
-
-**Parameters:**
-
-- `str` (`string`) - The string to match
-
-**Returns:** `Parser<string>` - A parser that matches and consumes the exact string `ts const parser = string("hello") parser.run("hello world") // Right(["hello", {...}]) parser.run("goodbye") // Left(error) `
+## Literal Matchers
 
 ### char
 
 ```typescript
-export const char = <T extends string>(ch: T): Parser<T> => ...
+char<T extends string>(ch: T): Parser<T>
 ```
 
-Creates a parser that matches a single character.
+Matches a single character exactly.
 
-**Parameters:**
-
-- `ch` (`T`) - The character to match
-
-**Returns:** `Parser<T>` - A parser that matches and consumes a single character `ts const parser = char("a") parser.run("abc") // Right(["a", {...}]) parser.run("xyz") // Left(error) `
-
-### alphabet
+**Example:**
 
 ```typescript
-export const alphabet = new Parser(state => ...
+const p = char("(");
+p.parseOrThrow("("); // "("
 ```
 
-A parser that matches any single alphabetic character (a-z, A-Z). `ts const parser = alphabet parser.run("abc") // Right(["a", {...}]) parser.run("123") // Left(error) `
-
-### digit
+### string
 
 ```typescript
-export const digit = new Parser(state => ...
+string(str: string): Parser<string>
 ```
 
-A parser that matches any single digit character (0-9). `ts const parser = digit parser.run("123") // Right(["1", {...}]) parser.run("abc") // Left(error) `
+Matches an exact string literal in the input.
 
-### many0
+**Example:**
 
 ```typescript
-export const many0 = <S, T>(parser: Parser<T>, separator?: Parser<S>)
+const p = string("function");
+p.parseOrThrow("function"); // "function"
 ```
 
-Creates a parser that matches zero or more occurrences of the input parser.
-
-**Parameters:**
-
-- `parser` (`Parser<T>`) - The parser to repeat
-- `separator?` (`Parser<S>`)
-
-### many
+### narrowedString
 
 ```typescript
-export const many = <T>(parser: Parser<T>)
+narrowedString<const T extends string>(str: T): Parser<T>
 ```
 
-Parses zero or more occurrences of a parser (alias for many0).
+Similar to `string`, but preserves the literal type in TypeScript's type system.
 
-**Parameters:**
-
-- `parser` (`Parser<T>`) - The parser to repeat
-
-### many1
+**Example:**
 
 ```typescript
-export const many1 = <S, T>(parser: Parser<T>, separator?: Parser<S>)
-```
-
-Creates a parser that matches one or more occurrences of the input parser.
-
-**Parameters:**
-
-- `parser` (`Parser<T>`) - The parser to repeat
-- `separator?` (`Parser<S>`)
-
-### manyN
-
-```typescript
-export const manyN = <S, T>(
-  parser: Parser<T>,
-  n: number,
-  separator?: Parser<S>
-)
-```
-
-Creates a parser that matches at least n occurrences of the input parser.
-
-**Parameters:**
-
-- `parser` (`Parser<T>`) - The parser to repeat
-- `n` (`number`) - Number of required repetitions
-- `separator?` (`Parser<S>`)
-
-### manyNExact
-
-```typescript
-export const manyNExact = <S, T>(
-  par: Parser<T>,
-  n: number,
-  separator?: Parser<S>
-)
-```
-
-Creates a parser that matches exactly n occurrences of the input parser.
-
-**Parameters:**
-
-- `par` (`Parser<T>`)
-- `n` (`number`) - Number of required repetitions
-- `separator?` (`Parser<S>`) - Optional parser to match between occurrences
-
-### skipMany0
-
-```typescript
-export const skipMany0 = <T>(parser: Parser<T>)
-```
-
-Creates a parser that skips zero or more occurrences of the input parser.
-
-**Parameters:**
-
-- `parser` (`Parser<T>`) - The parser to skip
-
-### skipMany1
-
-```typescript
-export const skipMany1 = <T>(parser: Parser<T>)
-```
-
-Creates a parser that skips one or more occurrences of the input parser.
-
-**Parameters:**
-
-- `parser` (`Parser<T>`) - The parser to skip
-
-### skipManyN
-
-```typescript
-export const skipManyN = <T>(parser: Parser<T>, n: number)
-```
-
-Creates a parser that skips exactly n occurrences of the input parser.
-
-**Parameters:**
-
-- `parser` (`Parser<T>`) - The parser to skip
-- `n` (`number`) - Number of required repetitions to skip
-
-### parseUntilChar
-
-```typescript
-export function parseUntilChar(char: string): Parser<string>;
-```
-
-Creates a parser that takes input until the given character is found.
-
-**Parameters:**
-
-- `char` (`string`) - The character to look for
-
-**Returns:** `Parser<string>` - A parser that takes input until the character is found
-
-### skipSpaces
-
-```typescript
-export const skipSpaces = new Parser(state => ...
-```
-
-A parser that skips any number of space characters.
-
-### sequence
-
-```typescript
-export const sequence = <const T extends any[]>(
-  parsers: T
-): Parser<SequenceOutput<T>> => ...
-```
-
-Creates a parser that runs multiple parsers in sequence and returns all results.
-
-**Parameters:**
-
-- `parsers` (`T`) - Array of parsers to run in sequence
-
-**Returns:** `Parser<SequenceOutput<T>>` - A parser that succeeds if all parsers succeed in order, returning a tuple of all results
-
-**Examples:**
-
-```typescript
-const parser = sequence([digit, char("-"), digit]);
-parser.run("1-2"); // Right([['1', '-', '2'], {...}])
+const p = narrowedString("GET"); // Parser<"GET">
 ```
 
 ### regex
 
 ```typescript
-export const regex = (re: RegExp): Parser<string> => ...
+regex(re: RegExp): Parser<string>
 ```
 
-Creates a parser that matches input against a regular expression. The regex must match at the start of the input.
+Matches the input against a regular expression. The regex must match at the current position (internally uses sticky `y` flag).
 
-**Parameters:**
-
-- `re` (`RegExp`) - The regular expression to match against
-
-**Returns:** `Parser<string>` - A parser that matches the regex pattern
-
-### commit
+**Example:**
 
 ```typescript
-export function commit(): Parser<void>;
+const identifier = regex(/[a-zA-Z_][a-zA-Z0-9_]*/);
 ```
 
-Creates a parser that commits to the current parsing path, preventing backtracking. After calling `commit()`, if parsing fails later in the sequence, the parser won't backtrack to try alternatives in a `choice` or `or` combinator. This results in more specific, helpful error messages instead of generic "expected one of" errors.
-
-**Returns:** `Parser<void>` - A parser that sets the commit flag in the parsing context
-
-**Examples:**
+### digit
 
 ```typescript
-// Use commit after identifying the type of construct
-const ifStatement = parser(function* () {
-  yield* keyword("if");
-  yield* commit(); // No backtracking after this point
-  yield* char("(").expect("opening parenthesis after 'if'");
-  const condition = yield* expression;
-  yield* char(")").expect("closing parenthesis");
-  const body = yield* block;
-  return { type: "if", condition, body };
-});
+digit: Parser<string>;
 ```
 
-```typescript
-// Commit in different parsing contexts
-const jsonParser = parser(function* () {
-  const firstChar = yield* peekChar;
+Matches any single numeric digit (`0-9`).
 
-  if (firstChar === "{") {
-    yield* char("{");
-    yield* commit(); // Definitely parsing an object
-    return yield* jsonObject;
-  } else if (firstChar === "[") {
-    yield* char("[");
-    yield* commit(); // Definitely parsing an array
-    return yield* jsonArray;
-  }
-  // ...
-});
+**Example:**
+
+```typescript
+digit.parseOrThrow("5"); // "5"
 ```
 
+### alphabet
+
 ```typescript
-// Commit with error recovery
-const statement = choice([
-  ifStatement,    // Has commit() after "if"
-  whileStatement, // Has commit() after "while"
-  forStatement,   // Has commit() after "for"
-  expression      // No commit, can always fall back to this
-])
-
-// Input: "if (x > 5 { }"  (missing closing paren)
-// Result: "Expected closing parenthesis" (not "Expected if, while, for, or expression")
-
-
-@see {@link cut} - Alias with Prolog-style naming
+alphabet: Parser<string>;
 ```
 
-### cut
+Matches any single alphabetic character (`a-z`, `A-Z`).
+
+**Example:**
 
 ```typescript
-export const cut = commit;
+alphabet.parseOrThrow("a"); // "a"
 ```
 
-Alias for {@link commit} using Prolog-style naming. The cut operator (!) in Prolog prevents backtracking, similar to how this prevents the parser from trying other alternatives after this point.
-
-**Examples:**
+### anyChar
 
 ```typescript
-const prologStyleIf = parser(function* () {
-  yield* keyword("if");
-  yield* cut(); // Using Prolog-style naming
-  yield* char("(");
-  // ...
-});
+anyChar(): Parser<string>
+```
+
+Matches and consumes any single character from the input. Fails only at the end of the input.
+
+**Example:**
+
+```typescript
+anyChar().parseOrThrow("!"); // "!"
 ```
 
 ### notChar
 
 ```typescript
-export function notChar(ch: string): Parser<string>;
+notChar(ch: string): Parser<string>
 ```
 
-Parses any character except the specified one.
+Matches any single character except the one specified.
 
-**Parameters:**
-
-- `ch` (`string`) - The character to exclude
-
-**Returns:** `Parser<string>` - A parser that matches any character except the specified one
-
-**Examples:**
+**Example:**
 
 ```typescript
 const notQuote = notChar('"');
-notQuote.parse("a"); // Success: 'a'
-notQuote.parse('"'); // Error: Expected any character except '"'
+notQuote.parseOrThrow("a"); // "a"
+```
+
+## Repetition
+
+### many
+
+```typescript
+many<T>(parser: Parser<T>): Parser<T[]>
+```
+
+Matches zero or more occurrences of the given parser. Alias for `many0`.
+
+**Example:**
+
+```typescript
+const p = many(char("a"));
+p.parseOrThrow("aaa"); // ["a", "a", "a"]
+p.parseOrThrow(""); // []
+```
+
+### many0
+
+```typescript
+many0<S, T>(parser: Parser<T>, separator?: Parser<S>): Parser<T[]>
+```
+
+Matches zero or more occurrences of a parser, optionally separated by another parser.
+
+**Example:**
+
+```typescript
+const p = many0(digit, char(","));
+p.parseOrThrow("1,2,3"); // ["1", "2", "3"]
+```
+
+### many1
+
+```typescript
+many1<S, T>(parser: Parser<T>, separator?: Parser<S>): Parser<T[]>
+```
+
+Matches one or more occurrences of a parser, optionally separated by another parser.
+
+**Example:**
+
+```typescript
+const p = many1(digit);
+p.parseOrThrow("123"); // ["1", "2", "3"]
+```
+
+### manyN
+
+```typescript
+manyN<S, T>(parser: Parser<T>, n: number, separator?: Parser<S>): Parser<T[]>
+```
+
+Matches at least `n` occurrences of the given parser.
+
+**Example:**
+
+```typescript
+const p = manyN(digit, 3);
+p.parseOrThrow("1234"); // ["1", "2", "3", "4"]
+```
+
+### manyNExact
+
+```typescript
+manyNExact<S, T>(par: Parser<T>, n: number, separator?: Parser<S>): Parser<T[]>
+```
+
+Matches exactly `n` occurrences of the given parser. Fails with a fatal error if the count doesn't match.
+
+**Example:**
+
+```typescript
+const p = manyNExact(digit, 3);
+p.parseOrThrow("123"); // ["1", "2", "3"]
+```
+
+### count
+
+```typescript
+count<T>(n: number, par: Parser<T>): Parser<T[]>
+```
+
+Parses exactly `n` occurrences of a parser using a loop.
+
+**Example:**
+
+```typescript
+const p = count(2, alphabet);
+p.parseOrThrow("ab"); // ["a", "b"]
+```
+
+### sepBy
+
+```typescript
+sepBy<S, T>(parser: Parser<T>, sepParser: Parser<S>): Parser<T[]>
+```
+
+Matches zero or more occurrences of `parser` separated by `sepParser`.
+
+**Example:**
+
+```typescript
+const p = sepBy(digit, char(","));
+p.parseOrThrow("1,2,3"); // ["1", "2", "3"]
+```
+
+### sepBy1
+
+```typescript
+sepBy1<S, T>(par: Parser<T>, sepParser: Parser<S>): Parser<T[]>
+```
+
+Matches one or more occurrences of `parser` separated by `sepParser`.
+
+**Example:**
+
+```typescript
+const p = sepBy1(digit, char(","));
+p.parseOrThrow("1"); // ["1"]
+```
+
+### sepEndBy
+
+```typescript
+sepEndBy<S, T>(par: Parser<T>, sep: Parser<S>): Parser<T[]>
+```
+
+Matches zero or more occurrences of `par` separated by `sep`, allowing an optional trailing separator.
+
+**Example:**
+
+```typescript
+const p = sepEndBy(digit, char(","));
+p.parseOrThrow("1,2,"); // ["1", "2"]
+```
+
+## Skip Variants
+
+### skipMany0
+
+```typescript
+skipMany0<T>(parser: Parser<T>): Parser<undefined>
+```
+
+Skips zero or more occurrences of the input parser. Returns `undefined`.
+
+**Example:**
+
+```typescript
+const p = skipMany0(char(" "));
+```
+
+### skipMany1
+
+```typescript
+skipMany1<T>(parser: Parser<T>): Parser<undefined>
+```
+
+Skips one or more occurrences of the input parser.
+
+**Example:**
+
+```typescript
+const p = skipMany1(char(" "));
+```
+
+### skipManyN
+
+```typescript
+skipManyN<T>(parser: Parser<T>, n: number): Parser<undefined>
+```
+
+Skips at least `n` occurrences of the input parser.
+
+**Example:**
+
+```typescript
+const p = skipManyN(digit, 2);
+```
+
+### skipUntil
+
+```typescript
+skipUntil<T>(parser: Parser<T>): Parser<undefined>
+```
+
+Skips input characters one by one until the given parser succeeds.
+
+**Example:**
+
+```typescript
+const p = skipUntil(string("END"));
+```
+
+### skipSpaces
+
+```typescript
+skipSpaces: Parser<undefined>;
+```
+
+Skips any number of space characters (` `).
+
+**Example:**
+
+```typescript
+const p = sequence([string("a"), skipSpaces, string("b")]);
+```
+
+## Take Variants
+
+### takeUntil
+
+```typescript
+takeUntil<T>(parser: Parser<T>): Parser<string>
+```
+
+Consumes and returns all input characters until the given parser matches. The matching part is also consumed.
+
+**Example:**
+
+```typescript
+const p = takeUntil(string("-->"));
+```
+
+### takeUpto
+
+```typescript
+takeUpto<T>(parser: Parser<T>): Parser<string>
+```
+
+Consumes and returns all input characters until the given parser would match, without consuming the matching part itself.
+
+**Example:**
+
+```typescript
+const p = takeUpto(char(")"));
+```
+
+### parseUntilChar
+
+```typescript
+parseUntilChar(char: string): Parser<string>
+```
+
+Consumes and returns all input characters until the specified character is encountered.
+
+**Example:**
+
+```typescript
+const p = parseUntilChar("\n");
+```
+
+## Alternatives
+
+### or
+
+```typescript
+or<Parsers extends Parser<any>[]>(...parsers: Parsers): Parser<T>
+```
+
+Tries multiple parsers in order. Returns the result of the first one that succeeds. It is commit-aware: if a parser commits, it won't try further alternatives.
+
+**Example:**
+
+```typescript
+const p = or(string("true"), string("false"));
+```
+
+### optional
+
+```typescript
+optional<T>(parser: Parser<T>): Parser<T | undefined>
+```
+
+Tries to match the parser. If it fails, returns `undefined` without consuming any input.
+
+**Example:**
+
+```typescript
+const p = optional(char("-"));
+```
+
+## Sequencing
+
+### sequence
+
+```typescript
+sequence<const T extends any[]>(parsers: T): Parser<SequenceOutput<T>>
+```
+
+Runs multiple parsers in sequence and returns an array of all results.
+
+**Example:**
+
+```typescript
+const p = sequence([char("("), digit, char(")")]);
+```
+
+### zip
+
+```typescript
+zip<A, B>(parserA: Parser<A>, parserB: Parser<B>): Parser<[A, B]>
+```
+
+Combines two parsers into one that returns a tuple of both results.
+
+**Example:**
+
+```typescript
+const p = zip(alphabet, digit);
+```
+
+### then
+
+```typescript
+then<A, B>(parserA: Parser<A>, parserB: Parser<B>): Parser<B>
+```
+
+Runs `parserA` then `parserB`, returning only the result of `parserB`.
+
+**Example:**
+
+```typescript
+const p = then(string("0x"), regex(/[0-9a-f]+/));
+```
+
+### thenDiscard
+
+```typescript
+thenDiscard<A, B>(parserA: Parser<A>, parserB: Parser<B>): Parser<A>
+```
+
+Runs `parserA` then `parserB`, returning only the result of `parserA`.
+
+**Example:**
+
+```typescript
+const p = thenDiscard(digit, char(";"));
+```
+
+### zipRight
+
+```typescript
+zipRight: typeof then;
+```
+
+Alias for `then`.
+
+### zipLeft
+
+```typescript
+zipLeft: typeof thenDiscard;
+```
+
+Alias for `thenDiscard`.
+
+## Delimiters
+
+### between
+
+```typescript
+between<T>(start: Parser<any>, end: Parser<any>, par: Parser<T>): Parser<T>
+```
+
+Matches content `par` surrounded by `start` and `end` parsers.
+
+**Example:**
+
+```typescript
+const p = between(char("("), char(")"), digit);
+```
+
+## Lookahead
+
+### lookahead
+
+```typescript
+lookahead<T>(par: Parser<T>): Parser<T | undefined>
+```
+
+Peeks at the input using the given parser without consuming any input.
+
+**Example:**
+
+```typescript
+const p = lookahead(string("DEBUG"));
+```
+
+### notFollowedBy
+
+```typescript
+notFollowedBy<T>(par: Parser<T>): Parser<boolean>
+```
+
+Succeeds only if the given parser fails at the current position. Does not consume input.
+
+**Example:**
+
+```typescript
+const keywordNotId = then(string("if"), notFollowedBy(alphabet));
+```
+
+## Control
+
+### commit
+
+```typescript
+commit(): Parser<void>
+```
+
+Prevents backtracking for the current alternative in an `or` or `choice` block. Once committed, any subsequent failure will be reported immediately.
+
+**Example:**
+
+```typescript
+const p = parser(function* () {
+  yield* string("function");
+  yield* commit();
+  yield* char("(").expect("opening parenthesis");
+});
+```
+
+### cut
+
+```typescript
+cut: typeof commit;
+```
+
+Prolog-style alias for `commit`.
+
+### atomic
+
+```typescript
+atomic<T>(parser: Parser<T>): Parser<T>
+```
+
+Wraps a parser such that if it fails, it resets the input position to where it started, even if it had already consumed input or committed.
+
+**Example:**
+
+```typescript
+const p = atomic(sequence([string("abc"), string("def")]));
 ```
 
 ### eof
 
 ```typescript
-export const eof = new Parser<void>(state => ...
+eof: Parser<void>;
 ```
 
-Parser that succeeds only at the end of input.
+Succeeds only if the end of the input has been reached.
 
-**Examples:**
+**Example:**
 
 ```typescript
-const parser = string("hello").then(eof);
-parser.parse("hello"); // Success
-parser.parse("hello world"); // Error: Expected end of input
+const fullParser = thenDiscard(myParser, eof);
+```
+
+### position
+
+```typescript
+position: Parser<SourcePosition>;
+```
+
+Returns the current source position (line, column, offset) without consuming input.
+
+**Example:**
+
+```typescript
+const p = parser(function* () {
+  const start = yield* position;
+  const content = yield* someParser;
+  const end = yield* position;
+  return { content, span: { start, end } };
+});
 ```
