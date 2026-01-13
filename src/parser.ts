@@ -4,7 +4,8 @@ import { ParserOutput, type ParserState, type Spanned, State } from "./state";
 import {
   MutableParserContext,
   PARSE_FAILED,
-  type FastPathResult
+  type FastPathResult,
+  contextPool
 } from "./fastpath";
 
 /**
@@ -258,11 +259,25 @@ export class Parser<T> {
       return this.parse(input);
     }
 
-    const ctx = new MutableParserContext(input);
-    const result = this.runFast(ctx);
+    const ctx = contextPool.acquire(input);
+    try {
+      const result = this.runFast(ctx);
 
-    if (result === PARSE_FAILED) {
-      const errorBundle = ctx.toErrorBundle();
+      if (result === PARSE_FAILED) {
+        const errorBundle = ctx.toErrorBundle();
+        return ParserOutput(
+          {
+            source: ctx.source,
+            offset: ctx.offset,
+            line: ctx.line,
+            column: ctx.column,
+            committed: ctx.committed,
+            labelStack: ctx.labelStack
+          },
+          Either.left(errorBundle)
+        );
+      }
+
       return ParserOutput(
         {
           source: ctx.source,
@@ -272,21 +287,11 @@ export class Parser<T> {
           committed: ctx.committed,
           labelStack: ctx.labelStack
         },
-        Either.left(errorBundle)
+        Either.right(result)
       );
+    } finally {
+      contextPool.release(ctx);
     }
-
-    return ParserOutput(
-      {
-        source: ctx.source,
-        offset: ctx.offset,
-        line: ctx.line,
-        column: ctx.column,
-        committed: ctx.committed,
-        labelStack: ctx.labelStack
-      },
-      Either.right(result)
-    );
   }
 
   /**

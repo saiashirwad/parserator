@@ -4,6 +4,7 @@ export * from "./either";
 export * from "./error-formatter";
 export * from "./fastpath";
 export * from "./hints";
+export * from "./optimized";
 export * from "./parser";
 export * from "./errors";
 export * from "./state";

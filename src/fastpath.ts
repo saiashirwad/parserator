@@ -223,3 +223,37 @@ export interface FastPathParser<T> {
 export function isFastPathParser<T>(parser: any): parser is FastPathParser<T> {
   return parser && typeof parser.runFast === "function";
 }
+
+class ContextPool {
+  private pool: MutableParserContext[] = [];
+  private maxSize = 100;
+
+  acquire(source: string): MutableParserContext {
+    const ctx = this.pool.pop();
+    if (ctx) {
+      ctx.source = source;
+      ctx.offset = 0;
+      ctx.line = 1;
+      ctx.column = 1;
+      ctx.committed = false;
+      ctx.labelStack = [];
+      ctx.error = null;
+      ctx.errorOffset = -1;
+      ctx.expectMessage = null;
+      return ctx;
+    }
+    return new MutableParserContext(source);
+  }
+
+  release(ctx: MutableParserContext): void {
+    if (this.pool.length < this.maxSize) {
+      this.pool.push(ctx);
+    }
+  }
+
+  clear(): void {
+    this.pool = [];
+  }
+}
+
+export const contextPool = new ContextPool();
