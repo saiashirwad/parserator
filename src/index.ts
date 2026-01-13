@@ -2,6 +2,7 @@ export * from "./combinators";
 // export * from "./debug";
 export * from "./either";
 export * from "./error-formatter";
+export * from "./fastpath";
 export * from "./hints";
 export * from "./parser";
 export * from "./errors";

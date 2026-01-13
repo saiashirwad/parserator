@@ -4,6 +4,11 @@
 
 import { Either } from "./either";
 import { type ParseError, type ParseErrorBundle } from "./errors";
+import {
+  MutableParserContext,
+  PARSE_FAILED,
+  type FastPathResult
+} from "./fastpath";
 import { Parser, parser } from "./parser";
 import {
   ParserOutput,
@@ -78,24 +83,42 @@ export function notFollowedBy<T>(par: Parser<T>): Parser<boolean> {
  * ```
  */
 export const string = (str: string): Parser<string> =>
-  new Parser(state => {
-    if (State.startsWith(state, str)) {
-      return Parser.succeed(str, State.consume(state, str.length));
+  new Parser(
+    state => {
+      if (State.startsWith(state, str)) {
+        return Parser.succeed(str, State.consume(state, str.length));
+      }
+
+      const message =
+        `Expected '${str}', ` +
+        `but found '${State.remaining(state).slice(0, str.length)}'`;
+
+      return Parser.fail(
+        {
+          message,
+          expected: [str],
+          found: State.remaining(state).slice(0, str.length)
+        },
+        state
+      );
+    },
+    ctx => {
+      if (ctx.startsWith(str)) {
+        ctx.advance(str.length);
+        return str;
+      }
+
+      const found = ctx.remaining().slice(0, str.length);
+      ctx.recordError({
+        tag: "Expected",
+        items: [str],
+        found: found || undefined,
+        span: ctx.span(0),
+        context: ctx.labelStack
+      });
+      return PARSE_FAILED;
     }
-
-    const message =
-      `Expected '${str}', ` +
-      `but found '${State.remaining(state).slice(0, str.length)}'`;
-
-    return Parser.fail(
-      {
-        message,
-        expected: [str],
-        found: State.remaining(state).slice(0, str.length)
-      },
-      state
-    );
-  });
+  );
 
 /**
  * Creates a parser that matches an exact string literal type.
@@ -124,28 +147,56 @@ export const narrowedString = <const T extends string>(str: T): Parser<T> =>
  * ```
  */
 export const char = <T extends string>(ch: T): Parser<T> =>
-  new Parser(state => {
-    if (ch.length !== 1) {
+  new Parser(
+    state => {
+      if (ch.length !== 1) {
+        return Parser.fail(
+          { message: "Incorrect usage of char parser.", expected: [ch] },
+          state
+        );
+      }
+      if (State.charAt(state) === ch) {
+        return Parser.succeed(ch, State.consume(state, 1));
+      }
+
+      const nextChar = State.charAt(state);
+
       return Parser.fail(
-        { message: "Incorrect usage of char parser.", expected: [ch] },
+        {
+          message: `Expected ${ch}${nextChar ? `but found ${nextChar}` : ""}`,
+          expected: [ch],
+          found: State.charAt(state)
+        },
         state
       );
-    }
-    if (State.charAt(state) === ch) {
-      return Parser.succeed(ch, State.consume(state, 1));
-    }
+    },
+    ctx => {
+      if (ch.length !== 1) {
+        ctx.recordError({
+          tag: "Custom",
+          message: "Incorrect usage of char parser.",
+          span: ctx.span(0),
+          context: ctx.labelStack
+        });
+        return PARSE_FAILED;
+      }
 
-    const nextChar = State.charAt(state);
+      if (ctx.charAt() === ch) {
+        ctx.advance(1);
+        return ch;
+      }
 
-    return Parser.fail(
-      {
-        message: `Expected ${ch}${nextChar ? `but found ${nextChar}` : ""}`,
-        expected: [ch],
-        found: State.charAt(state)
-      },
-      state
-    );
-  });
+      const nextChar = ctx.charAt();
+      ctx.recordError({
+        tag: "Expected",
+        items: [ch],
+        found: nextChar || undefined,
+        span: ctx.span(0),
+        context: ctx.labelStack
+      });
+      return PARSE_FAILED;
+    }
+  );
 
 /**
  * A parser that matches any single alphabetic character (a-z, A-Z).
@@ -332,66 +383,165 @@ function many_<S, T>(
   count: number
 ): (parser: Parser<T>, separator?: Parser<S>) => Parser<T[]> {
   return (parser: Parser<T>, separator?: Parser<S>): Parser<T[]> => {
-    return new Parser(state => {
-      const results: T[] = [];
-      let currentState = state;
+    return new Parser(
+      state => {
+        const results: T[] = [];
+        let currentState = state;
 
-      while (true) {
-        // Try to parse the next item
-        const itemResult = parser.run(currentState);
-        if (itemResult.result._tag === "Left") {
-          // Check if we're in a committed state
-          const isCommitted =
-            itemResult.state?.committed && !currentState?.committed;
+        while (true) {
+          const itemResult = parser.run(currentState);
+          if (itemResult.result._tag === "Left") {
+            const isCommitted =
+              itemResult.state?.committed && !currentState?.committed;
 
-          // If committed, propagate the error regardless of count
-          if (isCommitted) {
-            return itemResult as unknown as typeof itemResult & {
-              result: Either<T[], ParseErrorBundle>;
-            };
+            if (isCommitted) {
+              return itemResult as unknown as typeof itemResult & {
+                result: Either<T[], ParseErrorBundle>;
+              };
+            }
+
+            if (results.length >= count) {
+              return Parser.succeed(results, currentState);
+            }
+            const message = `Expected at least ${count} occurrences, but only found ${results.length}`;
+            return Parser.fail({ message, expected: [] }, itemResult.state);
           }
 
-          // If we have enough items, return success
-          if (results.length >= count) {
-            return Parser.succeed(results, currentState);
+          const { result: value, state: newState } = itemResult;
+          results.push(value.right);
+
+          if (newState.offset <= currentState.offset) {
+            throw new Error("Parser did not advance - infinite loop prevented");
           }
-          const message = `Expected at least ${count} occurrences, but only found ${results.length}`;
-          return Parser.fail({ message, expected: [] }, itemResult.state);
+          currentState = newState as ParserState;
+
+          if (separator) {
+            const { result: sepResult, state } = separator.run(currentState);
+            if (sepResult._tag === "Left") {
+              break;
+            }
+            if (state.offset <= currentState.offset) {
+              throw new Error(
+                "Separator parser did not advance - infinite loop prevented"
+              );
+            }
+            currentState = state as ParserState;
+          }
         }
 
-        // Add the item and update state
-        const { result: value, state: newState } = itemResult;
-        results.push(value.right);
-
-        // Check that parser advanced - prevent infinite loops
-        if (newState.offset <= currentState.offset) {
-          throw new Error("Parser did not advance - infinite loop prevented");
+        if (results.length >= count) {
+          return Parser.succeed(results, currentState);
         }
-        currentState = newState as ParserState;
 
-        // If we have a separator, try to parse it
-        if (separator) {
-          const { result: sepResult, state } = separator.run(currentState);
-          if (sepResult._tag === "Left") {
-            break;
+        const message = `Expected at least ${count} occurrences, but only found ${results.length}`;
+        return Parser.fail({ message, expected: [] }, currentState);
+      },
+      ctx => {
+        const results: T[] = [];
+        const startOffset = ctx.offset;
+
+        while (true) {
+          const prevOffset = ctx.offset;
+          const result =
+            parser.runFast ?
+              parser.runFast(ctx)
+            : (() => {
+                const output = parser.run({
+                  source: ctx.source,
+                  offset: ctx.offset,
+                  line: ctx.line,
+                  column: ctx.column,
+                  committed: ctx.committed,
+                  labelStack: ctx.labelStack
+                });
+
+                if (output.result._tag === "Left") {
+                  if (output.state.offset > ctx.errorOffset) {
+                    ctx.error = output.result.left.errors[0] || null;
+                    ctx.errorOffset = output.state.offset;
+                  }
+                  return PARSE_FAILED;
+                }
+
+                ctx.offset = output.state.offset;
+                ctx.line = output.state.line;
+                ctx.column = output.state.column;
+                ctx.committed = output.state.committed || false;
+                ctx.labelStack = output.state.labelStack || [];
+                return output.result.right;
+              })();
+
+          if (result === PARSE_FAILED) {
+            if (results.length >= count) {
+              return results;
+            }
+            ctx.recordError({
+              tag: "Custom",
+              message: `Expected at least ${count} occurrences, but only found ${results.length}`,
+              span: ctx.span(0),
+              context: ctx.labelStack
+            });
+            return PARSE_FAILED;
           }
-          // Check that separator advanced too
-          if (state.offset <= currentState.offset) {
-            throw new Error(
-              "Separator parser did not advance - infinite loop prevented"
-            );
+
+          results.push(result);
+
+          if (ctx.offset <= prevOffset) {
+            throw new Error("Parser did not advance - infinite loop prevented");
           }
-          currentState = state as ParserState;
+
+          if (separator) {
+            const sepPrevOffset = ctx.offset;
+            const sepResult =
+              separator.runFast ?
+                separator.runFast(ctx)
+              : (() => {
+                  const output = separator.run({
+                    source: ctx.source,
+                    offset: ctx.offset,
+                    line: ctx.line,
+                    column: ctx.column,
+                    committed: ctx.committed,
+                    labelStack: ctx.labelStack
+                  });
+
+                  if (output.result._tag === "Left") {
+                    return PARSE_FAILED;
+                  }
+
+                  ctx.offset = output.state.offset;
+                  ctx.line = output.state.line;
+                  ctx.column = output.state.column;
+                  ctx.committed = output.state.committed || false;
+                  ctx.labelStack = output.state.labelStack || [];
+                  return output.result.right;
+                })();
+
+            if (sepResult === PARSE_FAILED) {
+              break;
+            }
+
+            if (ctx.offset <= sepPrevOffset) {
+              throw new Error(
+                "Separator parser did not advance - infinite loop prevented"
+              );
+            }
+          }
         }
+
+        if (results.length >= count) {
+          return results;
+        }
+
+        ctx.recordError({
+          tag: "Custom",
+          message: `Expected at least ${count} occurrences, but only found ${results.length}`,
+          span: ctx.span(0),
+          context: ctx.labelStack
+        });
+        return PARSE_FAILED;
       }
-
-      if (results.length >= count) {
-        return Parser.succeed(results, currentState);
-      }
-
-      const message = `Expected at least ${count} occurrences, but only found ${results.length}`;
-      return Parser.fail({ message, expected: [] }, currentState);
-    });
+    );
   };
 }
 
@@ -672,28 +822,82 @@ export const skipSpaces = new Parser(state =>
 export function or<Parsers extends Parser<any>[]>(
   ...parsers: Parsers
 ): Parser<Parsers[number] extends Parser<infer T> ? T : never> {
-  return new Parser(state => {
-    const errors: ParseError[] = [];
+  return new Parser(
+    state => {
+      const errors: ParseError[] = [];
 
-    for (const parser of parsers) {
-      const { result, state: newState } = parser.run(state);
+      for (const parser of parsers) {
+        const { result, state: newState } = parser.run(state);
 
-      if (result._tag === "Right") {
-        return Parser.succeed(result.right, newState);
+        if (result._tag === "Right") {
+          return Parser.succeed(result.right, newState);
+        }
+
+        errors.push(...result.left.errors);
+
+        if (newState?.committed && !state?.committed) {
+          return Parser.failRich({ errors }, newState);
+        }
       }
 
-      // Accumulate errors from this branch
-      errors.push(...result.left.errors);
+      return Parser.failRich({ errors }, state);
+    },
+    ctx => {
+      const errors: ParseError[] = [];
 
-      // Check if we're committed - if so, don't try other alternatives
-      if (newState?.committed && !state?.committed) {
-        return Parser.failRich({ errors }, newState);
+      for (const parser of parsers) {
+        const snapshot = ctx.snapshot();
+
+        const result =
+          parser.runFast ?
+            parser.runFast(ctx)
+          : (() => {
+              const output = parser.run({
+                source: ctx.source,
+                offset: ctx.offset,
+                line: ctx.line,
+                column: ctx.column,
+                committed: ctx.committed,
+                labelStack: ctx.labelStack
+              });
+
+              if (output.result._tag === "Left") {
+                if (output.state.offset > ctx.errorOffset) {
+                  ctx.error = output.result.left.errors[0] || null;
+                  ctx.errorOffset = output.state.offset;
+                }
+                return PARSE_FAILED;
+              }
+
+              ctx.offset = output.state.offset;
+              ctx.line = output.state.line;
+              ctx.column = output.state.column;
+              ctx.committed = output.state.committed || false;
+              ctx.labelStack = output.state.labelStack || [];
+              return output.result.right;
+            })();
+
+        if (result !== PARSE_FAILED) {
+          return result;
+        }
+
+        if (ctx.error) {
+          errors.push(ctx.error);
+        }
+
+        if (ctx.committed && !snapshot.committed) {
+          return PARSE_FAILED;
+        }
+
+        ctx.restore(snapshot);
       }
+
+      if (errors.length > 0 && errors[0]) {
+        ctx.recordError(errors[0]);
+      }
+      return PARSE_FAILED;
     }
-
-    // All alternatives failed, return accumulated errors
-    return Parser.failRich({ errors }, state);
-  });
+  );
 }
 
 /**
@@ -704,14 +908,48 @@ export function or<Parsers extends Parser<any>[]>(
  * @returns {Parser<T | undefined>} A parser that either succeeds with a value or undefined
  */
 export function optional<T>(parser: Parser<T>): Parser<T | undefined> {
-  return new Parser((state: ParserState) => {
-    const { result, state: newState } = parser.run(state);
-    if (result._tag === "Left") {
-      return Parser.succeed(undefined, state);
+  return new Parser(
+    (state: ParserState) => {
+      const { result, state: newState } = parser.run(state);
+      if (result._tag === "Left") {
+        return Parser.succeed(undefined, state);
+      }
+      return Parser.succeed(result.right, newState);
+    },
+    ctx => {
+      const snapshot = ctx.snapshot();
+      const result =
+        parser.runFast ?
+          parser.runFast(ctx)
+        : (() => {
+            const output = parser.run({
+              source: ctx.source,
+              offset: ctx.offset,
+              line: ctx.line,
+              column: ctx.column,
+              committed: ctx.committed,
+              labelStack: ctx.labelStack
+            });
+
+            if (output.result._tag === "Left") {
+              return PARSE_FAILED;
+            }
+
+            ctx.offset = output.state.offset;
+            ctx.line = output.state.line;
+            ctx.column = output.state.column;
+            ctx.committed = output.state.committed || false;
+            ctx.labelStack = output.state.labelStack || [];
+            return output.result.right;
+          })();
+
+      if (result === PARSE_FAILED) {
+        ctx.restore(snapshot);
+        return undefined;
+      }
+      return result;
     }
-    // return result
-    return Parser.succeed(result.right, newState);
-  });
+  );
 }
 
 type SequenceOutput<T extends Parser<any>[], Acc extends any[] = []> =
@@ -752,21 +990,37 @@ export const sequence = <const T extends any[]>(
  * @returns {Parser<string>} A parser that matches the regex pattern
  */
 export const regex = (re: RegExp): Parser<string> => {
-  // Create a new RegExp without global flag to ensure consistent behavior
-  const nonGlobalRe = new RegExp(re.source, re.flags.replace("g", ""));
+  const stickyRe = new RegExp(re.source, "y");
 
-  return new Parser(state => {
-    // Use sticky flag to match at current offset without allocating substring
-    const stickyRe = new RegExp(re.source, "y");
-    stickyRe.lastIndex = state.offset;
-    const match = stickyRe.exec(state.source);
-    if (match) {
-      const value = match[0];
-      return Parser.succeed(value, State.consume(state, value.length));
+  return new Parser(
+    state => {
+      stickyRe.lastIndex = state.offset;
+      const match = stickyRe.exec(state.source);
+      if (match) {
+        const value = match[0];
+        return Parser.succeed(value, State.consume(state, value.length));
+      }
+      const message = `Expected ${re} but found ${State.peek(state, 10)}...`;
+      return Parser.fail({ message, expected: [re.toString()] }, state);
+    },
+    ctx => {
+      stickyRe.lastIndex = ctx.offset;
+      const match = stickyRe.exec(ctx.source);
+      if (match) {
+        const value = match[0];
+        ctx.advance(value.length);
+        return value;
+      }
+      ctx.recordError({
+        tag: "Expected",
+        items: [re.toString()],
+        found: ctx.remaining().slice(0, 10) || undefined,
+        span: ctx.span(0),
+        context: ctx.labelStack
+      });
+      return PARSE_FAILED;
     }
-    const message = `Expected ${re} but found ${State.peek(state, 10)}...`;
-    return Parser.fail({ message, expected: [re.toString()] }, state);
-  });
+  );
 };
 
 export function zip<A, B>(

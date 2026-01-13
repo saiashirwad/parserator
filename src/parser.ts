@@ -1,6 +1,11 @@
 import { Either } from "./either";
 import { ParseError, ParseErrorBundle, Span } from "./errors";
 import { ParserOutput, type ParserState, type Spanned, State } from "./state";
+import {
+  MutableParserContext,
+  PARSE_FAILED,
+  type FastPathResult
+} from "./fastpath";
 
 /**
  * Parser is the core type that represents a parser combinator.
@@ -15,17 +20,16 @@ import { ParserOutput, type ParserState, type Spanned, State } from "./state";
  * @template T The type of value this parser produces when successful
  */
 export class Parser<T> {
-  /**
-   * Creates a new Parser instance.
-   *
-   * @param run - The parsing function that takes a parser state and returns a parse result
-   */
+  public runFast?: (ctx: MutableParserContext) => FastPathResult<T>;
+
   constructor(
-    /**
-     * @internal
-     */
-    public run: (state: ParserState) => ParserOutput<T>
-  ) {}
+    public run: (state: ParserState) => ParserOutput<T>,
+    runFast?: (ctx: MutableParserContext) => FastPathResult<T>
+  ) {
+    if (runFast) {
+      this.runFast = runFast;
+    }
+  }
 
   // Monad/Applicative
 
@@ -249,6 +253,42 @@ export class Parser<T> {
     return ParserOutput(state, result);
   }
 
+  parseFast(input: string): ParserOutput<T> {
+    if (!this.runFast) {
+      return this.parse(input);
+    }
+
+    const ctx = new MutableParserContext(input);
+    const result = this.runFast(ctx);
+
+    if (result === PARSE_FAILED) {
+      const errorBundle = ctx.toErrorBundle();
+      return ParserOutput(
+        {
+          source: ctx.source,
+          offset: ctx.offset,
+          line: ctx.line,
+          column: ctx.column,
+          committed: ctx.committed,
+          labelStack: ctx.labelStack
+        },
+        Either.left(errorBundle)
+      );
+    }
+
+    return ParserOutput(
+      {
+        source: ctx.source,
+        offset: ctx.offset,
+        line: ctx.line,
+        column: ctx.column,
+        committed: ctx.committed,
+        labelStack: ctx.labelStack
+      },
+      Either.right(result)
+    );
+  }
+
   /**
    * Runs the parser on the given input and returns either the parsed value or error bundle.
    *
@@ -311,6 +351,15 @@ export class Parser<T> {
     return result.right;
   }
 
+  parseOrThrowFast(input: string): T {
+    const { result } = this.parseFast(input);
+
+    if (result._tag === "Left") {
+      throw result.left;
+    }
+    return result.right;
+  }
+
   /**
    * Transforms the result of this parser by applying a function to the parsed value.
    *
@@ -340,17 +389,54 @@ export class Parser<T> {
    * ```
    */
   map<B>(f: (a: T) => B): Parser<B> {
-    return new Parser<B>(state => {
-      const { result, state: newState } = this.run(state);
-      if (result._tag === "Left") {
-        return ParserOutput(
-          state,
-          result as unknown as Either<B, ParseErrorBundle>
-        );
+    return new Parser<B>(
+      state => {
+        const { result, state: newState } = this.run(state);
+        if (result._tag === "Left") {
+          return ParserOutput(
+            state,
+            result as unknown as Either<B, ParseErrorBundle>
+          );
+        }
+        return ParserOutput(newState, Either.right(f(result.right)));
+      },
+      ctx => {
+        const result =
+          this.runFast ?
+            this.runFast(ctx)
+          : (() => {
+              const output = this.run({
+                source: ctx.source,
+                offset: ctx.offset,
+                line: ctx.line,
+                column: ctx.column,
+                committed: ctx.committed,
+                labelStack: ctx.labelStack
+              });
+
+              if (output.result._tag === "Left") {
+                if (output.state.offset > ctx.errorOffset) {
+                  ctx.error = output.result.left.errors[0] || null;
+                  ctx.errorOffset = output.state.offset;
+                }
+                return PARSE_FAILED;
+              }
+
+              ctx.offset = output.state.offset;
+              ctx.line = output.state.line;
+              ctx.column = output.state.column;
+              ctx.committed = output.state.committed || false;
+              ctx.labelStack = output.state.labelStack || [];
+              return output.result.right;
+            })();
+
+        if (result === PARSE_FAILED) {
+          return PARSE_FAILED;
+        }
+
+        return f(result);
       }
-      // return Parser.succeed(f(result.right), newState);
-      return ParserOutput(newState, Either.right(f(result.right)));
-    });
+    );
   }
 
   /**
@@ -391,17 +477,82 @@ export class Parser<T> {
    * ```
    */
   flatMap<B>(f: (a: T) => Parser<B>): Parser<B> {
-    return new Parser<B>(state => {
-      const { result, state: newState } = this.run(state);
-      if (result._tag === "Left") {
-        return {
-          state: newState,
-          result: result as unknown as Either<B, ParseErrorBundle>
-        };
+    return new Parser<B>(
+      state => {
+        const { result, state: newState } = this.run(state);
+        if (result._tag === "Left") {
+          return {
+            state: newState,
+            result: result as unknown as Either<B, ParseErrorBundle>
+          };
+        }
+        const nextParser = f(result.right);
+        return nextParser.run(newState);
+      },
+      ctx => {
+        const result =
+          this.runFast ?
+            this.runFast(ctx)
+          : (() => {
+              const output = this.run({
+                source: ctx.source,
+                offset: ctx.offset,
+                line: ctx.line,
+                column: ctx.column,
+                committed: ctx.committed,
+                labelStack: ctx.labelStack
+              });
+
+              if (output.result._tag === "Left") {
+                if (output.state.offset > ctx.errorOffset) {
+                  ctx.error = output.result.left.errors[0] || null;
+                  ctx.errorOffset = output.state.offset;
+                }
+                return PARSE_FAILED;
+              }
+
+              ctx.offset = output.state.offset;
+              ctx.line = output.state.line;
+              ctx.column = output.state.column;
+              ctx.committed = output.state.committed || false;
+              ctx.labelStack = output.state.labelStack || [];
+              return output.result.right;
+            })();
+
+        if (result === PARSE_FAILED) {
+          return PARSE_FAILED;
+        }
+
+        const nextParser = f(result);
+        return nextParser.runFast ?
+            nextParser.runFast(ctx)
+          : (() => {
+              const output = nextParser.run({
+                source: ctx.source,
+                offset: ctx.offset,
+                line: ctx.line,
+                column: ctx.column,
+                committed: ctx.committed,
+                labelStack: ctx.labelStack
+              });
+
+              if (output.result._tag === "Left") {
+                if (output.state.offset > ctx.errorOffset) {
+                  ctx.error = output.result.left.errors[0] || null;
+                  ctx.errorOffset = output.state.offset;
+                }
+                return PARSE_FAILED;
+              }
+
+              ctx.offset = output.state.offset;
+              ctx.line = output.state.line;
+              ctx.column = output.state.column;
+              ctx.committed = output.state.committed || false;
+              ctx.labelStack = output.state.labelStack || [];
+              return output.result.right;
+            })();
       }
-      const nextParser = f(result.right);
-      return nextParser.run(newState);
-    });
+    );
   }
 
   /**
@@ -487,23 +638,94 @@ export class Parser<T> {
    * ```
    */
   zip<B>(parserB: Parser<B>): Parser<[T, B]> {
-    return new Parser(state => {
-      const { result: a, state: stateA } = this.run(state);
-      if (a._tag === "Left") {
-        return {
-          result: a as unknown as Either<[T, B], ParseErrorBundle>,
-          state: stateA
-        };
+    return new Parser(
+      state => {
+        const { result: a, state: stateA } = this.run(state);
+        if (a._tag === "Left") {
+          return {
+            result: a as unknown as Either<[T, B], ParseErrorBundle>,
+            state: stateA
+          };
+        }
+        const { result: b, state: stateB } = parserB.run(stateA);
+        if (b._tag === "Left") {
+          return {
+            result: b as unknown as Either<[T, B], ParseErrorBundle>,
+            state: stateB
+          };
+        }
+        return Parser.succeed([a.right, b.right], stateB);
+      },
+      ctx => {
+        const resultA =
+          this.runFast ?
+            this.runFast(ctx)
+          : (() => {
+              const output = this.run({
+                source: ctx.source,
+                offset: ctx.offset,
+                line: ctx.line,
+                column: ctx.column,
+                committed: ctx.committed,
+                labelStack: ctx.labelStack
+              });
+
+              if (output.result._tag === "Left") {
+                if (output.state.offset > ctx.errorOffset) {
+                  ctx.error = output.result.left.errors[0] || null;
+                  ctx.errorOffset = output.state.offset;
+                }
+                return PARSE_FAILED;
+              }
+
+              ctx.offset = output.state.offset;
+              ctx.line = output.state.line;
+              ctx.column = output.state.column;
+              ctx.committed = output.state.committed || false;
+              ctx.labelStack = output.state.labelStack || [];
+              return output.result.right;
+            })();
+
+        if (resultA === PARSE_FAILED) {
+          return PARSE_FAILED;
+        }
+
+        const resultB =
+          parserB.runFast ?
+            parserB.runFast(ctx)
+          : (() => {
+              const output = parserB.run({
+                source: ctx.source,
+                offset: ctx.offset,
+                line: ctx.line,
+                column: ctx.column,
+                committed: ctx.committed,
+                labelStack: ctx.labelStack
+              });
+
+              if (output.result._tag === "Left") {
+                if (output.state.offset > ctx.errorOffset) {
+                  ctx.error = output.result.left.errors[0] || null;
+                  ctx.errorOffset = output.state.offset;
+                }
+                return PARSE_FAILED;
+              }
+
+              ctx.offset = output.state.offset;
+              ctx.line = output.state.line;
+              ctx.column = output.state.column;
+              ctx.committed = output.state.committed || false;
+              ctx.labelStack = output.state.labelStack || [];
+              return output.result.right;
+            })();
+
+        if (resultB === PARSE_FAILED) {
+          return PARSE_FAILED;
+        }
+
+        return [resultA, resultB] as [T, B];
       }
-      const { result: b, state: stateB } = parserB.run(stateA);
-      if (b._tag === "Left") {
-        return {
-          result: b as unknown as Either<[T, B], ParseErrorBundle>,
-          state: stateB
-        };
-      }
-      return Parser.succeed([a.right, b.right], stateB);
-    });
+    );
   }
 
   /**
@@ -628,26 +850,68 @@ export class Parser<T> {
   }
 
   static gen = <T>(f: () => Generator<Parser<any>, T, any>): Parser<T> =>
-    new Parser<T>(state => {
-      const iterator = f();
-      let current = iterator.next();
-      let currentState: ParserState = state;
-      while (!current.done) {
-        const { result, state: updatedState } = current.value.run(currentState);
-        if (result._tag === "Left") {
-          // const hasFatalError = result.left.errors.some(e => e.tag === "Fatal");
-          // const isCommitted = updatedState?.committed || state?.committed;
-          // TODO: actually use hasFatalError and isCommitted to determine if we should continue or not
-          return {
-            result: result as unknown as Either<T, ParseErrorBundle>,
-            state: updatedState
-          };
+    new Parser<T>(
+      state => {
+        const iterator = f();
+        let current = iterator.next();
+        let currentState: ParserState = state;
+        while (!current.done) {
+          const { result, state: updatedState } =
+            current.value.run(currentState);
+          if (result._tag === "Left") {
+            return {
+              result: result as unknown as Either<T, ParseErrorBundle>,
+              state: updatedState
+            };
+          }
+          currentState = updatedState;
+          current = iterator.next(result.right);
         }
-        currentState = updatedState;
-        current = iterator.next(result.right);
+        return Parser.succeed(current.value, currentState);
+      },
+      ctx => {
+        const iterator = f();
+        let current = iterator.next();
+        while (!current.done) {
+          const parser = current.value;
+          let result: any;
+
+          if (parser.runFast) {
+            result = parser.runFast(ctx);
+          } else {
+            const output = parser.run({
+              source: ctx.source,
+              offset: ctx.offset,
+              line: ctx.line,
+              column: ctx.column,
+              committed: ctx.committed,
+              labelStack: ctx.labelStack
+            });
+
+            if (output.result._tag === "Left") {
+              if (output.state.offset > ctx.errorOffset) {
+                ctx.error = output.result.left.errors[0] || null;
+                ctx.errorOffset = output.state.offset;
+              }
+              return PARSE_FAILED;
+            }
+
+            ctx.offset = output.state.offset;
+            ctx.line = output.state.line;
+            ctx.column = output.state.column;
+            ctx.committed = output.state.committed || false;
+            ctx.labelStack = output.state.labelStack || [];
+            result = output.result.right;
+          }
+
+          if (result === PARSE_FAILED) {
+            return PARSE_FAILED;
+          }
+          current = iterator.next(result);
+        }
+        return current.value;
       }
-      return Parser.succeed(current.value, currentState);
-    });
+    );
 
   trim(parser: Parser<any>) {
     return parser.then(this).thenDiscard(parser);
