@@ -85,13 +85,14 @@ export const keywordWithHints =
   (keywords: string[]): ((keyword: string) => Parser<string>) =>
   (keyword: string) =>
     new Parser(state => {
-      if (state.remaining.startsWith(keyword)) {
+      if (State.remaining(state).startsWith(keyword)) {
         return Parser.succeed(keyword, State.consume(state, keyword.length));
       }
 
       // Try to extract what the user actually typed
-      const match = state.remaining.match(/^[a-zA-Z_][a-zA-Z0-9_]*/);
-      const found = match ? match[0] : state.remaining[0] || "end of input";
+      const match = State.remaining(state).match(/^[a-zA-Z_][a-zA-Z0-9_]*/);
+      const found =
+        match ? match[0] : State.remaining(state)[0] || "end of input";
 
       const hints = generateHints(found, keywords);
 
@@ -125,14 +126,15 @@ export function anyKeywordWithHints(keywords: string[]): Parser<string> {
   return new Parser(state => {
     // Try each keyword
     for (const keyword of keywords) {
-      if (state.remaining.startsWith(keyword)) {
+      if (State.remaining(state).startsWith(keyword)) {
         return Parser.succeed(keyword, State.consume(state, keyword.length));
       }
     }
 
     // No exact match found, try to extract what was typed and generate hints
-    const match = state.remaining.match(/^[a-zA-Z_][a-zA-Z0-9_]*/);
-    const found = match ? match[0] : state.remaining[0] || "end of input";
+    const match = State.remaining(state).match(/^[a-zA-Z_][a-zA-Z0-9_]*/);
+    const found =
+      match ? match[0] : State.remaining(state)[0] || "end of input";
 
     const hints = generateHints(found, keywords);
 
@@ -165,7 +167,7 @@ export function anyKeywordWithHints(keywords: string[]): Parser<string> {
 export function stringWithHints(validStrings: string[]): Parser<string> {
   return new Parser(state => {
     // Must start with quote
-    if (!state.remaining.startsWith('"')) {
+    if (!State.remaining(state).startsWith('"')) {
       const error: ParseError = {
         tag: "Expected",
         span: Span(state, 1),
@@ -178,12 +180,15 @@ export function stringWithHints(validStrings: string[]): Parser<string> {
     // Find the closing quote
     let i = 1;
     let content = "";
-    while (i < state.remaining.length && state.remaining[i] !== '"') {
-      content += state.remaining[i];
+    while (
+      i < State.remaining(state).length &&
+      State.remaining(state)[i] !== '"'
+    ) {
+      content += State.remaining(state)[i];
       i++;
     }
 
-    if (i >= state.remaining.length) {
+    if (i >= State.remaining(state).length) {
       const error: ParseError = {
         tag: "Expected",
         span: Span(state, i),

@@ -71,9 +71,10 @@ export type SourcePosition = {
  * @example
  * ```typescript
  * const state: ParserState = {
- *   remaining: "hello world",
- *   pos: { line: 1, column: 1, offset: 0 },
  *   source: "hello world",
+ *   offset: 0,
+ *   line: 1,
+ *   column: 1,
  *   debug: true,
  *   labelStack: ["expression", "identifier"],
  *   committed: false
@@ -81,12 +82,14 @@ export type SourcePosition = {
  * ```
  */
 export type ParserState = {
-  /** The portion of input that hasn't been consumed yet */
-  remaining: string;
-  /** Current position in the source code */
-  pos: SourcePosition;
   /** The complete original input string */
   source: string;
+  /** Current byte offset from start of input (0-indexed) */
+  offset: number;
+  /** Current line number (1-indexed) */
+  line: number;
+  /** Current column number (1-indexed) */
+  column: number;
   /** Whether debug mode is enabled for detailed error reporting */
   debug?: boolean;
   /** Stack of parsing context labels for error reporting */
@@ -107,10 +110,43 @@ export const State = {
    */
   fromInput(input: string): ParserState {
     return {
-      remaining: input,
       source: input,
-      pos: { line: 1, column: 1, offset: 0 }
+      offset: 0,
+      line: 1,
+      column: 1
     };
+  },
+
+  /**
+   * Gets the remaining unparsed portion of the input.
+   * WARNING: This allocates a new string. Prefer peek() or charAt() for better performance.
+   *
+   * @param state - The current parser state
+   * @returns The remaining input string from current offset
+   */
+  remaining(state: ParserState): string {
+    return state.source.slice(state.offset);
+  },
+
+  /**
+   * Gets the character at the current offset without allocating.
+   *
+   * @param state - The current parser state
+   * @returns The character at current offset, or empty string if at end
+   */
+  charAt(state: ParserState): string {
+    return state.source[state.offset] || "";
+  },
+
+  /**
+   * Checks if remaining input starts with the given string, without allocating.
+   *
+   * @param state - The current parser state
+   * @param str - The string to check for
+   * @returns True if remaining input starts with str
+   */
+  startsWith(state: ParserState, str: string): boolean {
+    return state.source.startsWith(str, state.offset);
   },
 
   /**
@@ -123,27 +159,45 @@ export const State = {
    */
   consume(state: ParserState, n: number): ParserState {
     if (n === 0) return state;
-    if (n > state.remaining.length) {
+    const remainingLength = state.source.length - state.offset;
+    if (n > remainingLength) {
       throw new Error("Cannot consume more characters than remaining");
     }
 
-    const consumed = state.remaining.slice(0, n);
-    let { line, column, offset } = state.pos;
+    // Fast path: just increment offset, don't compute line/column
+    // Line/column will be computed lazily when needed (on error)
+    return {
+      ...state,
+      offset: state.offset + n,
+      line: state.line, // Keep old values, will recompute if needed
+      column: state.column
+    };
+  },
 
-    for (const char of consumed) {
-      if (char === "\n") {
+  /**
+   * Computes the actual line and column for a given offset.
+   * This is expensive (O(offset)) so only call when creating errors.
+   *
+   * @param state - The current parser state
+   * @returns Updated state with correct line/column
+   */
+  computePosition(state: ParserState): ParserState {
+    let line = 1;
+    let column = 1;
+
+    for (let i = 0; i < state.offset; i++) {
+      if (state.source[i] === "\n") {
         line++;
         column = 1;
       } else {
         column++;
       }
-      offset++;
     }
 
     return {
       ...state,
-      remaining: state.remaining.slice(n),
-      pos: { line, column, offset }
+      line,
+      column
     };
   },
 
@@ -156,9 +210,10 @@ export const State = {
    * @throws Error if the input doesn't start with the specified string
    */
   consumeString(state: ParserState, str: string): ParserState {
-    if (!state.remaining.startsWith(str)) {
+    const remaining = State.remaining(state);
+    if (!remaining.startsWith(str)) {
       throw new Error(
-        `Cannot consume "${str}" - input "${state.remaining}" doesn't start with it`
+        `Cannot consume "${str}" - input "${remaining}" doesn't start with it`
       );
     }
     return State.consume(state, str.length);
@@ -175,10 +230,11 @@ export const State = {
     return State.consume(
       {
         ...state,
-        remaining: state.source,
-        pos: { line: 1, column: 1, offset: 0 }
+        offset: 0,
+        line: 1,
+        column: 1
       },
-      state.pos.offset + moveBy
+      state.offset + moveBy
     );
   },
 
@@ -193,8 +249,9 @@ export const State = {
     state: ParserState,
     predicate: (char: string) => boolean
   ): ParserState {
+    const remaining = State.remaining(state);
     let i = 0;
-    while (i < state.remaining.length && predicate(state.remaining[i])) {
+    while (i < remaining.length && predicate(remaining[i])) {
       i++;
     }
     return State.consume(state, i);
@@ -208,7 +265,7 @@ export const State = {
    * @returns The next n characters as a string
    */
   peek(state: ParserState, n: number = 1): string {
-    return state.remaining.slice(0, n);
+    return state.source.slice(state.offset, state.offset + n);
   },
 
   /**
@@ -218,7 +275,7 @@ export const State = {
    * @returns True if at end of input, false otherwise
    */
   isAtEnd(state: ParserState): boolean {
-    return state.remaining.length === 0;
+    return state.offset >= state.source.length;
   },
 
   /**
@@ -232,6 +289,19 @@ export const State = {
    * ```
    */
   printPosition(state: ParserState): string {
-    return `line ${state.pos.line}, column ${state.pos.column}, offset ${state.pos.offset}`;
+    return `line ${state.line}, column ${state.column}, offset ${state.offset}`;
+  },
+
+  /**
+   * Creates a SourcePosition from the current parser state.
+   * @param state - The current parser state
+   * @returns A SourcePosition object
+   */
+  toPosition(state: ParserState): SourcePosition {
+    return {
+      line: state.line,
+      column: state.column,
+      offset: state.offset
+    };
   }
 };

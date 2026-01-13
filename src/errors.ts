@@ -23,25 +23,39 @@ export type Span = {
 
 /**
  * Creates a Span from parser state and optional length.
+ * Automatically computes correct line/column if needed.
  * @param state - Parser state containing position information
  * @param length - Length of the span (defaults to 0)
  * @returns A new Span object
  * @example
  * ```typescript
- * const state = { pos: { offset: 10, line: 2, column: 3 } };
+ * const state = { offset: 10, line: 2, column: 3 };
  * const span = Span(state, 5);
  * // Returns: { offset: 10, length: 5, line: 2, column: 3 }
  * ```
  */
 export function Span(
-  state: { pos: { offset: number; line: number; column: number } },
+  state: { offset: number; line: number; column: number; source?: string },
   length: number = 0
 ): Span {
+  // If state has source, compute accurate position (lazy evaluation)
+  if (state.source) {
+    const { State } = require("./state");
+    const corrected = State.computePosition(state);
+    return {
+      offset: corrected.offset,
+      length,
+      line: corrected.line,
+      column: corrected.column
+    };
+  }
+
+  // Otherwise use provided values (for tests or pre-computed positions)
   return {
-    offset: state.pos.offset,
+    offset: state.offset,
     length,
-    line: state.pos.line,
-    column: state.pos.column
+    line: state.line,
+    column: state.column
   };
 }
 

@@ -16,12 +16,24 @@ export class Right<R, L = any> {
   }
 }
 
+// Pre-allocated common values for performance
+const VOID_RIGHT = new Right<void, never>(undefined);
+const TRUE_RIGHT = new Right<boolean, never>(true);
+const FALSE_RIGHT = new Right<boolean, never>(false);
+const EMPTY_STRING_RIGHT = new Right<string, never>("");
+const EMPTY_ARRAY_RIGHT = new Right<any[], never>([]);
+
 export const Either = {
   left<L, R = never>(l: L): Either<R, L> {
     return new Left(l);
   },
 
   right<R, L = never>(r: R): Either<R, L> {
+    // Fast path for common values
+    if (r === undefined) return VOID_RIGHT as any;
+    if (r === true) return TRUE_RIGHT as any;
+    if (r === false) return FALSE_RIGHT as any;
+    if (r === "") return EMPTY_STRING_RIGHT as any;
     return new Right(r);
   },
 
@@ -35,7 +47,7 @@ export const Either = {
 
   match<R, L, T>(onLeft: (left: L) => T, onRight: (right: R) => T) {
     return (either: Either<R, L>): T => {
-      if (Either.isLeft(either)) {
+      if (either._tag === "Left") {
         return onLeft(either.left);
       }
       return onRight(either.right);
@@ -48,7 +60,7 @@ export const Either = {
 
     while (!current.done) {
       const either = current.value;
-      if (Either.isLeft(either)) {
+      if (either._tag === "Left") {
         return either;
       }
       current = iterator.next(either.right);

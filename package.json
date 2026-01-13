@@ -35,6 +35,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "generate:docs": "bun run scripts/generate-api-docs.ts",
+    "bench": "bun run benchmarks/baseline.bench.ts",
     "ci": "bun run typecheck && bun run build && bun test && bun run format",
     "preversion": "bun run ci",
     "version": "bun run format && git add -A",
@@ -53,6 +54,8 @@
   "license": "MIT",
   "devDependencies": {
     "@types/bun": "^1.1.10",
+    "chevrotain": "^11.1.0",
+    "mitata": "^1.0.34",
     "prettier": "^3.5.3",
     "tsup": "^8.3.5",
     "typescript": "^5.0.0",

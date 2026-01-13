@@ -168,11 +168,9 @@ export class Parser<T> {
     state: ParserState
   ): ParserOutput<never> {
     const span = Span({
-      pos: {
-        offset: state.pos.offset,
-        line: state.pos.line,
-        column: state.pos.column
-      }
+      offset: state.offset,
+      line: state.line,
+      column: state.column
     });
 
     const parseErr = ParseError.custom({
@@ -274,7 +272,7 @@ export class Parser<T> {
    */
   parseOrError(input: string): T | ParseErrorBundle {
     const { result } = this.run(State.fromInput(input));
-    if (Either.isRight(result)) {
+    if (result._tag === "Right") {
       return result.right;
     }
     return result.left;
@@ -307,7 +305,7 @@ export class Parser<T> {
   parseOrThrow(input: string): T {
     const { result } = this.parse(input);
 
-    if (Either.isLeft(result)) {
+    if (result._tag === "Left") {
       throw result.left;
     }
     return result.right;
@@ -344,7 +342,7 @@ export class Parser<T> {
   map<B>(f: (a: T) => B): Parser<B> {
     return new Parser<B>(state => {
       const { result, state: newState } = this.run(state);
-      if (Either.isLeft(result)) {
+      if (result._tag === "Left") {
         return ParserOutput(
           state,
           result as unknown as Either<B, ParseErrorBundle>
@@ -395,7 +393,7 @@ export class Parser<T> {
   flatMap<B>(f: (a: T) => Parser<B>): Parser<B> {
     return new Parser<B>(state => {
       const { result, state: newState } = this.run(state);
-      if (Either.isLeft(result)) {
+      if (result._tag === "Left") {
         return {
           state: newState,
           result: result as unknown as Either<B, ParseErrorBundle>
@@ -491,14 +489,14 @@ export class Parser<T> {
   zip<B>(parserB: Parser<B>): Parser<[T, B]> {
     return new Parser(state => {
       const { result: a, state: stateA } = this.run(state);
-      if (Either.isLeft(a)) {
+      if (a._tag === "Left") {
         return {
           result: a as unknown as Either<[T, B], ParseErrorBundle>,
           state: stateA
         };
       }
       const { result: b, state: stateB } = parserB.run(stateA);
-      if (Either.isLeft(b)) {
+      if (b._tag === "Left") {
         return {
           result: b as unknown as Either<[T, B], ParseErrorBundle>,
           state: stateB
@@ -636,7 +634,7 @@ export class Parser<T> {
       let currentState: ParserState = state;
       while (!current.done) {
         const { result, state: updatedState } = current.value.run(currentState);
-        if (Either.isLeft(result)) {
+        if (result._tag === "Left") {
           // const hasFatalError = result.left.errors.some(e => e.tag === "Fatal");
           // const isCommitted = updatedState?.committed || state?.committed;
           // TODO: actually use hasFatalError and isCommitted to determine if we should continue or not
@@ -680,7 +678,7 @@ export class Parser<T> {
 
       const result = this.run(newState);
 
-      if (Either.isLeft(result.result)) {
+      if (result.result._tag === "Left") {
         return ParserOutput(
           state,
           Either.left(
@@ -712,7 +710,7 @@ export class Parser<T> {
   expect(description: string): Parser<T> {
     return new Parser<T>(state => {
       const output = this.run(state);
-      if (Either.isLeft(output.result)) {
+      if (output.result._tag === "Left") {
         return Parser.fail(
           {
             message: `Expected ${description}`
@@ -794,7 +792,7 @@ export class Parser<T> {
   commit = (): Parser<T> =>
     new Parser(state => {
       const result = this.run(state);
-      if (Either.isRight(result.result)) {
+      if (result.result._tag === "Right") {
         return ParserOutput(
           { ...result.state, committed: true },
           result.result
@@ -853,7 +851,7 @@ export class Parser<T> {
   atomic(): Parser<T> {
     return new Parser(state => {
       const result = this.run(state);
-      if (Either.isLeft(result.result)) {
+      if (result.result._tag === "Left") {
         // On failure, return the error but with the original state
         return ParserOutput(state, result.result);
       }
@@ -865,9 +863,9 @@ export class Parser<T> {
     new Parser(state => {
       const result = this.run(state);
 
-      const span = Span(state, result.state.pos.offset - state.pos.offset);
+      const span = Span(state, result.state.offset - state.offset);
       if (result.result._tag === "Right") {
-        // const span = Span(state, result.state.pos.offset - state.pos.offset);
+        // const span = Span(state, result.state.offset - state.offset);
         return ParserOutput(
           result.state,
           Either.right([result.result.right, span])
@@ -1062,7 +1060,7 @@ export const parser = Parser.gen;
 // ): Parser<T> {
 //   return new Parser<T>(state => {
 //     const output = this.run(state);
-//     if (Either.isLeft(output.result)) {
+//     if (output.result._tag === "Left") {
 //       return Parser.fail(
 //         {
 //           message: makeMessage({
@@ -1084,7 +1082,7 @@ export const parser = Parser.gen;
 // ): Parser<BindResult<T, K, B>> {
 //   return new Parser<BindResult<T, K, B>>(state => {
 //     const { result: resultA, state: stateA } = this.run(state);
-//     if (Either.isLeft(resultA)) {
+//     if (resultA._tag === "Left") {
 //       return {
 //         result: resultA as unknown as Either<
 //           BindResult<T, K, B>,
@@ -1095,7 +1093,7 @@ export const parser = Parser.gen;
 //     }
 //     const nextParser = other instanceof Parser ? other : other(resultA.right);
 //     const { result: resultB, state: stateB } = nextParser.run(stateA);
-//     if (Either.isLeft(resultB)) {
+//     if (resultB._tag === "Left") {
 //       return {
 //         result: resultB as unknown as Either<
 //           BindResult<T, K, B>,

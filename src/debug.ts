@@ -23,7 +23,7 @@
 //   );
 //   console.log(
 //     "Result:",
-//     Either.isRight(result.result) ?
+//     result.result._tag === "Right" ?
 //       `Success: ${JSON.stringify(result.result.right.value)}`
 //     : `Error: ${`${result.result.left.primary.tag}: ${JSON.stringify(result.result.left.primary)}`}`
 //   );

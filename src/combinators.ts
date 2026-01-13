@@ -27,7 +27,7 @@ import {
 export const lookahead = <T>(par: Parser<T>): Parser<T | undefined> =>
   new Parser(state => {
     const { result } = par.run(state);
-    if (Either.isRight(result)) {
+    if (result._tag === "Right") {
       return Parser.succeed(result.right, state);
     }
     return Parser.succeed(undefined, state);
@@ -48,7 +48,7 @@ export const lookahead = <T>(par: Parser<T>): Parser<T | undefined> =>
 export function notFollowedBy<T>(par: Parser<T>): Parser<boolean> {
   return new Parser(state => {
     const { result, state: newState } = par.run(state);
-    if (Either.isRight(result)) {
+    if (result._tag === "Right") {
       // if (parser.options?.name) {
       //   const message = `Found ${parser.options.name} when it should not appear here`;
       //   return Parser.fail({ message, expected: [] }, newState);
@@ -57,7 +57,7 @@ export function notFollowedBy<T>(par: Parser<T>): Parser<boolean> {
         {
           message: "Expected not to follow",
           expected: [],
-          found: state.remaining.at(0)
+          found: State.charAt(state)
         },
         newState
       );
@@ -79,19 +79,19 @@ export function notFollowedBy<T>(par: Parser<T>): Parser<boolean> {
  */
 export const string = (str: string): Parser<string> =>
   new Parser(state => {
-    if (state.remaining.startsWith(str)) {
+    if (State.startsWith(state, str)) {
       return Parser.succeed(str, State.consume(state, str.length));
     }
 
     const message =
       `Expected '${str}', ` +
-      `but found '${state.remaining.slice(0, str.length)}'`;
+      `but found '${State.remaining(state).slice(0, str.length)}'`;
 
     return Parser.fail(
       {
         message,
         expected: [str],
-        found: state.remaining.slice(0, str.length)
+        found: State.remaining(state).slice(0, str.length)
       },
       state
     );
@@ -131,17 +131,17 @@ export const char = <T extends string>(ch: T): Parser<T> =>
         state
       );
     }
-    if (state.remaining[0] === ch) {
+    if (State.charAt(state) === ch) {
       return Parser.succeed(ch, State.consume(state, 1));
     }
 
-    const nextChar = state.remaining.at(0);
+    const nextChar = State.charAt(state);
 
     return Parser.fail(
       {
         message: `Expected ${ch}${nextChar ? `but found ${nextChar}` : ""}`,
         expected: [ch],
-        found: state.remaining.at(0)
+        found: State.charAt(state)
       },
       state
     );
@@ -163,13 +163,13 @@ export const alphabet = new Parser(state => {
       state
     );
   }
-  const first = state.remaining[0];
+  const first = State.charAt(state);
   if (first && /^[a-zA-Z]$/.test(first)) {
     return Parser.succeed(first, State.consume(state, 1));
   }
   const message = `Expected alphabetic character, but got '${first}'`;
   return Parser.fail(
-    { message, expected: [], found: state.remaining[0] },
+    { message, expected: [], found: State.charAt(state) },
     state
   );
 });
@@ -190,13 +190,13 @@ export const digit = new Parser(state => {
       state
     );
   }
-  const first = state.remaining[0];
+  const first = State.charAt(state);
   if (first && /^[0-9]$/.test(first)) {
     return Parser.succeed(first, State.consume(state, 1));
   }
   const message = `Expected digit, but got '${first}'`;
   return Parser.fail(
-    { message, expected: [], found: state.remaining[0] },
+    { message, expected: [], found: State.charAt(state) },
     state
   );
 });
@@ -224,7 +224,7 @@ export function sepBy<S, T>(
     let currentState = state;
 
     const { result: firstResult, state: firstState } = parser.run(currentState);
-    if (Either.isLeft(firstResult)) {
+    if (firstResult._tag === "Left") {
       return Parser.succeed([], state);
     }
 
@@ -234,12 +234,12 @@ export function sepBy<S, T>(
     while (true) {
       const { result: sepResult, state: sepState } =
         sepParser.run(currentState);
-      if (Either.isLeft(sepResult)) {
+      if (sepResult._tag === "Left") {
         break;
       }
 
       const { result: itemResult, state: itemState } = parser.run(sepState);
-      if (Either.isLeft(itemResult)) {
+      if (itemResult._tag === "Left") {
         break;
       }
 
@@ -318,7 +318,7 @@ export function anyChar(): Parser<string> {
         state
       );
     }
-    return Parser.succeed(state.remaining[0], State.consume(state, 1));
+    return Parser.succeed(State.charAt(state), State.consume(state, 1));
   });
 }
 
@@ -339,7 +339,7 @@ function many_<S, T>(
       while (true) {
         // Try to parse the next item
         const itemResult = parser.run(currentState);
-        if (Either.isLeft(itemResult.result)) {
+        if (itemResult.result._tag === "Left") {
           // Check if we're in a committed state
           const isCommitted =
             itemResult.state?.committed && !currentState?.committed;
@@ -364,7 +364,7 @@ function many_<S, T>(
         results.push(value.right);
 
         // Check that parser advanced - prevent infinite loops
-        if (newState.pos.offset <= currentState.pos.offset) {
+        if (newState.offset <= currentState.offset) {
           throw new Error("Parser did not advance - infinite loop prevented");
         }
         currentState = newState as ParserState;
@@ -372,11 +372,11 @@ function many_<S, T>(
         // If we have a separator, try to parse it
         if (separator) {
           const { result: sepResult, state } = separator.run(currentState);
-          if (Either.isLeft(sepResult)) {
+          if (sepResult._tag === "Left") {
             break;
           }
           // Check that separator advanced too
-          if (state.pos.offset <= currentState.pos.offset) {
+          if (state.offset <= currentState.offset) {
             throw new Error(
               "Separator parser did not advance - infinite loop prevented"
             );
@@ -476,12 +476,12 @@ const skipMany_ =
 
       while (true) {
         const { result, state: newState } = parser.run(currentState);
-        if (Either.isLeft(result)) {
+        if (result._tag === "Left") {
           break;
         }
 
         // Check that parser advanced - prevent infinite loops
-        if (newState.pos.offset <= currentState.pos.offset) {
+        if (newState.offset <= currentState.offset) {
           throw new Error("Parser did not advance - infinite loop prevented");
         }
 
@@ -536,7 +536,7 @@ export function skipUntil<T>(parser: Parser<T>): Parser<undefined> {
 
     while (!State.isAtEnd(currentState)) {
       const { result, state: newState } = parser.run(currentState);
-      if (Either.isRight(result)) {
+      if (result._tag === "Right") {
         return Parser.succeed(undefined, newState);
       }
       currentState = State.consume(currentState, 1);
@@ -559,10 +559,10 @@ export function takeUntil<T>(parser: Parser<T>): Parser<string> {
 
     while (!State.isAtEnd(currentState)) {
       const { result, state: newState } = parser.run(currentState);
-      if (Either.isRight(result)) {
+      if (result._tag === "Right") {
         return Parser.succeed(collected, newState);
       }
-      collected += currentState.remaining[0];
+      collected += State.remaining(currentState)[0];
       currentState = State.consume(currentState, 1);
     }
 
@@ -591,10 +591,10 @@ export function parseUntilChar(char: string): Parser<string> {
     let collected = "";
 
     while (!State.isAtEnd(currentState)) {
-      if (currentState.remaining[0] === char) {
+      if (State.remaining(currentState)[0] === char) {
         return Parser.succeed(collected, currentState);
       }
-      collected += currentState.remaining[0];
+      collected += State.remaining(currentState)[0];
       currentState = State.consume(currentState, 1);
     }
 
@@ -678,7 +678,7 @@ export function or<Parsers extends Parser<any>[]>(
     for (const parser of parsers) {
       const { result, state: newState } = parser.run(state);
 
-      if (Either.isRight(result)) {
+      if (result._tag === "Right") {
         return Parser.succeed(result.right, newState);
       }
 
@@ -706,7 +706,7 @@ export function or<Parsers extends Parser<any>[]>(
 export function optional<T>(parser: Parser<T>): Parser<T | undefined> {
   return new Parser((state: ParserState) => {
     const { result, state: newState } = parser.run(state);
-    if (Either.isLeft(result)) {
+    if (result._tag === "Left") {
       return Parser.succeed(undefined, state);
     }
     // return result
@@ -756,12 +756,15 @@ export const regex = (re: RegExp): Parser<string> => {
   const nonGlobalRe = new RegExp(re.source, re.flags.replace("g", ""));
 
   return new Parser(state => {
-    const match = nonGlobalRe.exec(state.remaining);
-    if (match && match.index === 0) {
+    // Use sticky flag to match at current offset without allocating substring
+    const stickyRe = new RegExp(re.source, "y");
+    stickyRe.lastIndex = state.offset;
+    const match = stickyRe.exec(state.source);
+    if (match) {
       const value = match[0];
       return Parser.succeed(value, State.consume(state, value.length));
     }
-    const message = `Expected ${re} but found ${state.remaining.slice(0, 10)}...`;
+    const message = `Expected ${re} but found ${State.peek(state, 10)}...`;
     return Parser.fail({ message, expected: [re.toString()] }, state);
   });
 };
@@ -800,10 +803,10 @@ export function takeUpto<T>(parser: Parser<T>): Parser<string> {
 
     while (!State.isAtEnd(currentState)) {
       const { result } = parser.run(currentState);
-      if (Either.isRight(result)) {
+      if (result._tag === "Right") {
         return Parser.succeed(collected, currentState);
       }
-      collected += currentState.remaining[0];
+      collected += State.remaining(currentState)[0];
       currentState = State.consume(currentState, 1);
     }
 
@@ -977,15 +980,15 @@ export function notChar(ch: string): Parser<string> {
       );
     }
 
-    if (state.remaining[0] && state.remaining[0] !== ch) {
-      return Parser.succeed(state.remaining[0], State.consume(state, 1));
+    if (State.charAt(state) && State.charAt(state) !== ch) {
+      return Parser.succeed(State.charAt(state), State.consume(state, 1));
     }
 
     return Parser.fail(
       {
         message: `Expected any character except '${ch}'`,
         expected: [`not '${ch}'`],
-        found: state.remaining[0]
+        found: State.charAt(state)
       },
       state
     );
@@ -1003,7 +1006,7 @@ export function notChar(ch: string): Parser<string> {
  * ```
  */
 export const eof = new Parser<void>(state => {
-  if (state.remaining.length === 0) {
+  if (State.remaining(state).length === 0) {
     return Parser.succeed(undefined, state);
   }
   return Parser.fail(
@@ -1011,8 +1014,8 @@ export const eof = new Parser<void>(state => {
       message: "Expected end of input",
       expected: ["end of input"],
       found:
-        state.remaining.slice(0, 20) +
-        (state.remaining.length > 20 ? "..." : "")
+        State.remaining(state).slice(0, 20) +
+        (State.remaining(state).length > 20 ? "..." : "")
     },
     state
   );
@@ -1068,5 +1071,5 @@ export const sepEndBy = <S, T>(par: Parser<T>, sep: Parser<S>): Parser<T[]> =>
   );
 
 export const position: Parser<SourcePosition> = new Parser(state => {
-  return ParserOutput(state, Either.right(state.pos));
+  return ParserOutput(state, Either.right(State.toPosition(state)));
 });

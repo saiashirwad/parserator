@@ -1,0 +1,74 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "Alice",
+      "email": "alice@example.com",
+      "age": 30,
+      "active": true
+    },
+    {
+      "id": 2,
+      "name": "Bob",
+      "email": "bob@example.com",
+      "age": 25,
+      "active": false
+    },
+    {
+      "id": 3,
+      "name": "Charlie",
+      "email": "charlie@example.com",
+      "age": 35,
+      "active": true
+    },
+    {
+      "id": 4,
+      "name": "Diana",
+      "email": "diana@example.com",
+      "age": 28,
+      "active": true
+    },
+    {
+      "id": 5,
+      "name": "Eve",
+      "email": "eve@example.com",
+      "age": 32,
+      "active": false
+    }
+  ],
+  "products": [
+    {
+      "id": 101,
+      "name": "Laptop",
+      "price": 999.99,
+      "stock": 50,
+      "tags": ["electronics", "computers"]
+    },
+    {
+      "id": 102,
+      "name": "Mouse",
+      "price": 29.99,
+      "stock": 200,
+      "tags": ["electronics", "accessories"]
+    },
+    {
+      "id": 103,
+      "name": "Keyboard",
+      "price": 79.99,
+      "stock": 150,
+      "tags": ["electronics", "accessories"]
+    },
+    {
+      "id": 104,
+      "name": "Monitor",
+      "price": 299.99,
+      "stock": 75,
+      "tags": ["electronics", "displays"]
+    }
+  ],
+  "metadata": {
+    "version": "1.0",
+    "timestamp": "2026-01-13T09:47:22.704Z",
+    "source": "benchmark-fixture"
+  }
+}
