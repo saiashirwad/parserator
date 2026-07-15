@@ -1,25 +1,37 @@
 {
   "compilerOptions": {
-    "lib": ["ESNext", "DOM"],
+    "lib": ["ESNext"],
     "target": "ESNext",
     "module": "ESNext",
     "moduleDetection": "force",
-    "jsx": "react-jsx",
-    "allowJs": true,
-    // Bundler mode
     "moduleResolution": "bundler",
+    "types": ["node"],
+    // Module handling: source imports use explicit .ts extensions, which
+    // tsc rewrites to .js in emitted output (see tsconfig.build.json)
     "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
     "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "erasableSyntaxOnly": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
     "noEmit": true,
-    "declaration": true,
-    "declarationMap": true,
-    // Best practices
+    // Strictness
     "strict": true,
-    "skipLibCheck": true,
+    "exactOptionalPropertyTypes": true,
     "noFallthroughCasesInSwitch": true,
-    // Some stricter flags (disabled by default)
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false
-  }
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+    "noUncheckedSideEffectImports": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "useDefineForClassFields": true,
+    // Output & diagnostics
+    "forceConsistentCasingInFileNames": true,
+    "noErrorTruncation": true,
+    "stableTypeOrdering": true,
+    "skipLibCheck": true
+  },
+  "exclude": ["node_modules", "dist"]
 }

@@ -2,84 +2,65 @@
   "name": "parserator",
   "version": "0.1.41",
   "description": "An elegant parser combinators library for Typescript",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      },
-      "require": {
-        "types": "./dist/index.d.cts",
-        "default": "./dist/index.cjs"
-      }
-    }
+  "keywords": [
+    "functional-programming",
+    "parser",
+    "parser-combinators",
+    "typescript"
+  ],
+  "homepage": "https://github.com/saiashirwad/parserator#readme",
+  "bugs": {
+    "url": "https://github.com/saiashirwad/parserator/issues"
+  },
+  "license": "MIT",
+  "author": "Sai (https://bsky.app/profile/texoport.in)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saiashirwad/parserator.git"
   },
   "files": [
     "dist",
     "README.md"
   ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsup && bun build.ts",
-    "test": "bun test",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "bun run build && bun test",
-    "publish:patch": "bun run build && npm version patch && npm publish --access public",
-    "publish:minor": "bun run build && npm version minor && npm publish --access public",
-    "publish:major": "bun run build && npm version major && npm publish --access public",
-    "release:patch": "bun run build && bun test && bun run publish:patch",
-    "release:minor": "bun run build && bun test && bun run publish:minor",
-    "release:major": "bun run build && bun test && bun run publish:major",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "generate:docs": "bun run scripts/generate-api-docs.ts",
-    "bench": "bun run benchmarks/baseline.bench.ts",
-    "ci": "bun run typecheck && bun run build && bun test && bun run format",
-    "preversion": "bun run ci",
-    "version": "bun run format && git add -A",
-    "postversion": "git push && git push --tags",
-    "docs:dev": "vitepress dev docs",
-    "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "lint": "oxlint",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "ci": "pnpm typecheck && pnpm build && pnpm test && pnpm lint && pnpm format:check",
+    "prepublishOnly": "pnpm run ci",
+    "release:patch": "npm version patch && pnpm publish",
+    "release:minor": "npm version minor && pnpm publish",
+    "release:major": "npm version major && pnpm publish",
+    "preversion": "pnpm run ci",
+    "postversion": "git push && git push --tags"
   },
-  "keywords": [
-    "parser",
-    "parser-combinators",
-    "typescript",
-    "functional-programming"
-  ],
-  "author": "Sai (https://bsky.app/profile/texoport.in)",
-  "license": "MIT",
   "devDependencies": {
-    "@types/bun": "^1.1.10",
-    "chevrotain": "^11.1.0",
-    "mitata": "^1.0.34",
-    "prettier": "^3.5.3",
-    "tsup": "^8.3.5",
-    "typescript": "^5.0.0",
-    "vitepress": "^1.6.3"
+    "@types/node": "^26.1.1",
+    "oxfmt": "^0.59.0",
+    "oxlint": "^1.74.0",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.6",
+    "vitest": "^4.0.0"
   },
-  "peerDependencies": {
-    "typescript": "^5.0.0"
+  "engines": {
+    "node": ">=20.19.0"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/saiashirwad/parserator.git"
-  },
-  "bugs": {
-    "url": "https://github.com/saiashirwad/parserator/issues"
-  },
-  "homepage": "https://github.com/saiashirwad/parserator#readme",
-  "prettier": {
-    "printWidth": 80,
-    "useTabs": false,
-    "semi": true,
-    "objectWrap": "preserve",
-    "trailingComma": "none",
-    "experimentalTernaries": true,
-    "experimentalOperatorPosition": "end",
-    "arrowParens": "avoid"
-  }
+  "packageManager": "pnpm@11.11.0"
 }

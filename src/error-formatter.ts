@@ -1,28 +1,28 @@
-import type { ParseError, ParseErrorBundle } from "./errors";
+import type { ParseError, ParseErrorBundle } from "./errors.ts"
 
-export type ErrorFormat = "plain" | "ansi" | "html" | "json";
+export type ErrorFormat = "plain" | "ansi" | "html" | "json"
 
 export type ErrorFormatterOptions = {
-  maxContextLines?: number;
-  showHints?: boolean;
-  colorize?: boolean;
-  showContext?: boolean;
-  tabSize?: number;
-};
+  maxContextLines?: number
+  showHints?: boolean
+  colorize?: boolean
+  showContext?: boolean
+  tabSize?: number
+}
 
 /**
  * Formats ParseErrorBundle into human-readable error messages with multiple output formats.
  * Supports plain text, ANSI colors, HTML, and JSON formats.
  */
 export class ErrorFormatter {
-  private _format: ErrorFormat;
-  private options: ErrorFormatterOptions;
+  private _format: ErrorFormat
+  private options: ErrorFormatterOptions
 
   constructor(
     format: ErrorFormat = "plain",
     options: ErrorFormatterOptions = {}
   ) {
-    this._format = format;
+    this._format = format
     // Set default options
     this.options = {
       maxContextLines: 3,
@@ -31,7 +31,7 @@ export class ErrorFormatter {
       showContext: true,
       tabSize: 2,
       ...options
-    };
+    }
   }
 
   /**
@@ -43,13 +43,13 @@ export class ErrorFormatter {
   format(bundle: ParseErrorBundle): string {
     switch (this._format) {
       case "ansi":
-        return this.formatAnsi(bundle);
+        return this.formatAnsi(bundle)
       case "html":
-        return this.formatHtml(bundle);
+        return this.formatHtml(bundle)
       case "json":
-        return this.formatJson(bundle);
+        return this.formatJson(bundle)
       default:
-        return this.formatPlain(bundle);
+        return this.formatPlain(bundle)
     }
   }
 
@@ -57,16 +57,31 @@ export class ErrorFormatter {
    * Format error with ANSI color codes for terminal output.
    */
   private formatAnsi(bundle: ParseErrorBundle): string {
-    const primary = bundle.primary;
-    const lines = bundle.source.split("\n");
-    const errorLine = lines[primary.span.line - 1] || "";
+    return this.formatParts(bundle, true).join("\n")
+  }
 
-    const parts: string[] = [];
+  /**
+   * Format error as plain text without colors.
+   */
+  private formatPlain(bundle: ParseErrorBundle): string {
+    return this.formatParts(bundle, false).join("\n")
+  }
 
-    // Error header with location
+  /**
+   * Build the shared parts of an ANSI or plain text error report.
+   */
+  private formatParts(bundle: ParseErrorBundle, useColors: boolean): string[] {
+    const primary = bundle.primary
+    const lines = bundle.source.split("\n")
+    const errorLine = lines[primary.span.line - 1] || ""
+
+    const parts: string[] = []
+
+    // Error header
+    const header = `Error at line ${primary.span.line}, column ${primary.span.column}:`
     parts.push(
-      `\x1b[31mError\x1b[0m at line ${primary.span.line}, column ${primary.span.column}:`
-    );
+      useColors ? `\x1b[31mError\x1b[0m at ${header.slice(6)}` : header
+    )
 
     // Show context lines if enabled
     if (this.options.showContext && this.options.maxContextLines! > 0) {
@@ -74,140 +89,86 @@ export class ErrorFormatter {
         lines,
         primary.span.line - 1,
         this.options.maxContextLines!
-      );
-      parts.push(...contextLines.map(line => `  ${line}`));
+      )
+      parts.push(...contextLines.map(line => `  ${line}`))
     } else {
-      // Just show the error line
-      parts.push(`  ${errorLine}`);
-    }
-
-    // Add pointer arrow (accounting for line prefix)
-    const linePrefix = `  >   ${primary.span.line.toString().padStart(0, " ")} | `;
-    const adjustedColumn = primary.span.column + linePrefix.length - 2; // -2 for the "  " we add
-    const pointer = this.createPointer(adjustedColumn, primary.span.length);
-    parts.push(`  ${pointer}`);
-
-    // Error message
-    parts.push(this.formatErrorMessage(primary));
-
-    // Add hints if available
-    const hints = this.getHints(primary);
-    if (this.options.showHints && hints.length > 0) {
-      parts.push("");
-      for (const hint of hints) {
-        parts.push(`  \x1b[36mDid you mean: ${hint}?\x1b[0m`);
-      }
-    }
-
-    // Add context stack if available
-    if (
-      this.options.showContext &&
-      primary.context &&
-      primary.context.length > 0
-    ) {
-      parts.push("");
-      parts.push(`  \x1b[90mContext: ${primary.context.join(" > ")}\x1b[0m`);
-    }
-
-    return parts.join("\n");
-  }
-
-  /**
-   * Format error as plain text without colors.
-   */
-  private formatPlain(bundle: ParseErrorBundle): string {
-    const primary = bundle.primary;
-    const lines = bundle.source.split("\n");
-    const errorLine = lines[primary.span.line - 1] || "";
-
-    const parts: string[] = [];
-
-    // Error header
-    parts.push(
-      `Error at line ${primary.span.line}, column ${primary.span.column}:`
-    );
-
-    // Show context lines
-    if (this.options.showContext && this.options.maxContextLines! > 0) {
-      const contextLines = this.getContextLines(
-        lines,
-        primary.span.line - 1,
-        this.options.maxContextLines!
-      );
-      parts.push(...contextLines.map(line => `  ${line}`));
-    } else {
-      parts.push(`  ${errorLine}`);
+      parts.push(`  ${errorLine}`)
     }
 
     // Add pointer (accounting for line prefix)
-    const linePrefix = `  >   ${primary.span.line.toString()} | `;
-    const adjustedColumn = primary.span.column + linePrefix.length - 2; // -2 for the "  " we add
+    const linePrefix = `  >   ${primary.span.line.toString().padStart(3, " ")} | `
+    const adjustedColumn = primary.span.column + linePrefix.length - 2 // -2 for the "  " we add
     const pointer = this.createPointer(
       adjustedColumn,
       primary.span.length,
-      false
-    );
-    parts.push(`  ${pointer}`);
+      useColors
+    )
+    parts.push(`  ${pointer}`)
 
     // Error message
-    parts.push(this.formatErrorMessage(primary, false));
+    parts.push(
+      this.formatErrorMessage(primary, useColors, useColors ? "  " : "")
+    )
 
     // Add hints
-    const hints = this.getHints(primary);
+    const hints = this.getHints(primary)
     if (this.options.showHints && hints.length > 0) {
-      parts.push("");
+      parts.push("")
+      const prefix = useColors ? "  \x1b[36mDid you mean: " : "  Did you mean: "
+      const suffix = useColors ? "?\x1b[0m" : "?"
       for (const hint of hints) {
-        parts.push(`  Did you mean: ${hint}?`);
+        parts.push(`${prefix}${hint}${suffix}`)
       }
     }
 
-    // Add context
+    // Add context stack
     if (
       this.options.showContext &&
       primary.context &&
       primary.context.length > 0
     ) {
-      parts.push("");
-      parts.push(`  Context: ${primary.context.join(" > ")}`);
+      parts.push("")
+      const context = `Context: ${primary.context.join(" > ")}`
+      parts.push(useColors ? `  \x1b[90m${context}\x1b[0m` : `  ${context}`)
     }
 
-    return parts.join("\n");
+    return parts
   }
 
   /**
    * Format error as HTML with styling.
    */
   private formatHtml(bundle: ParseErrorBundle): string {
-    const primary = bundle.primary;
-    const lines = bundle.source.split("\n");
-    const errorLine = lines[primary.span.line - 1] || "";
+    const primary = bundle.primary
+    const lines = bundle.source.split("\n")
+    const errorLine = lines[primary.span.line - 1] || ""
 
-    const parts: string[] = [];
+    const parts: string[] = []
 
-    parts.push('<div class="parse-error">');
+    parts.push('<div class="parse-error">')
 
     // Error header
     parts.push(
       `  <div class="error-header">Error at line ${primary.span.line}, column ${primary.span.column}:</div>`
-    );
+    )
 
     // Code context
-    parts.push('  <div class="error-context">');
+    parts.push('  <div class="error-context">')
     if (this.options.showContext && this.options.maxContextLines! > 0) {
       const contextLines = this.getContextLines(
         lines,
         primary.span.line - 1,
         this.options.maxContextLines!
-      );
+      )
       for (const line of contextLines) {
         parts.push(
           `    <div class="context-line">${this.escapeHtml(line)}</div>`
-        );
+        )
       }
     } else {
       parts.push(
         `    <div class="error-line">${this.escapeHtml(errorLine)}</div>`
-      );
+      )
     }
 
     // Pointer (accounting for line prefix in plain text representation)
@@ -215,25 +176,25 @@ export class ErrorFormatter {
       primary.span.column,
       primary.span.length,
       false
-    );
-    parts.push(`    <div class="error-pointer">${pointer}</div>`);
-    parts.push("  </div>");
+    )
+    parts.push(`    <div class="error-pointer">${pointer}</div>`)
+    parts.push("  </div>")
 
     // Error message
     parts.push(
-      `  <div class="error-message">${this.escapeHtml(this.formatErrorMessage(primary, false))}</div>`
-    );
+      `  <div class="error-message">${this.escapeHtml(this.formatErrorMessage(primary, false, ""))}</div>`
+    )
 
     // Hints
-    const hints = this.getHints(primary);
+    const hints = this.getHints(primary)
     if (this.options.showHints && hints.length > 0) {
-      parts.push('  <div class="error-hints">');
+      parts.push('  <div class="error-hints">')
       for (const hint of hints) {
         parts.push(
           `    <div class="hint">Did you mean: <span class="suggestion">${this.escapeHtml(hint)}</span>?</div>`
-        );
+        )
       }
-      parts.push("  </div>");
+      parts.push("  </div>")
     }
 
     // Context
@@ -244,35 +205,34 @@ export class ErrorFormatter {
     ) {
       parts.push(
         `  <div class="error-context-stack">Context: ${primary.context.map(c => `<span class="context-item">${this.escapeHtml(c)}</span>`).join(" &gt; ")}</div>`
-      );
+      )
     }
 
-    parts.push("</div>");
+    parts.push("</div>")
 
-    return parts.join("\n");
+    return parts.join("\n")
   }
 
   /**
    * Format error as JSON for programmatic consumption.
    */
   private formatJson(bundle: ParseErrorBundle): string {
-    const primary = bundle.primary;
-    const lines = bundle.source.split("\n");
+    const primary = bundle.primary
+    const lines = bundle.source.split("\n")
 
-    const contextLines =
-      this.options.showContext ?
-        this.getContextLines(
+    const contextLines = this.options.showContext
+      ? this.getContextLines(
           lines,
           primary.span.line - 1,
           this.options.maxContextLines!
         )
-      : [lines[primary.span.line - 1] || ""];
+      : [lines[primary.span.line - 1] || ""]
 
     return JSON.stringify(
       {
         error: {
           type: primary.tag,
-          message: this.getPlainErrorMessage(primary),
+          message: this.formatErrorMessage(primary, false, ""),
           location: {
             line: primary.span.line,
             column: primary.span.column,
@@ -299,7 +259,7 @@ export class ErrorFormatter {
       },
       null,
       this.options.tabSize
-    );
+    )
   }
 
   /**
@@ -307,39 +267,23 @@ export class ErrorFormatter {
    */
   private formatErrorMessage(
     error: ParseError,
-    useColors: boolean = true
+    useColors: boolean = true,
+    indent: string = "  "
   ): string {
-    const red = useColors ? "\x1b[31m" : "";
-    const yellow = useColors ? "\x1b[33m" : "";
-    const reset = useColors ? "\x1b[0m" : "";
+    const red = useColors ? "\x1b[31m" : ""
+    const yellow = useColors ? "\x1b[33m" : ""
+    const reset = useColors ? "\x1b[0m" : ""
 
     switch (error.tag) {
       case "Expected":
-        const foundText = error.found ? `, found ${error.found}` : "";
-        return `  ${yellow}Expected:${reset} ${error.items.join(" or ")}${foundText}`;
+        const foundText = error.found ? `, found ${error.found}` : ""
+        return `${indent}${yellow}Expected:${reset} ${error.items.join(" or ")}${foundText}`
       case "Unexpected":
-        return `  ${red}Unexpected:${reset} ${error.found}`;
+        return `${indent}${red}Unexpected:${reset} ${error.found}`
       case "Custom":
-        return `  ${error.message}`;
+        return `${indent}${error.message}`
       case "Fatal":
-        return `  ${red}Fatal:${reset} ${error.message}`;
-    }
-  }
-
-  /**
-   * Get plain error message without formatting.
-   */
-  private getPlainErrorMessage(error: ParseError): string {
-    switch (error.tag) {
-      case "Expected":
-        const foundText = error.found ? `, found ${error.found}` : "";
-        return `Expected: ${error.items.join(" or ")}${foundText}`;
-      case "Unexpected":
-        return `Unexpected: ${error.found}`;
-      case "Custom":
-        return error.message;
-      case "Fatal":
-        return `Fatal: ${error.message}`;
+        return `${indent}${red}Fatal:${reset} ${error.message}`
     }
   }
 
@@ -351,11 +295,11 @@ export class ErrorFormatter {
     length: number = 1,
     useColors: boolean = true
   ): string {
-    const spaces = " ".repeat(Math.max(0, column - 1));
-    const carets = "^".repeat(Math.max(1, length));
-    const red = useColors ? "\x1b[31m" : "";
-    const reset = useColors ? "\x1b[0m" : "";
-    return `${spaces}${red}${carets}${reset}`;
+    const spaces = " ".repeat(Math.max(0, column - 1))
+    const carets = "^".repeat(Math.max(1, length))
+    const red = useColors ? "\x1b[31m" : ""
+    const reset = useColors ? "\x1b[0m" : ""
+    return `${spaces}${red}${carets}${reset}`
   }
 
   /**
@@ -366,24 +310,24 @@ export class ErrorFormatter {
     errorLineIndex: number,
     maxLines: number
   ): string[] {
-    const contextRadius = Math.floor(maxLines / 2);
-    const startLine = Math.max(0, errorLineIndex - contextRadius);
+    const contextRadius = Math.floor(maxLines / 2)
+    const startLine = Math.max(0, errorLineIndex - contextRadius)
     const endLine = Math.min(
       allLines.length - 1,
       errorLineIndex + contextRadius
-    );
+    )
 
-    const contextLines: string[] = [];
+    const contextLines: string[] = []
     for (let i = startLine; i <= endLine; i++) {
-      const lineNum = i + 1;
-      const lineContent = allLines[i] || "";
-      const isErrorLine = i === errorLineIndex;
-      const prefix = isErrorLine ? ">" : " ";
-      const paddedLineNum = lineNum.toString().padStart(3, " ");
-      contextLines.push(`${prefix} ${paddedLineNum} | ${lineContent}`);
+      const lineNum = i + 1
+      const lineContent = allLines[i] || ""
+      const isErrorLine = i === errorLineIndex
+      const prefix = isErrorLine ? ">" : " "
+      const paddedLineNum = lineNum.toString().padStart(3, " ")
+      contextLines.push(`${prefix} ${paddedLineNum} | ${lineContent}`)
     }
 
-    return contextLines;
+    return contextLines
   }
 
   /**
@@ -395,34 +339,31 @@ export class ErrorFormatter {
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
+      .replace(/'/g, "&#39;")
   }
 
   /**
    * Create a new formatter with different options.
    */
   withOptions(options: Partial<ErrorFormatterOptions>): ErrorFormatter {
-    return new ErrorFormatter(this._format, { ...this.options, ...options });
+    return new ErrorFormatter(this._format, { ...this.options, ...options })
   }
 
   /**
    * Create a new formatter with a different format.
    */
   withFormat(format: ErrorFormat): ErrorFormatter {
-    return new ErrorFormatter(format, this.options);
+    return new ErrorFormatter(format, this.options)
   }
 
   /**
    * Get hints from an error, handling the union type safely.
    */
   private getHints(error: ParseError): string[] {
-    // if (error.tag === "Custom" && error.hints) {
-    //   return error.hints;
-    // }
     if (error.tag === "Unexpected" && error.hints) {
-      return error.hints;
+      return error.hints
     }
-    return [];
+    return []
   }
 }
 
@@ -438,4 +379,4 @@ export const formatError = {
     new ErrorFormatter("html", options).format(bundle),
   json: (bundle: ParseErrorBundle, options?: ErrorFormatterOptions) =>
     new ErrorFormatter("json", options).format(bundle)
-};
+}

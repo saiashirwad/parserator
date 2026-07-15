@@ -14,87 +14,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          bun-version: latest
+          node-version: 26
+          cache: pnpm
 
       - name: Install dependencies
-        run: bun install
+        run: pnpm install --frozen-lockfile
 
       - name: Type check
-        run: bun run typecheck
+        run: pnpm typecheck
 
       - name: Build
-        run: bun run build
+        run: pnpm build
 
       - name: Run tests
-        run: bun test
+        run: pnpm test
+
+      - name: Lint
+        run: pnpm lint
 
       - name: Format check
-        run: bun run format:check
-
-  benchmark:
-    name: Performance Benchmarks
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-
-      - name: Install dependencies
-        run: bun install
-
-      - name: Run benchmarks (current)
-        run: |
-          echo "## Benchmark Results (Current Branch)" >> $GITHUB_STEP_SUMMARY
-          bun run benchmarks/baseline.bench.ts | tee benchmark-current.txt
-          cat benchmark-current.txt >> $GITHUB_STEP_SUMMARY
-
-      - name: Checkout base branch
-        run: |
-          git checkout ${{ github.base_ref }}
-          bun install
-
-      - name: Run benchmarks (base)
-        run: |
-          echo "## Benchmark Results (Base Branch)" >> $GITHUB_STEP_SUMMARY
-          bun run benchmarks/baseline.bench.ts | tee benchmark-base.txt
-          cat benchmark-base.txt >> $GITHUB_STEP_SUMMARY
-
-      - name: Comment results
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const current = fs.readFileSync('benchmark-current.txt', 'utf8');
-            const base = fs.readFileSync('benchmark-base.txt', 'utf8');
-
-            const body = `## 📊 Benchmark Results
-
-            ### Current Branch
-            \`\`\`
-            ${current}
-            \`\`\`
-
-            ### Base Branch
-            \`\`\`
-            ${base}
-            \`\`\`
-
-            > ⚠️ Note: Benchmark results may vary between runs. Look for significant changes (>10%).
-            `;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: body
-            });
+        run: pnpm format:check

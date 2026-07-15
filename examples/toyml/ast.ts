@@ -9,7 +9,7 @@ export type Literal =
   | { readonly tag: "Char"; value: string }
   | { readonly tag: "String"; value: string }
   | { readonly tag: "Bool"; value: boolean }
-  | { readonly tag: "Unit" };
+  | { readonly tag: "Unit" }
 
 export const Literal = {
   int: (value: number): Literal => ({ tag: "Int", value }),
@@ -18,7 +18,7 @@ export const Literal = {
   string: (value: string): Literal => ({ tag: "String", value }),
   bool: (value: boolean): Literal => ({ tag: "Bool", value }),
   unit: (): Literal => ({ tag: "Unit" })
-};
+}
 
 // Patterns (for let bindings and match expressions)
 
@@ -32,7 +32,7 @@ export type Pattern =
   | { readonly tag: "PConstructor"; name: string; args: Pattern[] }
   | { readonly tag: "PAs"; pattern: Pattern; alias: string }
   | { readonly tag: "POr"; left: Pattern; right: Pattern }
-  | { readonly tag: "PAnnotated"; pattern: Pattern; type: Type };
+  | { readonly tag: "PAnnotated"; pattern: Pattern; type: Type }
 
 export const Pattern = {
   wildcard: (): Pattern => ({ tag: "PWildcard" }),
@@ -61,7 +61,7 @@ export const Pattern = {
     pattern,
     type
   })
-};
+}
 
 // Types
 
@@ -71,7 +71,7 @@ export type Type =
   | { readonly tag: "TArrow"; from: Type; to: Type }
   | { readonly tag: "TTuple"; types: Type[] }
   | { readonly tag: "TApp"; constructor: Type; args: Type[] }
-  | { readonly tag: "TList"; element: Type };
+  | { readonly tag: "TList"; element: Type }
 
 export const Type = {
   const: (name: string): Type => ({ tag: "TConst", name }),
@@ -92,7 +92,7 @@ export const Type = {
   string: (): Type => Type.const("string"),
   char: (): Type => Type.const("char"),
   unit: (): Type => Type.const("unit")
-};
+}
 
 // Expressions
 
@@ -105,9 +105,9 @@ export type Expr =
   | { readonly tag: "ERecord"; fields: Array<{ label: string; value: Expr }> }
   | { readonly tag: "ERecordAccess"; record: Expr; label: string }
   | {
-      readonly tag: "ERecordUpdate";
-      record: Expr;
-      updates: Array<{ label: string; value: Expr }>;
+      readonly tag: "ERecordUpdate"
+      record: Expr
+      updates: Array<{ label: string; value: Expr }>
     }
   | { readonly tag: "EApp"; func: Expr; arg: Expr }
   | { readonly tag: "EInfix"; left: Expr; op: string; right: Expr }
@@ -118,20 +118,20 @@ export type Expr =
   | { readonly tag: "ELetRec"; bindings: LetBinding[]; body: Expr }
   | { readonly tag: "EFun"; params: Pattern[]; body: Expr }
   | { readonly tag: "ESequence"; first: Expr; second: Expr }
-  | { readonly tag: "EAnnotated"; expr: Expr; type: Type };
+  | { readonly tag: "EAnnotated"; expr: Expr; type: Type }
 
 export type MatchCase = {
-  pattern: Pattern;
-  guard?: Expr;
-  body: Expr;
-};
+  pattern: Pattern
+  guard?: Expr | undefined
+  body: Expr
+}
 
 export type LetBinding = {
-  pattern: Pattern;
-  params: Pattern[];
-  annotation?: Type;
-  value: Expr;
-};
+  pattern: Pattern
+  params: Pattern[]
+  annotation?: Type | undefined
+  value: Expr
+}
 
 export const Expr = {
   lit: (literal: Literal): Expr => ({ tag: "ELit", literal }),
@@ -167,6 +167,7 @@ export const Expr = {
   if: (cond: Expr, then_: Expr, else_: Expr): Expr => ({
     tag: "EIf",
     cond,
+    // oxlint-disable-next-line unicorn/no-thenable -- AST branch field, not a promise
     then: then_,
     else: else_
   }),
@@ -204,31 +205,31 @@ export const Expr = {
   string: (s: string): Expr => Expr.lit(Literal.string(s)),
   char: (c: string): Expr => Expr.lit(Literal.char(c)),
   unit: (): Expr => Expr.lit(Literal.unit())
-};
+}
 
 // Type Definitions
 
-export type TypeParam = string;
+export type TypeParam = string
 
 export type ConstructorDef = {
-  name: string;
-  args: Type[];
-};
+  name: string
+  args: Type[]
+}
 
 export type TypeDef =
   | { readonly tag: "Alias"; params: TypeParam[]; name: string; type: Type }
   | {
-      readonly tag: "Variant";
-      params: TypeParam[];
-      name: string;
-      constructors: ConstructorDef[];
+      readonly tag: "Variant"
+      params: TypeParam[]
+      name: string
+      constructors: ConstructorDef[]
     }
   | {
-      readonly tag: "Record";
-      params: TypeParam[];
-      name: string;
-      fields: Array<{ label: string; type: Type; mutable: boolean }>;
-    };
+      readonly tag: "Record"
+      params: TypeParam[]
+      name: string
+      fields: Array<{ label: string; type: Type; mutable: boolean }>
+    }
 
 export const TypeDef = {
   alias: (params: TypeParam[], name: string, type: Type): TypeDef => ({
@@ -257,14 +258,14 @@ export const TypeDef = {
     name,
     fields
   })
-};
+}
 
 // Top-level Declarations
 
 export type Declaration =
   | { readonly tag: "DLet"; recursive: boolean; bindings: LetBinding[] }
   | { readonly tag: "DType"; definitions: TypeDef[] }
-  | { readonly tag: "DException"; name: string; args: Type[] };
+  | { readonly tag: "DException"; name: string; args: Type[] }
 
 export const Declaration = {
   let: (recursive: boolean, bindings: LetBinding[]): Declaration => ({
@@ -281,8 +282,8 @@ export const Declaration = {
     name,
     args
   })
-};
+}
 
 // Program
 
-export type Program = Declaration[];
+export type Program = Declaration[]

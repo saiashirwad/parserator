@@ -1,3 +1,5 @@
+import { ErrorFormatter } from "./error-formatter.ts"
+
 /**
  * Represents a location span in source code with position and size information.
  * @example
@@ -12,18 +14,17 @@
  */
 export type Span = {
   /** Byte offset from the start of the source */
-  offset: number;
+  offset: number
   /** Length of the span in bytes */
-  length: number;
+  length: number
   /** Line number (1-indexed) */
-  line: number;
+  line: number
   /** Column number (1-indexed) */
-  column: number;
-};
+  column: number
+}
 
 /**
  * Creates a Span from parser state and optional length.
- * Automatically computes correct line/column if needed.
  * @param state - Parser state containing position information
  * @param length - Length of the span (defaults to 0)
  * @returns A new Span object
@@ -35,60 +36,47 @@ export type Span = {
  * ```
  */
 export function Span(
-  state: { offset: number; line: number; column: number; source?: string },
+  state: { offset: number; line: number; column: number },
   length: number = 0
 ): Span {
-  // If state has source, compute accurate position (lazy evaluation)
-  if (state.source) {
-    const { State } = require("./state");
-    const corrected = State.computePosition(state);
-    return {
-      offset: corrected.offset,
-      length,
-      line: corrected.line,
-      column: corrected.column
-    };
-  }
-
-  // Otherwise use provided values (for tests or pre-computed positions)
   return {
     offset: state.offset,
     length,
     line: state.line,
     column: state.column
-  };
+  }
 }
 
 type ExpectedParseError = {
-  tag: "Expected";
-  span: Span;
-  items: string[];
-  context: string[];
-  found?: string;
-};
+  tag: "Expected"
+  span: Span
+  items: string[]
+  context: string[]
+  found?: string
+}
 
 type UnexpectedParseError = {
-  tag: "Unexpected";
-  span: Span;
-  found: string;
-  context: string[];
-  hints?: string[];
-};
+  tag: "Unexpected"
+  span: Span
+  found: string
+  context: string[]
+  hints?: string[]
+}
 
 type CustomParseError = {
-  tag: "Custom";
-  span: Span;
-  message: string;
-  hints?: string[];
-  context: string[];
-};
+  tag: "Custom"
+  span: Span
+  message: string
+  hints?: string[]
+  context: string[]
+}
 
 type FatalParseError = {
-  tag: "Fatal";
-  span: Span;
-  message: string;
-  context: string[];
-};
+  tag: "Fatal"
+  span: Span
+  message: string
+  context: string[]
+}
 
 /**
  * Union type representing all possible parsing errors.
@@ -112,7 +100,7 @@ export type ParseError =
   | CustomParseError
   | ExpectedParseError
   | UnexpectedParseError
-  | FatalParseError;
+  | FatalParseError
 
 /**
  * Factory functions for creating different types of ParseError objects.
@@ -161,7 +149,7 @@ export const ParseError = {
     tag: "Fatal",
     ...params
   })
-};
+}
 
 /**
  * A collection of parsing errors with formatting and analysis capabilities.
@@ -185,10 +173,13 @@ export class ParseErrorBundle {
    * @param source - The original source code being parsed
    * @returns {ParseErrorBundle} A new ParseErrorBundle instance containing the errors and source
    */
-  constructor(
-    public errors: ParseError[],
-    public source: string
-  ) {}
+  errors: ParseError[]
+  source: string
+
+  constructor(errors: ParseError[], source: string) {
+    this.errors = errors
+    this.source = source
+  }
 
   /**
    * Gets the primary error (the one that occurred furthest in the input).
@@ -198,7 +189,7 @@ export class ParseErrorBundle {
   get primary(): ParseError {
     return this.errors.reduce((furthest, current) =>
       current.span.offset > furthest.span.offset ? current : furthest
-    );
+    )
   }
 
   /**
@@ -207,8 +198,8 @@ export class ParseErrorBundle {
    * @returns {ParseError[]} Array of errors at the furthest position
    */
   get primaryErrors(): ParseError[] {
-    const maxOffset = this.primary.span.offset;
-    return this.errors.filter(err => err.span.offset === maxOffset);
+    const maxOffset = this.primary.span.offset
+    return this.errors.filter(err => err.span.offset === maxOffset)
   }
 
   /**
@@ -216,16 +207,16 @@ export class ParseErrorBundle {
    * @returns {string} A human-readable error message
    */
   toString(): string {
-    const err = this.primary;
+    const err = this.primary
     switch (err.tag) {
       case "Expected":
-        return `Expected ${err.items.join(" or ")}${err.found ? `, found ${err.found}` : ""}`;
+        return `Expected ${err.items.join(" or ")}${err.found ? `, found ${err.found}` : ""}`
       case "Unexpected":
-        return `Unexpected ${err.found}`;
+        return `Unexpected ${err.found}`
       case "Custom":
-        return err.message;
+        return err.message
       case "Fatal":
-        return `Fatal: ${err.message}`;
+        return `Fatal: ${err.message}`
     }
   }
 
@@ -235,7 +226,6 @@ export class ParseErrorBundle {
    * @returns {string} Formatted error message with context and highlighting
    */
   format(format: "plain" | "ansi" | "html" | "json" = "plain"): string {
-    const { ErrorFormatter } = require("./error-formatter");
-    return new ErrorFormatter(format).format(this);
+    return new ErrorFormatter(format).format(this)
   }
 }

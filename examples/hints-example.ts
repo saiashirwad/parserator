@@ -1,28 +1,15 @@
 import {
   anyKeywordWithHints,
   char,
-  Either,
   many0,
   many1,
   sequence
-} from "../src";
+} from "../src/index.ts"
 
-// const nTh: <const N extends number, const Arr extends any[]>(
-//   n: N
-// ) => (arr: Arr) => Arr[N] = n => arr => arr[n];
+const keyword = anyKeywordWithHints(["name", "hi", "typescript"])
 
-const p = sequence([
+export const dollarKeyword = sequence([
   many1(char("$")),
   many0(char(".")),
-  anyKeywordWithHints(["name", "hi", "typescript"])
-]);
-
-const inputs = ["$ha", "$$$..name"] as const;
-for (const input of inputs) {
-  const result = p.parse(input);
-  console.log(
-    result.result._tag === "Left" ?
-      result.result.left.format("ansi")
-    : result.result.right
-  );
-}
+  keyword
+])

@@ -1,105 +1,94 @@
 import {
-  parser,
-  char,
-  string,
-  regex,
-  or,
-  many,
-  sepBy,
   between,
-  optional,
+  char,
+  or,
+  parser,
   Parser,
-  skipSpaces
-} from "../src";
+  regex,
+  sepBy,
+  string
+} from "../src/index.ts"
 
-const whitespace = regex(/\s*/);
-function token<T>(p: Parser<T>): Parser<T> {
-  return p.trimLeft(whitespace);
-}
+type JsonValue =
+  | null
+  | boolean
+  | number
+  | string
+  | JsonValue[]
+  | { [key: string]: JsonValue }
 
-const jsonNull = string("null").map(() => null);
-const jsonTrue = string("true").map(() => true);
-const jsonFalse = string("false").map(() => false);
-const jsonBool = or(jsonTrue, jsonFalse);
+const whitespace = regex(/\s*/)
+const token = <T>(p: Parser<T>): Parser<T> => p.trimLeft(whitespace)
+
+const jsonNull = string("null").map(() => null)
+
+const jsonBool = or(
+  string("true").map(() => true),
+  string("false").map(() => false)
+)
 
 const jsonNumber = regex(/-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?/).map(
   Number
-);
+)
+
+const escapes: Record<string, string> = {
+  '"': '"',
+  "\\": "\\",
+  "/": "/",
+  b: "\b",
+  f: "\f",
+  n: "\n",
+  r: "\r",
+  t: "\t"
+}
+
+const escape = char("\\").then(
+  or(
+    regex(/u[0-9a-fA-F]{4}/).map(hex =>
+      String.fromCharCode(parseInt(hex.slice(1), 16))
+    ),
+    regex(/["\\/bfnrt]/).map(c => escapes[c]!)
+  )
+)
 
 const jsonString = parser(function* () {
-  yield* char('"');
-  const chars: string[] = [];
+  yield* char('"')
+  const chars: string[] = []
 
   while (true) {
     const next = yield* or(
-      string('\\"').map(() => '"'),
-      string("\\\\").map(() => "\\"),
-      string("\\/").map(() => "/"),
-      string("\\b").map(() => "\b"),
-      string("\\f").map(() => "\f"),
-      string("\\n").map(() => "\n"),
-      string("\\r").map(() => "\r"),
-      string("\\t").map(() => "\t"),
-      regex(/\\u[0-9a-fA-F]{4}/).map(s =>
-        String.fromCharCode(parseInt(s.slice(2), 16))
-      ),
+      escape,
       regex(/[^"\\]+/),
       char('"').map(() => null)
-    );
-
-    if (next === null) break;
-    chars.push(next);
+    )
+    if (next === null) break
+    chars.push(next)
   }
 
-  return chars.join("");
-});
+  return chars.join("")
+})
 
-const jsonValue: Parser<any> = Parser.lazy(() =>
+const jsonValue: Parser<JsonValue> = Parser.lazy(() =>
   or(jsonNull, jsonBool, jsonNumber, jsonString, jsonArray, jsonObject)
-);
+)
 
-const jsonArray: Parser<any[]> = between(
+const jsonArray: Parser<JsonValue[]> = between(
   token(char("[")),
   token(char("]")),
   sepBy(token(jsonValue), token(char(",")))
-);
+)
 
-const jsonObject: Parser<Record<string, any>> = parser(function* () {
-  yield* token(char("{"));
+const jsonMember = parser(function* () {
+  const key = yield* token(jsonString)
+  yield* token(char(":"))
+  const value = yield* token(jsonValue)
+  return [key, value] as const
+})
 
-  const pairs = yield* sepBy(
-    parser(function* () {
-      const key = yield* token(jsonString);
-      yield* token(char(":"));
-      const value = yield* token(jsonValue);
-      return [key, value] as const;
-    }),
-    token(char(","))
-  );
+const jsonObject: Parser<{ [key: string]: JsonValue }> = between(
+  token(char("{")),
+  token(char("}")),
+  sepBy(jsonMember, token(char(",")))
+).map(pairs => Object.fromEntries(pairs))
 
-  yield* token(char("}"));
-
-  return Object.fromEntries(pairs);
-});
-
-export const json = token(jsonValue);
-
-if (import.meta.main) {
-  const testInput = `{
-    "name": "parserator",
-    "version": "0.1.41",
-    "numbers": [1, 2, 3, 4.5, -6.7e-8],
-    "nested": {
-      "bool": true,
-      "null": null,
-      "string": "hello \\"world\\""
-    }
-  }`;
-
-  try {
-    const result = json.parseOrThrow(testInput);
-    console.log("Parsed:", JSON.stringify(result, null, 2));
-  } catch (error) {
-    console.error("Parse error:", error);
-  }
-}
+export const json = token(jsonValue)

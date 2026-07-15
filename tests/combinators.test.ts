@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest"
 import {
   alphabet,
   between,
@@ -12,20 +12,20 @@ import {
   sepBy,
   skipSpaces,
   takeUntil
-} from "../src/combinators";
-import { Either } from "../src/either";
-import { Parser } from "../src/parser";
+} from "../src/combinators"
+import { Either } from "../src/either"
+import { Parser } from "../src/parser"
 
 const stringParser = skipSpaces
   .then(char('"'))
   .then(many1(or(alphabet, digit)))
   .thenDiscard(char('"'))
-  .map(s => s.join(""));
+  .map(s => s.join(""))
 
 const integerParser = skipSpaces
   .then(many1(digit))
   .map(s => parseInt(s.join("")))
-  .expect("an integer");
+  .expect("an integer")
 
 // test("sepBy string array", () => {
 //   const p = char("[")
@@ -35,10 +35,10 @@ const integerParser = skipSpaces
 // });
 
 test("optional", () => {
-  const p = optional(or(stringParser, integerParser));
-  expect(p.parseOrThrow('"hello"')).toEqual("hello");
-  expect(p.parseOrThrow("123")).toEqual(123);
-});
+  const p = optional(or(stringParser, integerParser))
+  expect(p.parseOrThrow('"hello"')).toEqual("hello")
+  expect(p.parseOrThrow("123")).toEqual(123)
+})
 
 // test("sequence", () => {
 //   const p = sequence([
@@ -57,62 +57,62 @@ test("optional", () => {
 
 describe("regex", () => {
   test("should match at the start of the input", () => {
-    const p = regex(/foo/);
-    expect(p.parseOrThrow("foo")).toEqual("foo");
-  });
+    const p = regex(/foo/)
+    expect(p.parseOrThrow("foo")).toEqual("foo")
+  })
 
   test("should not match at the start of the input", () => {
-    const p = regex(/foo/);
-    expect(Either.isLeft(p.parse("bar").result)).toEqual(true);
-  });
+    const p = regex(/foo/)
+    expect(Either.isLeft(p.parse("bar").result)).toEqual(true)
+  })
 
   test("should match at the start of the input with global flag", () => {
-    const p = regex(/foo/g);
-    expect(p.parseOrThrow("foo")).toEqual("foo");
-  });
-});
+    const p = regex(/foo/g)
+    expect(p.parseOrThrow("foo")).toEqual("foo")
+  })
+})
 
 describe("basic combinators", () => {
   test("char", () => {
-    const p = char("a");
-    expect(p.parseOrThrow("a")).toBe("a");
-    expect(Either.isLeft(p.parse("b").result)).toBe(true);
-    expect(Either.isLeft(p.parse("").result)).toBe(true);
-  });
+    const p = char("a")
+    expect(p.parseOrThrow("a")).toBe("a")
+    expect(Either.isLeft(p.parse("b").result)).toBe(true)
+    expect(Either.isLeft(p.parse("").result)).toBe(true)
+  })
 
   test("digit", () => {
-    expect(digit.parseOrThrow("1")).toBe("1");
-    expect(digit.parseOrThrow("9")).toBe("9");
-    expect(Either.isLeft(digit.parse("a").result)).toBe(true);
-    expect(Either.isLeft(digit.parse("").result)).toBe(true);
-  });
+    expect(digit.parseOrThrow("1")).toBe("1")
+    expect(digit.parseOrThrow("9")).toBe("9")
+    expect(Either.isLeft(digit.parse("a").result)).toBe(true)
+    expect(Either.isLeft(digit.parse("").result)).toBe(true)
+  })
 
   test("alphabet", () => {
-    expect(alphabet.parseOrThrow("a")).toBe("a");
-    expect(alphabet.parseOrThrow("Z")).toBe("Z");
-    expect(Either.isLeft(alphabet.parse("1").result)).toBe(true);
-    expect(Either.isLeft(alphabet.parse("").result)).toBe(true);
-  });
-});
+    expect(alphabet.parseOrThrow("a")).toBe("a")
+    expect(alphabet.parseOrThrow("Z")).toBe("Z")
+    expect(Either.isLeft(alphabet.parse("1").result)).toBe(true)
+    expect(Either.isLeft(alphabet.parse("").result)).toBe(true)
+  })
+})
 
 describe("many combinators", () => {
   test("many1 requires at least one match", () => {
-    const digits = many1(digit);
-    expect(digits.parseOrThrow("123")).toEqual(["1", "2", "3"]);
-    expect(digits.parseOrThrow("1")).toEqual(["1"]);
-    expect(Either.isLeft(digits.parse("").result)).toBe(true);
-    expect(Either.isLeft(digits.parse("abc").result)).toBe(true);
-  });
+    const digits = many1(digit)
+    expect(digits.parseOrThrow("123")).toEqual(["1", "2", "3"])
+    expect(digits.parseOrThrow("1")).toEqual(["1"])
+    expect(Either.isLeft(digits.parse("").result)).toBe(true)
+    expect(Either.isLeft(digits.parse("abc").result)).toBe(true)
+  })
 
   test("manyNExact requires exactly n matches", () => {
-    const threeDigits = manyNExact(digit, 3);
-    const t1 = threeDigits.parseOrError("123");
-    expect(t1).toEqual(["1", "2", "3"]);
-    expect(Either.isLeft(threeDigits.parse("12").result)).toBe(true);
-    const t2 = threeDigits.parse("1234");
-    expect(Either.isLeft(t2.result)).toBe(true);
-    expect(Either.isLeft(threeDigits.parse("").result)).toBe(true);
-  });
+    const threeDigits = manyNExact(digit, 3)
+    const t1 = threeDigits.parseOrError("123")
+    expect(t1).toEqual(["1", "2", "3"])
+    expect(Either.isLeft(threeDigits.parse("12").result)).toBe(true)
+    const t2 = threeDigits.parse("1234")
+    expect(Either.isLeft(t2.result)).toBe(true)
+    expect(Either.isLeft(threeDigits.parse("").result)).toBe(true)
+  })
 
   // test("manyN with separator", () => {
   //   const threeDigitsComma = manyN(digit, 3, char(",")).thenDiscard(
@@ -121,7 +121,7 @@ describe("many combinators", () => {
   //   expect(threeDigitsComma.parseOrThrow("1,2,3")).toEqual(["1", "2", "3"]);
   //   expect(Either.isLeft(threeDigitsComma.parse("1,2").result)).toBe(true);
   // });
-});
+})
 
 describe("complex combinations", () => {
   // test("nested array of numbers", () => {
@@ -137,18 +137,18 @@ describe("complex combinations", () => {
   // });
 
   test("simple expression parser", () => {
-    type Expr = number;
-    const expr: Parser<Expr> = Parser.lazy(() => or(number, parens));
-    const number = many1(digit).map(s => parseInt(s.join("")));
+    type Expr = number
+    const expr: Parser<Expr> = Parser.lazy(() => or(number, parens))
+    const number = many1(digit).map(s => parseInt(s.join("")))
     const parens: Parser<number> = char("(")
       .then(expr)
       .thenDiscard(char(")"))
-      .map((n: number) => n * 2);
-    expect(expr.parseOrThrow("123")).toBe(123);
-    expect(expr.parseOrThrow("(123)")).toBe(246);
-    expect(expr.parseOrThrow("((123))")).toBe(492);
-    expect(Either.isLeft(expr.parse("(123").result)).toBe(true);
-  });
+      .map((n: number) => n * 2)
+    expect(expr.parseOrThrow("123")).toBe(123)
+    expect(expr.parseOrThrow("(123)")).toBe(246)
+    expect(expr.parseOrThrow("((123))")).toBe(492)
+    expect(Either.isLeft(expr.parse("(123").result)).toBe(true)
+  })
 
   // test("key-value parser", () => {
   //   const key = many1(alphabet).map(s => s.join(""));
@@ -161,39 +161,39 @@ describe("complex combinations", () => {
   //   expect(object.parseOrThrow("{foo:123,bar:456}")).toEqual({ foo: 123, bar: 456 });
   //   expect(Either.isLeft(object.parse("{foo:123,}").result)).toBe(true);
   // });
-});
+})
 
 describe("error handling", () => {
   test("custom error messages", () => {
-    const p = digit.expect("a digit");
-    const { result } = p.parse("a");
-    console.log(result._tag === "Left" && result.left.format("ansi"));
-    expect(Either.isLeft(result)).toBe(true);
-  });
+    const p = digit.expect("a digit")
+    const { result } = p.parse("a")
+    console.log(result._tag === "Left" && result.left.format("ansi"))
+    expect(Either.isLeft(result)).toBe(true)
+  })
 
   test("error callback", () => {
-    const p = digit.expect("a digit");
-    const { result } = p.parse("a");
-    expect(Either.isLeft(result)).toBe(true);
-  });
-});
+    const p = digit.expect("a digit")
+    const { result } = p.parse("a")
+    expect(Either.isLeft(result)).toBe(true)
+  })
+})
 
 describe("parser composition", () => {
   test("map transformation", () => {
-    const p = digit.map(Number);
-    expect(p.parseOrThrow("5")).toBe(5);
-  });
+    const p = digit.map(Number)
+    expect(p.parseOrThrow("5")).toBe(5)
+  })
 
   test("flatMap chaining", () => {
-    const p = digit.flatMap(d => digit.map(d2 => Number(d + d2)));
-    expect(p.parseOrThrow("12")).toBe(12);
-  });
+    const p = digit.flatMap(d => digit.map(d2 => Number(d + d2)))
+    expect(p.parseOrThrow("12")).toBe(12)
+  })
 
   test("then sequencing", () => {
-    const p = char("[").then(digit).thenDiscard(char("]"));
-    expect(p.parseOrThrow("[5]")).toBe("5");
-  });
-});
+    const p = char("[").then(digit).thenDiscard(char("]"))
+    expect(p.parseOrThrow("[5]")).toBe("5")
+  })
+})
 
 describe("advanced combinators", () => {
   // test("lookAhead without consuming", () => {
@@ -208,11 +208,11 @@ describe("advanced combinators", () => {
   // });
 
   test("sepBy with empty input", () => {
-    const p = sepBy(char(","), digit);
-    // expect(p.parseOrThrow("")).toEqual([])
-    // expect(p.parseOrThrow("1")).toEqual(["1"])
-    // expect(p.parseOrThrow("1,2,3")).toEqual(["1", "2", "3"])
-  });
+    const p = sepBy(digit, char(","))
+    expect(p.parseOrThrow("")).toEqual([])
+    expect(p.parseOrThrow("1")).toEqual(["1"])
+    expect(p.parseOrThrow("1,2,3")).toEqual(["1", "2", "3"])
+  })
 
   test("optional with chaining", () => {
     const p = optional(char("-")).flatMap(sign =>
@@ -220,38 +220,38 @@ describe("advanced combinators", () => {
         sign: sign === "-" ? -1 : 1,
         value: Number(digits.join(""))
       }))
-    );
+    )
 
-    expect(p.parseOrThrow("123")).toEqual({ sign: 1, value: 123 });
-    expect(p.parseOrThrow("-123")).toEqual({ sign: -1, value: 123 });
-  });
-});
+    expect(p.parseOrThrow("123")).toEqual({ sign: 1, value: 123 })
+    expect(p.parseOrThrow("-123")).toEqual({ sign: -1, value: 123 })
+  })
+})
 
 describe("error recovery", () => {
   test("custom error with context", () => {
-    const identifier = regex(/[a-z]+/).expect("lowercase identifier");
-    const number = regex(/[0-9]+/).expect("number");
+    const identifier = regex(/[a-z]+/).expect("lowercase identifier")
+    const number = regex(/[0-9]+/).expect("number")
     const assignment = identifier
       .thenDiscard(char("=").thenDiscard(skipSpaces))
       .then(number)
-      .expect("assignment");
+      .expect("assignment")
 
-    const { result } = assignment.parse("foo = bar");
-    expect(Either.isLeft(result)).toBe(true);
-  });
+    const { result } = assignment.parse("foo = bar")
+    expect(Either.isLeft(result)).toBe(true)
+  })
 
   test("error position tracking", () => {
-    const p = many1(digit).thenDiscard(char(";"));
-    const { result, state } = p.parse("123x");
-    expect(Either.isLeft(result)).toBe(true);
-  });
-});
+    const p = many1(digit).thenDiscard(char(";"))
+    const { result } = p.parse("123x")
+    expect(Either.isLeft(result)).toBe(true)
+  })
+})
 
 describe("between", () => {
   test("between parser", () => {
-    const p = between(char("("), char(")"), many1(digit));
-    expect(p.parseOrThrow("(123)")).toEqual(["1", "2", "3"]);
-  });
+    const p = between(char("("), char(")"), many1(digit))
+    expect(p.parseOrThrow("(123)")).toEqual(["1", "2", "3"])
+  })
 
   // test("between with nested parsers", () => {
   //   const strParser = char('"')
@@ -271,20 +271,20 @@ describe("between", () => {
   //   const result = p.parseOrThrow('["hello", "world"]');
   //   expect(result).toEqual(["hello", "world"]);
   // });
-});
+})
 
 describe("takeUntil", () => {
   test("takeUntil 1", () => {
-    const p = takeUntil(char("a"));
-    expect(p.parseOrThrow("123142abc")).toBe("123142");
-  });
+    const p = takeUntil(char("a"))
+    expect(p.parseOrThrow("123142abc")).toBe("123142")
+  })
 
   test("takeUntil 2", () => {
     const strParser = char('"')
       .then(many1(or(alphabet, digit)))
       .thenDiscard(char('"'))
-      .map(s => s.join(""));
-    const p = takeUntil(strParser);
-    expect(p.parseOrThrow('this is a "hello"')).toBe("this is a ");
-  });
-});
+      .map(s => s.join(""))
+    const p = takeUntil(strParser)
+    expect(p.parseOrThrow('this is a "hello"')).toBe("this is a ")
+  })
+})
