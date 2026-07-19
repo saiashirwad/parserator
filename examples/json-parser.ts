@@ -51,16 +51,20 @@ const escape = char("\\").then(
   )
 )
 
+// Hoisted out of the generator: constructing parsers inside a parse loop
+// would recompile the regex and reallocate the `or` on every iteration.
+const stringPart = or(
+  escape,
+  regex(/[^"\\]+/),
+  char('"').map(() => null)
+)
+
 const jsonString = parser(function* () {
   yield* char('"')
   const chars: string[] = []
 
   while (true) {
-    const next = yield* or(
-      escape,
-      regex(/[^"\\]+/),
-      char('"').map(() => null)
-    )
+    const next = yield* stringPart
     if (next === null) break
     chars.push(next)
   }

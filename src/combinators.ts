@@ -71,12 +71,11 @@ export const string = (str: string): Parser<string> =>
       return Parser.succeed(str, State.consume(state, str.length))
     }
 
-    const found = State.peek(state, str.length)
     return Parser.fail(
       {
-        message: `Expected '${str}', but found '${found}'`,
-        expected: [str],
-        found
+        message: () =>
+          `Expected '${str}', but found '${State.peek(state, str.length)}'`,
+        expected: [str]
       },
       state
     )
@@ -110,17 +109,19 @@ export const char = <T extends string>(ch: T): Parser<T> => {
   if (ch.length !== 1) {
     throw new Error("char expects a single character")
   }
+  const code = ch.charCodeAt(0)
   return new Parser(state => {
-    const found = State.charAt(state)
-    if (found === ch) {
+    if (state.source.charCodeAt(state.offset) === code) {
       return Parser.succeed(ch, State.consume(state, 1))
     }
 
     return Parser.fail(
       {
-        message: `Expected '${ch}'${found ? `, but found '${found}'` : ""}`,
-        expected: [ch],
-        found
+        message: () => {
+          const found = State.charAt(state)
+          return `Expected '${ch}'${found ? `, but found '${found}'` : ""}`
+        },
+        expected: [ch]
       },
       state
     )
@@ -328,11 +329,19 @@ export function takeWhileChar1(
   predicate: (ch: string) => boolean,
   expected: string
 ): Parser<string> {
-  return takeWhileChar(predicate).flatMap(s =>
-    s.length > 0
-      ? Parser.lift(s)
-      : Parser.error(`Expected at least one ${expected}`)
-  )
+  return new Parser(state => {
+    const newState = State.consumeWhile(state, predicate)
+    if (newState.offset === state.offset) {
+      return Parser.fail(
+        { message: `Expected at least one ${expected}` },
+        state
+      )
+    }
+    return Parser.succeed(
+      state.source.slice(state.offset, newState.offset),
+      newState
+    )
+  })
 }
 
 /**
@@ -460,10 +469,19 @@ export function sepBy1<S, T>(
   par: Parser<T>,
   sepParser: Parser<S>
 ): Parser<T[]> {
-  return parser(function* () {
-    const first = yield* par
-    const rest = yield* many0(sepParser.then(par))
-    return [first, ...rest]
+  const rest = many0(sepParser.then(par))
+  return new Parser(state => {
+    const firstOutput = par.run(state)
+    if (firstOutput.result._tag === "Left") {
+      return firstOutput as ParserOutput<any>
+    }
+    const restOutput = rest.run(firstOutput.state)
+    if (restOutput.result._tag === "Left") {
+      return restOutput as ParserOutput<any>
+    }
+    const results = restOutput.result.right
+    results.unshift(firstOutput.result.right)
+    return Parser.succeed(results, restOutput.state)
   })
 }
 
@@ -503,12 +521,7 @@ export function between<T>(
   end: Parser<any>,
   par: Parser<T>
 ): Parser<T> {
-  return parser(function* () {
-    yield* start
-    const content = yield* par
-    yield* end.expect("closing delimiter")
-    return content
-  })
+  return start.then(par).thenDiscard(end.expect("closing delimiter"))
 }
 
 /**
@@ -525,7 +538,19 @@ function many_<S, T>(
       let currentState = state
 
       while (true) {
-        const itemResult = parser.run({ ...currentState, committed: false })
+        // Reset the commit flag for each iteration so a committed failure
+        // inside an item propagates but a clean failure ends the repetition.
+        // Skip the allocation when the flag is already unset.
+        const itemResult = parser.run(
+          currentState.committed
+            ? {
+                source: currentState.source,
+                offset: currentState.offset,
+                labelStack: currentState.labelStack,
+                committed: false
+              }
+            : currentState
+        )
         if (itemResult.result._tag === "Left") {
           if (itemResult.state.committed) {
             return itemResult as ParserOutput<any>
@@ -860,23 +885,32 @@ export function or<Parsers extends Parser<any>[]>(
   ...parsers: Parsers
 ): Parser<Parsers[number] extends Parser<infer T> ? T : never> {
   return new Parser(state => {
-    const errors: ParseError[] = []
+    let errors: ParseError[] | null = null
 
-    for (const parser of parsers) {
-      const { result, state: newState } = parser.run(state)
+    for (let i = 0; i < parsers.length; i++) {
+      const output = parsers[i]!.run(state)
 
-      if (result._tag === "Right") {
-        return Parser.succeed(result.right, newState)
+      if (output.result._tag === "Right") {
+        return output
       }
 
-      errors.push(...result.left.errors)
+      const alternativeErrors = output.result.left.errors
+      if (errors === null) {
+        // Common case: a single failing alternative before success or the
+        // end — reuse its error array instead of copying.
+        errors = alternativeErrors
+      } else {
+        for (let j = 0; j < alternativeErrors.length; j++) {
+          errors.push(alternativeErrors[j]!)
+        }
+      }
 
-      if (newState.committed && !state.committed) {
-        return Parser.failRich({ errors }, newState)
+      if (output.state.committed && !state.committed) {
+        return Parser.failRich({ errors }, output.state)
       }
     }
 
-    return Parser.failRich({ errors }, state)
+    return Parser.failRich({ errors: errors ?? [] }, state)
   })
 }
 
@@ -941,16 +975,28 @@ export const sequence = <const T extends any[]>(
  */
 export const regex = (re: RegExp): Parser<string> => {
   const stickyRe = new RegExp(re.source, "y")
+  const reString = re.toString()
 
   return new Parser(state => {
     stickyRe.lastIndex = state.offset
-    const match = stickyRe.exec(state.source)
-    if (match) {
-      const value = match[0]
-      return Parser.succeed(value, State.consume(state, value.length))
+    // test() instead of exec(): advances lastIndex on a sticky regex without
+    // allocating a match array; the matched text is sliced from the source.
+    if (stickyRe.test(state.source)) {
+      const end = stickyRe.lastIndex
+      const value = state.source.slice(state.offset, end)
+      return Parser.succeed(
+        value,
+        end === state.offset ? state : State.consume(state, end - state.offset)
+      )
     }
-    const message = `Expected ${re} but found ${State.peek(state, 10)}...`
-    return Parser.fail({ message, expected: [re.toString()] }, state)
+    return Parser.fail(
+      {
+        message: () =>
+          `Expected ${reString} but found ${State.peek(state, 10)}...`,
+        expected: [reString]
+      },
+      state
+    )
   })
 }
 

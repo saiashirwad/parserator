@@ -24,26 +24,95 @@ export type Span = {
 }
 
 /**
+ * Computes the 1-indexed line and column for a byte offset into source text.
+ *
+ * This is O(offset), but it only runs when a span's line/column is actually
+ * read (error formatting/inspection), never on the parsing hot path.
+ */
+export function positionAt(
+  source: string,
+  offset: number
+): { line: number; column: number } {
+  let line = 1
+  let lastNewline = -1
+  let idx = source.indexOf("\n")
+  while (idx !== -1 && idx < offset) {
+    line++
+    lastNewline = idx
+    idx = source.indexOf("\n", idx + 1)
+  }
+  return { line, column: offset - lastNewline }
+}
+
+/**
+ * A Span whose line/column are computed lazily from the source on first
+ * access. Creating one is O(1), which keeps parser failure paths cheap —
+ * spans are created for every failed alternative in `or`, and almost all
+ * of them are discarded by backtracking without ever being displayed.
+ */
+class LazySpan {
+  offset: number
+  length: number
+  #source: string
+  #line = -1
+  #column = -1
+
+  constructor(offset: number, length: number, source: string) {
+    this.offset = offset
+    this.length = length
+    this.#source = source
+  }
+
+  get line(): number {
+    if (this.#line === -1) this.#compute()
+    return this.#line
+  }
+
+  get column(): number {
+    if (this.#column === -1) this.#compute()
+    return this.#column
+  }
+
+  #compute(): void {
+    const pos = positionAt(this.#source, this.offset)
+    this.#line = pos.line
+    this.#column = pos.column
+  }
+}
+
+/**
  * Creates a Span from parser state and optional length.
+ *
+ * When the state carries its source (all real parser states do), line and
+ * column are computed lazily on first access. A state without source falls
+ * back to any explicitly provided line/column values.
+ *
  * @param state - Parser state containing position information
  * @param length - Length of the span (defaults to 0)
  * @returns A new Span object
  * @example
  * ```typescript
- * const state = { offset: 10, line: 2, column: 3 };
- * const span = Span(state, 5);
- * // Returns: { offset: 10, length: 5, line: 2, column: 3 }
+ * const span = Span(parserState, 5);
+ * span.line // computed on demand
  * ```
  */
 export function Span(
-  state: { offset: number; line: number; column: number },
+  state: {
+    offset: number
+    source?: string
+    line?: number
+    column?: number
+  },
   length: number = 0
 ): Span {
+  if (typeof state.source === "string") {
+    return new LazySpan(state.offset, length, state.source)
+  }
   return {
     offset: state.offset,
     length,
-    line: state.line,
-    column: state.column
+    line: state.line ?? 1,
+    column: state.column ?? 1
   }
 }
 
@@ -149,6 +218,34 @@ export const ParseError = {
     tag: "Fatal",
     ...params
   })
+}
+
+/**
+ * A CustomParseError whose message may be provided as a thunk, so the
+ * (template-string) message is only materialized when the error is actually
+ * read. Class instances share one hidden class, keeping the parser failure
+ * path allocation-cheap.
+ * @internal
+ */
+export class LazyCustomError {
+  readonly tag = "Custom" as const
+  span: Span
+  context: string[]
+  hints: string[] = []
+  #message: string | (() => string)
+
+  constructor(span: Span, message: string | (() => string), context: string[]) {
+    this.span = span
+    this.#message = message
+    this.context = context
+  }
+
+  get message(): string {
+    if (typeof this.#message === "function") {
+      this.#message = this.#message()
+    }
+    return this.#message
+  }
 }
 
 /**

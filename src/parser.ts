@@ -1,5 +1,12 @@
 import { Either } from "./either.ts"
-import { ParseError, ParseErrorBundle, Span } from "./errors.ts"
+import {
+  LazyCustomError,
+  ParseError,
+  ParseErrorBundle,
+  Span
+} from "./errors.ts"
+
+const emptyContext: string[] = []
 import { ParserOutput, type ParserState, type Spanned, State } from "./state.ts"
 
 /**
@@ -106,15 +113,23 @@ export class Parser<T> {
    * @internal
    */
   static fail(
-    error: { message: string; expected?: string[]; found?: string },
+    error: {
+      message: string | (() => string)
+      expected?: string[]
+      found?: string
+    },
     state: ParserState
   ): ParserOutput<never> {
-    const parseErr = ParseError.custom({
-      span: Span(state),
-      message: error.message,
-      context: state.labelStack ?? [],
-      hints: []
-    })
+    // Failures are allocated on every backtracked alternative, so this path
+    // is hot. LazyCustomError has a stable shape (single hidden class) and
+    // defers both message building (when given as a thunk) and line/column
+    // computation until the error is actually displayed — most failures are
+    // discarded by backtracking in `or`/`optional` and never shown.
+    const parseErr: ParseError = new LazyCustomError(
+      Span(state),
+      error.message,
+      state.labelStack ?? emptyContext
+    )
     return ParserOutput(
       state,
       Either.left(new ParseErrorBundle([parseErr], state.source))
@@ -136,20 +151,6 @@ export class Parser<T> {
     return ParserOutput(
       state,
       Either.left(new ParseErrorBundle(errorBundle.errors, state.source))
-    )
-  }
-
-  /**
-   * Reuses a Left result from one parser output as the error for another type.
-   * Centralizes the `as unknown` cast so combinators don't repeat it.
-   */
-  private static passLeft<T, U>(
-    newState: ParserState,
-    error: Either<T, ParseErrorBundle>
-  ): ParserOutput<U> {
-    return ParserOutput(
-      newState,
-      error as unknown as Either<U, ParseErrorBundle>
     )
   }
 
@@ -226,7 +227,8 @@ export class Parser<T> {
    * ```
    */
   static lazy<T>(fn: () => Parser<T>): Parser<T> {
-    return new Parser(state => fn().run(state))
+    let cached: Parser<T> | undefined
+    return new Parser(state => (cached ??= fn()).run(state))
   }
 
   /**
@@ -311,11 +313,11 @@ export class Parser<T> {
    */
   map<B>(f: (a: T) => B): Parser<B> {
     return new Parser<B>(state => {
-      const { result, state: newState } = this.run(state)
-      if (result._tag === "Left") {
-        return Parser.passLeft(newState, result)
+      const output = this.run(state)
+      if (output.result._tag === "Left") {
+        return output as unknown as ParserOutput<B>
       }
-      return ParserOutput(newState, Either.right(f(result.right)))
+      return ParserOutput(output.state, Either.right(f(output.result.right)))
     })
   }
 
@@ -338,11 +340,11 @@ export class Parser<T> {
    */
   flatMap<B>(f: (a: T) => Parser<B>): Parser<B> {
     return new Parser<B>(state => {
-      const { result, state: newState } = this.run(state)
-      if (result._tag === "Left") {
-        return Parser.passLeft(newState, result)
+      const output = this.run(state)
+      if (output.result._tag === "Left") {
+        return output as unknown as ParserOutput<B>
       }
-      return f(result.right).run(newState)
+      return f(output.result.right).run(output.state)
     })
   }
 
@@ -360,15 +362,18 @@ export class Parser<T> {
    */
   zip<B>(parserB: Parser<B>): Parser<[T, B]> {
     return new Parser(state => {
-      const { result: a, state: stateA } = this.run(state)
-      if (a._tag === "Left") {
-        return Parser.passLeft(stateA, a)
+      const outputA = this.run(state)
+      if (outputA.result._tag === "Left") {
+        return outputA as unknown as ParserOutput<[T, B]>
       }
-      const { result: b, state: stateB } = parserB.run(stateA)
-      if (b._tag === "Left") {
-        return Parser.passLeft(stateB, b)
+      const outputB = parserB.run(outputA.state)
+      if (outputB.result._tag === "Left") {
+        return outputB as unknown as ParserOutput<[T, B]>
       }
-      return Parser.succeed([a.right, b.right], stateB)
+      return Parser.succeed(
+        [outputA.result.right, outputB.result.right],
+        outputB.state
+      )
     })
   }
 
@@ -387,14 +392,22 @@ export class Parser<T> {
   // Deliberate sequencing API; the module namespace does NOT export a `then`
   // oxlint-disable-next-line unicorn/no-thenable
   then<B>(parserB: Parser<B>): Parser<B> {
-    return this.zip(parserB).map(([_, b]) => b)
+    return new Parser<B>(state => {
+      const outputA = this.run(state)
+      if (outputA.result._tag === "Left") {
+        return outputA as unknown as ParserOutput<B>
+      }
+      return parserB.run(outputA.state)
+    })
   }
 
   /**
    * Alias for `then` - sequences parsers and keeps the right result.
    * @see {@link then}
    */
-  zipRight = this.then
+  zipRight<B>(parserB: Parser<B>): Parser<B> {
+    return this.then(parserB)
+  }
 
   /**
    * Sequences this parser with another, keeping only the first result.
@@ -408,14 +421,26 @@ export class Parser<T> {
    * ```
    */
   thenDiscard<B>(parserB: Parser<B>): Parser<T> {
-    return this.zip(parserB).map(([a, _]) => a)
+    return new Parser<T>(state => {
+      const outputA = this.run(state)
+      if (outputA.result._tag === "Left") {
+        return outputA
+      }
+      const outputB = parserB.run(outputA.state)
+      if (outputB.result._tag === "Left") {
+        return outputB as unknown as ParserOutput<T>
+      }
+      return ParserOutput(outputB.state, outputA.result)
+    })
   }
 
   /**
    * Alias for `thenDiscard` - sequences parsers and keeps the left result.
    * @see {@link thenDiscard}
    */
-  zipLeft = this.thenDiscard;
+  zipLeft<B>(parserB: Parser<B>): Parser<T> {
+    return this.thenDiscard(parserB)
+  }
 
   /**
    * Makes this parser usable in generator syntax (`yield*`) inside `parser(function* () { ... })`.
@@ -462,12 +487,12 @@ export class Parser<T> {
       let current = iterator.next()
       let currentState = state
       while (!current.done) {
-        const { result, state: updatedState } = current.value.run(currentState)
-        if (result._tag === "Left") {
-          return Parser.passLeft(updatedState, result)
+        const output = current.value.run(currentState)
+        if (output.result._tag === "Left") {
+          return output as unknown as ParserOutput<T>
         }
-        currentState = updatedState
-        current = iterator.next(result.right)
+        currentState = output.state
+        current = iterator.next(output.result.right)
       }
       return Parser.succeed(current.value, currentState)
     })
@@ -547,8 +572,6 @@ export class Parser<T> {
         const errorState = {
           ...state,
           offset: primaryError.span.offset,
-          line: primaryError.span.line,
-          column: primaryError.span.column,
           committed: output.state.committed || state.committed
         }
         return Parser.fail({ message: `Expected ${description}` }, errorState)

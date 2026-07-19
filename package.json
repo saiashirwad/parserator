@@ -39,6 +39,10 @@
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "bench": "node bench/json.bench.ts && node bench/micro.bench.ts",
+    "bench:json": "node bench/json.bench.ts",
+    "bench:micro": "node bench/micro.bench.ts",
+    "bench:profile": "rm -rf bench/.profiles && node --cpu-prof --cpu-prof-dir=bench/.profiles bench/profile-json.ts && node bench/analyze-profile.ts bench/.profiles/*.cpuprofile",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint",
     "format": "oxfmt",
@@ -53,8 +57,11 @@
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
+    "@types/parsimmon": "^1.10.9",
+    "mitata": "^1.0.34",
     "oxfmt": "^0.59.0",
     "oxlint": "^1.74.0",
+    "parsimmon": "^1.18.1",
     "typescript": "^7.0.2",
     "vite": "^7.3.6",
     "vitest": "^4.0.0"

@@ -1,5 +1,5 @@
 import type { Either } from "./either.ts"
-import type { ParseErrorBundle, Span } from "./errors.ts"
+import { type ParseErrorBundle, positionAt, type Span } from "./errors.ts"
 
 export type Spanned<T> = [value: T, span: Span]
 
@@ -46,21 +46,33 @@ export type SourcePosition = {
 /**
  * Represents the complete state of a parser at any point during parsing.
  * Contains the input being parsed, current position, and optional context information.
+ *
+ * Note: line/column are not tracked here — they are derived lazily from
+ * (source, offset) only when an error is displayed. This keeps advancing
+ * the parser O(1) instead of O(n) per consumed character.
  */
 export type ParserState = {
   /** The complete original input string */
   source: string
   /** Current byte offset from start of input (0-indexed) */
   offset: number
-  /** Current line number (1-indexed) */
-  line: number
-  /** Current column number (1-indexed) */
-  column: number
   /** Stack of parsing context labels for error reporting */
   labelStack?: string[] | undefined
   /** Whether the parser has committed to this parse path */
   committed?: boolean | undefined
 }
+
+/**
+ * Creates a new state at the given offset, preserving source and context.
+ * Prefer this over object spread in hot paths — it creates a single
+ * consistent hidden class for all parser states.
+ */
+const advanced = (state: ParserState, offset: number): ParserState => ({
+  source: state.source,
+  offset,
+  labelStack: state.labelStack,
+  committed: state.committed
+})
 
 /**
  * Utility object containing static methods for creating and manipulating parser state.
@@ -76,8 +88,8 @@ export const State = {
     return {
       source: input,
       offset: 0,
-      line: 1,
-      column: 1
+      labelStack: undefined,
+      committed: undefined
     }
   },
 
@@ -115,11 +127,10 @@ export const State = {
 
   /**
    * Creates a new state by consuming n characters from the current state.
-   * Line and column are updated by scanning the consumed characters.
    *
    * @param state - The current parser state
    * @param n - Number of characters to consume
-   * @returns A new state with n characters consumed and position updated
+   * @returns A new state with n characters consumed
    * @throws Error if attempting to consume more characters than remaining
    */
   consume(state: ParserState, n: number): ParserState {
@@ -127,19 +138,7 @@ export const State = {
     if (n > state.source.length - state.offset) {
       throw new Error("Cannot consume more characters than remaining")
     }
-
-    let { line, column } = state
-    const end = state.offset + n
-    for (let i = state.offset; i < end; i++) {
-      if (state.source[i] === "\n") {
-        line++
-        column = 1
-      } else {
-        column++
-      }
-    }
-
-    return { ...state, offset: end, line, column }
+    return advanced(state, state.offset + n)
   },
 
   /**
@@ -153,18 +152,14 @@ export const State = {
     state: ParserState,
     predicate: (char: string) => boolean
   ): ParserState {
-    let { line, column } = state
+    const source = state.source
+    const length = source.length
     let end = state.offset
-    while (end < state.source.length && predicate(state.source.charAt(end))) {
-      if (state.source.charAt(end) === "\n") {
-        line++
-        column = 1
-      } else {
-        column++
-      }
+    while (end < length && predicate(source.charAt(end))) {
       end++
     }
-    return { ...state, offset: end, line, column }
+    if (end === state.offset) return state
+    return advanced(state, end)
   },
 
   /**
@@ -195,19 +190,22 @@ export const State = {
    * @returns A formatted string showing line, column, and offset
    */
   printPosition(state: ParserState): string {
-    return `line ${state.line}, column ${state.column}, offset ${state.offset}`
+    const { line, column } = positionAt(state.source, state.offset)
+    return `line ${line}, column ${column}, offset ${state.offset}`
   },
 
   /**
    * Creates a SourcePosition from the current parser state.
+   * Line and column are computed on demand from the source.
    *
    * @param state - The current parser state
    * @returns A SourcePosition object
    */
   toPosition(state: ParserState): SourcePosition {
+    const { line, column } = positionAt(state.source, state.offset)
     return {
-      line: state.line,
-      column: state.column,
+      line,
+      column,
       offset: state.offset
     }
   }
