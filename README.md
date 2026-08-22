@@ -1,8 +1,8 @@
 # Parserator
 
-Parser combinators for TypeScript, written to be read.
+Parser combinators for TypeScript.
 
-You build a parser out of small functions and compose them with plain TypeScript. No grammar files, no codegen, no build step. Generator syntax makes a parser look like the grammar it implements, and the types follow along.
+You write a parser as a generator function. Each `yield*` runs a smaller parser and hands back its value. The return type of the function is the type of the parser. No grammar file, no codegen step.
 
 ```typescript
 import { parser, char, regex } from "parserator"
@@ -27,21 +27,21 @@ point.parseOrThrow("(10,20)") // { x: 10, y: 20 }
 npm install parserator
 ```
 
-ESM only. Node 20.19 or newer. Zero runtime dependencies.
+ESM only. Node 20.19 or newer. No runtime dependencies.
 
-## Why
+## Why I wrote it
 
-- **Generators, not method chains.** Sequencing is `yield*`, so you can use `if`, `while`, and local variables inside a parser. The result type is inferred from `return`.
-- **Errors a person can read.** Every failure carries a span. Formatting gives you the offending line, a caret, the expected item, and a breadcrumb of labels. Output as plain text, ANSI, HTML, or JSON.
-- **Commit and backtrack on your terms.** `commit()` stops `or` from trying the next branch once you know where you are. You get "Expected '=' after variable name" instead of "Expected 'let' or number".
-- **"Did you mean?"** Keyword parsers suggest near misses by edit distance.
-- **Fast.** Line and column are computed lazily, error messages are built only when read, and the hot path allocates little. On a JSON benchmark it runs 1.4–2.7x faster than Parsimmon.
+Most combinator libraries make you sequence parsers with `.chain()` or `.then()`. That works until you need an `if` in the middle of a rule, and then the code stops looking like the grammar. Generators fix that. Inside `parser(function* () { ... })` you get `if`, `while`, and local variables, and TypeScript still infers the result type from `return`.
+
+The other thing I cared about was error messages. A parser that says "expected 'let' or number at column 1" when the user forgot an `=` on column 7 is useless. Parserator has `commit()` for that. Once a branch commits, `or` stops trying the alternatives and the error comes from the place the mistake was made.
+
+It is also fast. The state is a string and an offset. Line and column get computed only when someone formats an error, and error messages on branches that get backtracked over are never built. On the JSON benchmark it beats Parsimmon by 1.4 to 2.7x depending on input.
 
 ## A tour
 
 ### Sequencing
 
-Any `Parser<T>` can be `yield*`ed inside `parser(function* () { ... })`. The yield evaluates to `T`.
+Any `Parser<T>` can be `yield*`ed inside a `parser` block. The yield evaluates to `T`.
 
 ```typescript
 const ws = regex(/\s*/)
@@ -55,12 +55,12 @@ const assignment = parser(function* () {
 })
 ```
 
-Method chains work too when they read better: `.map`, `.flatMap`, `.zip`, `.then`, `.thenDiscard`, `.trim`.
+Method chains still exist for the cases where they read better. `.map`, `.flatMap`, `.zip`, `.then`, `.thenDiscard`, and `.trim` are all there.
 
 ### Choice, repetition, recursion
 
 ```typescript
-import { or, many, sepBy, between, Parser } from "parserator"
+import { or, sepBy, between, Parser } from "parserator"
 
 const list: Parser<unknown[]> = Parser.lazy(() =>
   between(
@@ -73,9 +73,9 @@ const list: Parser<unknown[]> = Parser.lazy(() =>
 list.parseOrThrow("[1, [2, 3], []]") // [1, [2, 3], []]
 ```
 
-`Parser.lazy` defers construction so a parser can refer to itself. `or` tries alternatives in order. `sepBy`, `sepBy1`, `sepEndBy`, `many`, `many1`, `optional`, `sequence`, `lookahead`, and `notFollowedBy` cover the rest.
+`Parser.lazy` delays construction so a parser can refer to itself. `or` tries its alternatives in order and takes the first that succeeds. For repetition there are `many`, `many1`, `manyN`, `sepBy`, `sepBy1`, and `sepEndBy`. `optional`, `sequence`, `lookahead`, and `notFollowedBy` cover the rest.
 
-### Errors that point at the problem
+### Errors that point at the mistake
 
 ```typescript
 import { commit, string } from "parserator"
@@ -102,9 +102,9 @@ Error at line 1, column 7:
 Expected '=' after variable name
 ```
 
-Without `commit()`, `or` would fall through to `number` and report a failure at column 1. With it, the error comes from inside `letExpr` where the real mistake is.
+Take out the `commit()` and `or` falls through to `number`, which fails at column 1 with a message about digits. That is the wrong error. The user typed `let`, so they meant a let binding, and the parser should hold them to it.
 
-`.expect(msg)` replaces the error message at the point of failure. `.label(name)` names a whole parser and adds it to the `Context:` trail. `atomic(p)` makes a parser all-or-nothing: on failure it resets to where it started, including the commit flag. `Parser.fatal(msg)` raises an error that nothing can backtrack past.
+`.expect(msg)` swaps the error message at the point of failure. `.label(name)` names a whole parser and adds it to the `Context:` trail in formatted output. `atomic(p)` makes a parser all or nothing. If it fails partway through, the state resets to where it started, commit flag included. `Parser.fatal(msg)` raises an error that nothing can backtrack past.
 
 ### Typo suggestions
 
@@ -124,7 +124,7 @@ Unexpected: mtch
   Did you mean: match?
 ```
 
-`keywordWithHints`, `stringWithHints`, and the raw `generateHints` / `levenshteinDistance` are there when you want to build your own.
+Suggestions come from Levenshtein distance, two edits or fewer by default. `keywordWithHints` and `stringWithHints` do the same for single keywords and quoted strings. `generateHints` and `levenshteinDistance` are exported if you want to wire it up yourself.
 
 ### Getting results out
 
@@ -134,25 +134,23 @@ Unexpected: mtch
 | `p.parseOrError(input)` | `T \| ParseErrorBundle`                          |
 | `p.parse(input)`        | `{ state, result: Either<T, ParseErrorBundle> }` |
 
-`ParseErrorBundle` holds every error collected. `.primary` is the one that got furthest into the input. `.format("plain" | "ansi" | "html" | "json")` renders it; `ErrorFormatter` gives you control over context lines, hints, and tab width.
+`ParseErrorBundle` keeps every error the parse produced. `.primary` is the one that got furthest into the input, which is almost always the one you want to show. `.format()` takes `"plain"`, `"ansi"`, `"html"`, or `"json"`. `ErrorFormatter` lets you set how many context lines to print, whether to show hints, and the tab width.
 
 ## Examples
 
-Full parsers live in [`examples/`](examples):
+Full parsers live in [`examples/`](examples).
 
-- [`json-parser.ts`](examples/json-parser.ts) — JSON, the one used in the benchmarks
-- [`ini-parser.ts`](examples/ini-parser.ts) — INI files, with `atomic` and `commit` for precise errors
-- [`scheme-parser.ts`](examples/scheme-parser.ts) — an S-expression language with special forms
-- [`js-parser.ts`](examples/js-parser.ts) — a JavaScript subset with reserved-word checks
-- [`toyml/`](examples/toyml) — an ML-like language: `let rec`, `match`, records, variants, and precedence climbing built by composing parsers
+- [`json-parser.ts`](examples/json-parser.ts) is the JSON parser the benchmarks use.
+- [`ini-parser.ts`](examples/ini-parser.ts) parses INI files and shows `atomic` and `commit` working together.
+- [`scheme-parser.ts`](examples/scheme-parser.ts) parses S-expressions with `lambda`, `let`, and `if` as special forms.
+- [`js-parser.ts`](examples/js-parser.ts) handles a JavaScript subset and rejects reserved words as identifiers with `Parser.fatal`.
+- [`toyml/`](examples/toyml) is an ML-like language with `let rec`, `match`, records, and variants. Its operator precedence table is built by folding a parser-building function over the levels, which is the part of this repo I'd point someone at first.
 
-Run them all against good and bad input with `node examples/main.ts`.
+`node examples/main.ts` runs each one against good and bad input and prints the formatted errors.
 
 ## Performance
 
-The hot path does as little as it can. Parser state is `{ source, offset }` plus two optional flags, so advancing costs nothing. Spans compute line and column only when an error is displayed. Error messages on branches that get backtracked over are never built.
-
-Median time to parse, Apple Silicon, Node 24:
+Median time to parse, Apple Silicon, Node 24.
 
 | Input          | parserator | parsimmon | `JSON.parse` |
 | -------------- | ---------: | --------: | -----------: |
@@ -160,21 +158,21 @@ Median time to parse, Apple Silicon, Node 24:
 | medium (~20KB) |     1.66ms |    3.06ms |       89.4µs |
 | large (~350KB) |     77.0ms |   138.6ms |       6.15ms |
 
-A few rules hold up under the micro benchmarks: prefer `regex` or `takeWhileChar` over `many1(digit)` for runs of characters, order `or` alternatives by likelihood, and hoist parsers out of loops. See [`bench/`](bench) for the suite and `pnpm bench` to run it.
+`JSON.parse` is still 12 to 28x faster, which is the price of combinators. Three rules hold up in the micro benchmarks. Use `regex` or `takeWhileChar` for runs of characters instead of `many1(digit)`, which is about 80x slower. Put the likeliest alternative first in `or`. Build parsers once, outside any loop. The suite is in [`bench/`](bench) and runs with `pnpm bench`.
 
 ## API at a glance
 
-**Primitives** — `char`, `string`, `regex`, `anyChar`, `oneOfChars`, `anyOfStrings`, `digit`, `alphabet`, `takeWhileChar`, `takeUntil`, `takeUpto`, `eof`, `position`
+Primitives: `char`, `string`, `regex`, `anyChar`, `oneOfChars`, `anyOfStrings`, `digit`, `alphabet`, `takeWhileChar`, `takeUntil`, `takeUpto`, `eof`, `position`
 
-**Combinators** — `or`, `optional`, `many`, `many1`, `manyN`, `sepBy`, `sepBy1`, `sepEndBy`, `between`, `sequence`, `count`, `lookahead`, `notFollowedBy`, `zip`, `zipLeft`, `zipRight`, `atomic`, `commit`
+Combinators: `or`, `optional`, `many`, `many1`, `manyN`, `sepBy`, `sepBy1`, `sepEndBy`, `between`, `sequence`, `count`, `lookahead`, `notFollowedBy`, `zip`, `zipLeft`, `zipRight`, `atomic`, `commit`
 
-**Parser methods** — `map`, `flatMap`, `zip`, `then`, `thenDiscard`, `trim`, `expect`, `label`, `commit`, `atomic`, `spanned`, `tap`
+Parser methods: `map`, `flatMap`, `zip`, `then`, `thenDiscard`, `trim`, `expect`, `label`, `commit`, `atomic`, `spanned`, `tap`
 
-**Constructors** — `parser(function* () {})`, `Parser.lazy`, `Parser.lift`, `Parser.error`, `Parser.fatal`
+Constructors: `parser(function* () {})`, `Parser.lazy`, `Parser.lift`, `Parser.error`, `Parser.fatal`
 
-**Errors** — `ParseErrorBundle`, `ErrorFormatter`, `formatError`
+Errors: `ParseErrorBundle`, `ErrorFormatter`, `formatError`
 
-**Hints** — `anyKeywordWithHints`, `keywordWithHints`, `stringWithHints`, `generateHints`
+Hints: `anyKeywordWithHints`, `keywordWithHints`, `stringWithHints`, `generateHints`
 
 ## License
 
