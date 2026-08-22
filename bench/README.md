@@ -40,7 +40,7 @@ JSON macro benchmark, median time per parse:
 
 Before the optimization pass, parserator was slower than Parsimmon on four of
 the five fixtures (up to 2× slower on string-heavy input). It is now
-1.4–2.7× faster than Parsimmon on every fixture, at 2.3–3.2× its own
+1.6–2.7× faster than Parsimmon on every fixture, at 2.3–3.2× its own
 previous speed. Native `JSON.parse` (C++) remains 12–28× faster — that gap
 is the cost of the combinator abstraction itself and is similar for every
 JS combinator library.

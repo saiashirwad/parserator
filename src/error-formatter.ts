@@ -79,9 +79,7 @@ export class ErrorFormatter {
 
     // Error header
     const header = `Error at line ${primary.span.line}, column ${primary.span.column}:`
-    parts.push(
-      useColors ? `\x1b[31mError\x1b[0m at ${header.slice(6)}` : header
-    )
+    parts.push(useColors ? `\x1b[31mError\x1b[0m${header.slice(5)}` : header)
 
     // Show context lines if enabled
     if (this.options.showContext && this.options.maxContextLines! > 0) {
@@ -95,9 +93,11 @@ export class ErrorFormatter {
       parts.push(`  ${errorLine}`)
     }
 
-    // Add pointer (accounting for line prefix)
-    const linePrefix = `  >   ${primary.span.line.toString().padStart(3, " ")} | `
-    const adjustedColumn = primary.span.column + linePrefix.length - 2 // -2 for the "  " we add
+    // Add pointer. Context lines look like "  >   1 | text": two spaces are
+    // added below, so the pointer only needs to skip "> ", the 3-wide line
+    // number, and " | ".
+    const linePrefixWidth = "> ".length + 3 + " | ".length
+    const adjustedColumn = primary.span.column + linePrefixWidth
     const pointer = this.createPointer(
       adjustedColumn,
       primary.span.length,
