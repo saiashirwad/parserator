@@ -263,7 +263,7 @@ export class LazyCustomError {
  * console.log(bundle.format("ansi")); // Formatted with colors
  * ```
  */
-export class ParseErrorBundle {
+export class ParseErrorBundle extends Error {
   /**
    * Creates a new ParseErrorBundle.
    * @param errors - Array of parsing errors
@@ -274,6 +274,8 @@ export class ParseErrorBundle {
   source: string
 
   constructor(errors: ParseError[], source: string) {
+    super()
+    this.name = "ParseErrorBundle"
     this.errors = errors
     this.source = source
   }
@@ -303,7 +305,7 @@ export class ParseErrorBundle {
    * Converts the primary error to a simple string representation.
    * @returns {string} A human-readable error message
    */
-  toString(): string {
+  override toString(): string {
     const err = this.primary
     switch (err.tag) {
       case "Expected":
