@@ -533,7 +533,10 @@ export class Parser<T> {
 
       if (output.result._tag === "Left") {
         return ParserOutput(
-          state,
+          {
+            ...state,
+            committed: output.state.committed || state.committed
+          },
           Either.left(
             new ParseErrorBundle(
               [
