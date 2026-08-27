@@ -489,6 +489,7 @@ export class Parser<T> {
       while (!current.done) {
         const output = current.value.run(currentState)
         if (output.result._tag === "Left") {
+          iterator.return(undefined as T)
           return output as unknown as ParserOutput<T>
         }
         currentState = output.state
