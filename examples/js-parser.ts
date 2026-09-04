@@ -1,34 +1,40 @@
 import {
-  atomic,
+  attempt,
   between,
   char,
   commit,
   eof,
+  fail,
+  fatal,
   many,
+  notFollowedBy,
   optional,
-  or,
+  precedence,
+  choice,
   parser,
-  Parser,
+  recursive,
   regex,
   sepBy,
-  skipMany0,
-  string
+  succeed,
+  skipMany,
+  literal
 } from "../src/index.ts"
+import type { Parser } from "../src/index.ts"
 
 // =============================================================================
 // Lexical Elements
 // =============================================================================
 
-const whitespace = regex(/\s+/).label("whitespace")
-const lineComment = regex(/\/\/[^\n]*/).label("line comment")
-const blockComment = regex(/\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\//).label(
+const whitespace = regex(/\s+/).context("whitespace")
+const lineComment = regex(/\/\/[^\r\n\u2028\u2029]*/).context("line comment")
+const blockComment = regex(/\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\//).context(
   "block comment"
 )
-const space = or(whitespace, lineComment, blockComment)
-const spaces = skipMany0(space)
+const space = choice(whitespace, lineComment, blockComment)
+const spaces = skipMany(space)
 
 function token<T>(parser: Parser<T>): Parser<T> {
-  return parser.trimLeft(spaces)
+  return spaces.zipRight(parser)
 }
 
 const keywords = [
@@ -43,17 +49,17 @@ const keywords = [
   "null"
 ]
 const keyword = (k: string) =>
-  token(string(k).thenDiscard(regex(/(?![a-zA-Z0-9_])/))).commit()
+  token(literal(k).zipLeft(regex(/(?![a-zA-Z0-9_])/)))
 
-const identifier = token(
+const identifier: Parser<string> = token(
   regex(/[a-zA-Z_][a-zA-Z0-9_]*/)
-    .label("identifier")
+    .context("identifier")
     .flatMap(name =>
       keywords.includes(name)
-        ? Parser.fatal(
+        ? fail(
             `'${name}' is a reserved keyword and cannot be used as an identifier`
           )
-        : Parser.lift(name)
+        : succeed(name)
     )
 )
 
@@ -61,49 +67,36 @@ const identifier = token(
 const numberLiteral = token(
   regex(/-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/)
     .map(Number)
-    .label("number")
+    .context("number")
 )
 
 const stringLiteral = token(
-  or(
+  choice(
     between(char('"'), char('"'), regex(/[^"]*/)),
     between(char("'"), char("'"), regex(/[^']*/))
-  ).label("string")
+  ).context("string")
 )
 
 const booleanLiteral = token(
-  or(
+  choice(
     keyword("true").map(() => true),
     keyword("false").map(() => false)
   )
-).label("boolean")
+).context("boolean")
 
-const nullLiteral = token(keyword("null").map(() => null)).label("null")
+const nullLiteral = token(keyword("null").map(() => null)).context("null")
 
 // Operators
 const assignmentOp = token(
-  or(string("="), string("+="), string("-="), string("*="), string("/="))
-)
-const binaryOp = token(
-  or(
-    string("==="),
-    string("!=="),
-    string("=="),
-    string("!="),
-    string("<="),
-    string(">="),
-    string("<"),
-    string(">"),
-    string("&&"),
-    string("||"),
-    string("+"),
-    string("-"),
-    string("*"),
-    string("/"),
-    string("%")
+  choice(
+    literal("="),
+    literal("+="),
+    literal("-="),
+    literal("*="),
+    literal("/=")
   )
 )
-const unaryOp = token(or(string("!"), string("-"), string("+")))
+const unaryOp = token(choice(literal("!"), literal("-"), literal("+")))
 
 // =============================================================================
 // AST Types
@@ -146,61 +139,63 @@ type Statement =
 let expression: Parser<Expression>
 
 // Primary expressions
-const primaryExpression: Parser<Expression> = or(
+const primaryExpression: Parser<Expression> = choice(
   // Literals
   numberLiteral.map(value => ({ type: "literal" as const, value })),
   stringLiteral.map(value => ({ type: "literal" as const, value })),
   booleanLiteral.map(value => ({ type: "literal" as const, value })),
   nullLiteral.map(value => ({ type: "literal" as const, value })),
 
-  // Identifier
-  identifier.map(name => ({ type: "identifier" as const, name })),
-
   // Function expression
-  atomic(
+  attempt(
     parser(function* () {
       yield* keyword("function")
-      yield* token(char("(")).expect("opening parenthesis after 'function'")
+      yield* token(char("(")).expected("opening parenthesis after 'function'")
       const params = yield* sepBy(identifier, token(char(",")))
-      yield* token(char(")")).expect("closing parenthesis")
-      const body = yield* blockStatement.expect("function body")
+      yield* token(char(")")).expected("closing parenthesis")
+      const body = yield* blockStatement.expected("function body")
       return { type: "function" as const, params, body: body.body }
     })
   ),
 
+  // Identifier (after function expressions, so `function` gets its branch).
+  identifier.map(name => ({ type: "identifier" as const, name })),
+
   // Object literal
-  atomic(
+  attempt(
     parser(function* () {
       yield* token(char("{"))
       yield* commit()
       const properties = yield* sepBy(
         parser(function* () {
-          const key = yield* or(identifier, stringLiteral).expect(
+          const key = yield* choice(identifier, stringLiteral).expected(
             "property key"
           )
           const hasColon = yield* optional(token(char(":")))
           const value = hasColon
-            ? yield* Parser.lazy(() => expression).expect("property value")
+            ? yield* recursive<Expression>(() => expression).expected(
+                "property value"
+              )
             : { type: "identifier" as const, name: key }
           return { key, value }
         }),
         token(char(","))
       )
-      yield* token(char("}")).expect("closing brace for object")
+      yield* token(char("}")).expected("closing brace for object")
       return { type: "object" as const, properties }
     })
   ),
 
   // Array literal
-  atomic(
+  attempt(
     parser(function* () {
       yield* token(char("["))
       yield* commit()
       const elements = yield* sepBy(
-        Parser.lazy(() => expression),
+        recursive<Expression>(() => expression),
         token(char(","))
       )
-      yield* token(char("]")).expect("closing bracket for array")
+      yield* token(char("]")).expected("closing bracket for array")
       return { type: "array" as const, elements }
     })
   ),
@@ -209,7 +204,7 @@ const primaryExpression: Parser<Expression> = or(
   between(
     token(char("(")),
     token(char(")")),
-    Parser.lazy(() => expression)
+    recursive<Expression>(() => expression)
   )
 )
 
@@ -219,26 +214,28 @@ const postfixExpression: Parser<Expression> = parser(function* () {
 
   while (true) {
     const next = yield* optional(
-      or(
+      choice(
         // Function call
-        atomic(
+        attempt(
           parser(function* () {
             yield* token(char("("))
             const args = yield* sepBy(
-              Parser.lazy(() => expression),
+              recursive<Expression>(() => expression),
               token(char(","))
             )
-            yield* token(char(")")).expect(
+            yield* token(char(")")).expected(
               "closing parenthesis for function call"
             )
             return { type: "call" as const, args }
           })
         ),
         // Member access
-        atomic(
+        attempt(
           parser(function* () {
             yield* token(char("."))
-            const property = yield* identifier.expect("property name after '.'")
+            const property = yield* identifier.expected(
+              "property name after '.'"
+            )
             return { type: "member" as const, property }
           })
         )
@@ -258,7 +255,7 @@ const postfixExpression: Parser<Expression> = parser(function* () {
 })
 
 // Unary expressions
-const unaryExpression: Parser<Expression> = or(
+const unaryExpression: Parser<Expression> = choice(
   parser(function* () {
     const op = yield* unaryOp
     const arg = yield* unaryExpression
@@ -267,22 +264,71 @@ const unaryExpression: Parser<Expression> = or(
   postfixExpression
 )
 
-// Binary expressions (simplified - no precedence for now)
-const binaryExpression: Parser<Expression> = parser(function* () {
-  const left = yield* unaryExpression
-  const rest = yield* optional(
-    parser(function* () {
-      const op = yield* binaryOp
-      const right = yield* binaryExpression
-      return { op, right }
-    })
-  )
+// Binary expressions, from tightest to loosest precedence.
+const binaryOperator = <T extends string>(
+  operator: Parser<T>
+): Parser<(left: Expression, right: Expression) => Expression> =>
+  operator.map(op => (left, right) => ({
+    type: "binary" as const,
+    left,
+    op,
+    right
+  }))
 
-  if (rest) {
-    return { type: "binary" as const, left, op: rest.op, right: rest.right }
+const nonAssignmentOperator = <const T extends string>(
+  operator: T
+): Parser<T> => literal(operator).zipLeft(notFollowedBy(char("=")))
+
+const binaryExpression: Parser<Expression> = precedence(unaryExpression, [
+  {
+    associativity: "left",
+    operators: [
+      binaryOperator(
+        token(
+          choice(
+            nonAssignmentOperator("*"),
+            nonAssignmentOperator("/"),
+            literal("%")
+          )
+        )
+      )
+    ]
+  },
+  {
+    associativity: "left",
+    operators: [
+      binaryOperator(
+        token(choice(nonAssignmentOperator("+"), nonAssignmentOperator("-")))
+      )
+    ]
+  },
+  {
+    associativity: "left",
+    operators: [
+      binaryOperator(
+        token(choice(literal("<="), literal(">="), literal("<"), literal(">")))
+      )
+    ]
+  },
+  {
+    associativity: "left",
+    operators: [
+      binaryOperator(
+        token(
+          choice(literal("==="), literal("!=="), literal("=="), literal("!="))
+        )
+      )
+    ]
+  },
+  {
+    associativity: "left",
+    operators: [binaryOperator(token(literal("&&")))]
+  },
+  {
+    associativity: "left",
+    operators: [binaryOperator(token(literal("||")))]
   }
-  return left
-})
+])
 
 // Assignment expression
 expression = parser(function* () {
@@ -291,7 +337,7 @@ expression = parser(function* () {
     parser(function* () {
       const op = yield* assignmentOp
       yield* commit() // After seeing assignment op, we're committed
-      const right = yield* expression.expect(
+      const right = yield* expression.expected(
         "expression after assignment operator"
       )
       return { op, right }
@@ -301,7 +347,7 @@ expression = parser(function* () {
   if (assignment) {
     // Validate left-hand side
     if (left.type !== "identifier" && left.type !== "member") {
-      return yield* Parser.fatal("Invalid assignment target")
+      return yield* fatal("Invalid assignment target")
     }
     return {
       type: "binary" as const,
@@ -320,33 +366,35 @@ expression = parser(function* () {
 
 let statement: Parser<Statement>
 
-const blockStatement: Parser<Extract<Statement, { type: "block" }>> = atomic(
+const blockStatement: Parser<Extract<Statement, { type: "block" }>> = attempt(
   parser(function* () {
     yield* token(char("{"))
     // Don't commit immediately - this could be an object literal
-    const body = yield* many(Parser.lazy(() => statement))
-    yield* token(char("}")).expect("closing brace for block")
+    const body = yield* many(recursive<Statement>(() => statement))
+    yield* token(char("}")).expected("closing brace for block")
     return { type: "block" as const, body }
   })
 )
 
 const variableStatement: Parser<Statement> = parser(function* () {
-  const kind = (yield* or(keyword("let"), keyword("const"))) as "let" | "const"
+  const kind = (yield* choice(keyword("let"), keyword("const"))) as
+    | "let"
+    | "const"
 
-  const name = yield* identifier.expect("variable name")
+  const name = yield* identifier.expected("variable name")
 
   const init = yield* optional(
     parser(function* () {
       yield* token(char("="))
-      return yield* expression.expect("initializer expression")
+      return yield* expression.expected("initializer expression")
     })
   )
 
   if (kind === "const" && !init) {
-    return yield* Parser.fatal("Missing initializer in const declaration")
+    return yield* fatal("Missing initializer in const declaration")
   }
 
-  yield* token(char(";")).expect("semicolon after variable declaration")
+  yield* token(char(";")).expected("semicolon after variable declaration")
 
   return { type: "variable" as const, kind, name, init }
 })
@@ -354,11 +402,11 @@ const variableStatement: Parser<Statement> = parser(function* () {
 const functionStatement: Parser<Statement> = parser(function* () {
   yield* keyword("function")
 
-  const name = yield* identifier.expect("function name")
-  yield* token(char("(")).expect("opening parenthesis")
+  const name = yield* identifier.expected("function name")
+  yield* token(char("(")).expected("opening parenthesis")
   const params = yield* sepBy(identifier, token(char(",")))
-  yield* token(char(")")).expect("closing parenthesis")
-  const body = yield* blockStatement.expect("function body")
+  yield* token(char(")")).expected("closing parenthesis")
+  const body = yield* blockStatement.expected("function body")
 
   return { type: "function" as const, name, params, body: body.body }
 })
@@ -366,16 +414,16 @@ const functionStatement: Parser<Statement> = parser(function* () {
 const ifStatement: Parser<Statement> = parser(function* () {
   yield* keyword("if")
 
-  yield* token(char("(")).expect("opening parenthesis after 'if'")
-  const test = yield* expression.expect("condition expression")
-  yield* token(char(")")).expect("closing parenthesis")
+  yield* token(char("(")).expected("opening parenthesis after 'if'")
+  const test = yield* expression.expected("condition expression")
+  yield* token(char(")")).expected("closing parenthesis")
 
-  const consequent = yield* statement.expect("if body")
+  const consequent = yield* statement.expected("if body")
 
   const alternate = yield* optional(
     parser(function* () {
       yield* keyword("else")
-      return yield* statement.expect("else body")
+      return yield* statement.expected("else body")
     })
   )
 
@@ -385,9 +433,15 @@ const ifStatement: Parser<Statement> = parser(function* () {
 const returnStatement: Parser<Statement> = parser(function* () {
   yield* keyword("return")
 
-  const value = yield* optional(regex(/(?![;\n])/).then(expression))
+  const trivia = yield* many(space)
+  if (trivia.some(text => /[\r\n\u2028\u2029]/u.test(text))) {
+    yield* optional(char(";"))
+    return { type: "return" as const, value: undefined }
+  }
 
-  yield* token(char(";")).expect("semicolon after return statement")
+  const value = yield* optional(expression)
+
+  yield* token(char(";")).expected("semicolon after return statement")
 
   return { type: "return" as const, value }
 })
@@ -395,11 +449,11 @@ const returnStatement: Parser<Statement> = parser(function* () {
 // Expression statement
 const expressionStatement: Parser<Statement> = parser(function* () {
   const expr = yield* expression
-  yield* token(char(";")).expect("semicolon after expression")
+  yield* token(char(";")).expected("semicolon after expression")
   return { type: "expression" as const, expression: expr }
 })
 
-statement = or(
+statement = choice(
   blockStatement,
   variableStatement,
   functionStatement,
@@ -413,6 +467,6 @@ export const program = parser(function* () {
   yield* spaces
   const statements = yield* many(statement)
   yield* spaces
-  yield* eof.expect("end of input")
+  yield* eof.expected("end of input")
   return statements
 })

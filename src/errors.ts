@@ -1,328 +1,135 @@
-import { ErrorFormatter } from "./error-formatter.ts"
+/** A half-open span into a JavaScript string (UTF-16 code-unit offsets). */
+export type Span = { readonly start: number; readonly end: number }
 
-/**
- * Represents a location span in source code with position and size information.
- * @example
- * ```typescript
- * const span: Span = {
- *   offset: 10,
- *   length: 5,
- *   line: 2,
- *   column: 3
- * };
- * ```
- */
-export type Span = {
-  /** Byte offset from the start of the source */
-  offset: number
-  /** Length of the span in bytes */
-  length: number
-  /** Line number (1-indexed) */
-  line: number
-  /** Column number (1-indexed) */
-  column: number
+export type Diagnostic = {
+  readonly kind: "expected" | "unexpected" | "custom" | "fatal"
+  readonly span: Span
+  readonly expected?: readonly string[]
+  readonly found?: string
+  readonly message?: string
+  readonly context?: readonly string[]
+  readonly hints?: readonly string[]
+}
+export type DiagnosticJson = Diagnostic & { readonly sourceName?: string }
+
+/** Source text shared by diagnostics and their renderers. */
+export class SourceText {
+  readonly text: string
+  readonly name: string | undefined
+  #lineStarts: number[] | undefined
+
+  constructor(text: string, name?: string) {
+    this.text = text
+    this.name = name
+  }
+
+  private lineStarts(): number[] {
+    if (this.#lineStarts) return this.#lineStarts
+    const starts = [0]
+    for (let i = 0; i < this.text.length; i++) {
+      const c = this.text.charCodeAt(i)
+      if (c === 13) {
+        if (this.text.charCodeAt(i + 1) === 10) i++
+        starts.push(i + 1)
+      } else if (c === 10) starts.push(i + 1)
+    }
+    this.#lineStarts = starts
+    return starts
+  }
+
+  get lineCount(): number {
+    return this.lineStarts().length
+  }
+
+  positionAt(offset: number): { line: number; column: number } {
+    const starts = this.lineStarts()
+    const bounded = Math.max(0, Math.min(offset, this.text.length))
+    let low = 0
+    let high = starts.length
+    while (low + 1 < high) {
+      const mid = (low + high) >>> 1
+      if (starts[mid]! <= bounded) low = mid
+      else high = mid
+    }
+    return { line: low + 1, column: bounded - starts[low]! + 1 }
+  }
+
+  lineAt(line: number): string {
+    const starts = this.lineStarts()
+    const index = Math.max(1, Math.min(line, starts.length)) - 1
+    const start = starts[index]!
+    const end = starts[index + 1] ?? this.text.length
+    return this.text.slice(start, end).replace(/\r?\n$|\r$/, "")
+  }
 }
 
-/**
- * Computes the 1-indexed line and column for a byte offset into source text.
- *
- * This is O(offset), but it only runs when a span's line/column is actually
- * read (error formatting/inspection), never on the parsing hot path.
- */
+export function diagnosticMessage(diagnostic: Diagnostic): string {
+  if (diagnostic.kind === "fatal") return fatalMessage(diagnostic.message)
+  if (diagnostic.message) return diagnostic.message
+  if (diagnostic.kind === "expected") {
+    const expected = diagnostic.expected?.join(" or ") || "valid input"
+    return `Expected ${expected}${diagnostic.found ? `, found ${diagnostic.found}` : ""}`
+  }
+  return diagnostic.found
+    ? `Unexpected ${diagnostic.found}`
+    : "Unexpected input"
+}
+
+export function fatalMessage(message?: string): string {
+  const detail = (message ?? "parse failed").replace(/^(?:Fatal:\s*)+/i, "")
+  return `Fatal: ${detail}`
+}
+
+/** The stable public parse error. */
+export class ParseError extends Error {
+  readonly diagnostic: Diagnostic
+  readonly source: SourceText
+
+  constructor(diagnostic: Diagnostic, source: SourceText | string) {
+    super(diagnosticMessage(diagnostic))
+    this.name = "ParseError"
+    this.diagnostic = diagnostic
+    this.source = typeof source === "string" ? new SourceText(source) : source
+  }
+
+  format(
+    options: {
+      style?: "plain" | "ansi"
+      contextLines?: number
+      showHints?: boolean
+    } = {}
+  ): string {
+    // The formatter imports this class for its input type; the import is safe
+    // because no formatter code runs while this module is being initialized.
+    return new ErrorFormatter(options).format(this)
+  }
+
+  toJSON(): DiagnosticJson {
+    return {
+      ...this.diagnostic,
+      ...(this.source.name ? { sourceName: this.source.name } : {})
+    }
+  }
+}
+
+import { ErrorFormatter } from "./error-formatter.ts"
+
+export type FailureControl =
+  | { readonly kind: "recoverable"; readonly cutGeneration: number }
+  | { readonly kind: "fatal" }
+
+export type Failure = {
+  readonly diagnostic: Diagnostic
+  readonly control: FailureControl
+}
+
 export function positionAt(
   source: string,
   offset: number
 ): { line: number; column: number } {
-  let line = 1
-  let lastNewline = -1
-  let idx = source.indexOf("\n")
-  while (idx !== -1 && idx < offset) {
-    line++
-    lastNewline = idx
-    idx = source.indexOf("\n", idx + 1)
-  }
-  return { line, column: offset - lastNewline }
+  return new SourceText(source).positionAt(offset)
 }
 
-/**
- * A Span whose line/column are computed lazily from the source on first
- * access. Creating one is O(1), which keeps parser failure paths cheap —
- * spans are created for every failed alternative in `or`, and almost all
- * of them are discarded by backtracking without ever being displayed.
- */
-class LazySpan {
-  offset: number
-  length: number
-  #source: string
-  #line = -1
-  #column = -1
-
-  constructor(offset: number, length: number, source: string) {
-    this.offset = offset
-    this.length = length
-    this.#source = source
-  }
-
-  get line(): number {
-    if (this.#line === -1) this.#compute()
-    return this.#line
-  }
-
-  get column(): number {
-    if (this.#column === -1) this.#compute()
-    return this.#column
-  }
-
-  #compute(): void {
-    const pos = positionAt(this.#source, this.offset)
-    this.#line = pos.line
-    this.#column = pos.column
-  }
-}
-
-/**
- * Creates a Span from parser state and optional length.
- *
- * When the state carries its source (all real parser states do), line and
- * column are computed lazily on first access. A state without source falls
- * back to any explicitly provided line/column values.
- *
- * @param state - Parser state containing position information
- * @param length - Length of the span (defaults to 0)
- * @returns A new Span object
- * @example
- * ```typescript
- * const span = Span(parserState, 5);
- * span.line // computed on demand
- * ```
- */
-export function Span(
-  state: {
-    offset: number
-    source?: string
-    line?: number
-    column?: number
-  },
-  length: number = 0
-): Span {
-  if (typeof state.source === "string") {
-    return new LazySpan(state.offset, length, state.source)
-  }
-  return {
-    offset: state.offset,
-    length,
-    line: state.line ?? 1,
-    column: state.column ?? 1
-  }
-}
-
-type ExpectedParseError = {
-  tag: "Expected"
-  span: Span
-  items: string[]
-  context: string[]
-  found?: string
-}
-
-type UnexpectedParseError = {
-  tag: "Unexpected"
-  span: Span
-  found: string
-  context: string[]
-  hints?: string[]
-}
-
-type CustomParseError = {
-  tag: "Custom"
-  span: Span
-  message: string
-  hints?: string[]
-  context: string[]
-}
-
-type FatalParseError = {
-  tag: "Fatal"
-  span: Span
-  message: string
-  context: string[]
-}
-
-/**
- * Union type representing all possible parsing errors.
- * Each error type has a discriminant tag for pattern matching.
- * @example
- * ```typescript
- * function handleError(error: ParseError) {
- *   switch (error.tag) {
- *     case "Expected":
- *       console.log(`Expected ${error.items.join(" or ")}`);
- *       break;
- *     case "Unexpected":
- *       console.log(`Unexpected ${error.found}`);
- *       break;
- *     // ... handle other cases
- *   }
- * }
- * ```
- */
-export type ParseError =
-  | CustomParseError
-  | ExpectedParseError
-  | UnexpectedParseError
-  | FatalParseError
-
-/**
- * Factory functions for creating different types of ParseError objects.
- * Provides a convenient API for constructing errors without manually setting tags.
- * @example
- * ```typescript
- * const span = Span(state);
- *
- * // Create an expected error
- * const expectedError = ParseError.expected({
- *   span,
- *   items: ["identifier", "keyword"],
- *   context: ["function declaration"],
- *   found: "number"
- * });
- *
- * // Create a custom error
- * const customError = ParseError.custom({
- *   span,
- *   message: "Invalid syntax",
- *   context: ["expression"],
- *   hints: ["Try using parentheses"]
- * });
- * ```
- */
-export const ParseError = {
-  /** Creates an ExpectedParseError for when specific tokens were expected */
-  expected: (params: Omit<ExpectedParseError, "tag">): ExpectedParseError => ({
-    tag: "Expected",
-    ...params
-  }),
-  /** Creates an UnexpectedParseError for when an unexpected token was found */
-  unexpected: (
-    params: Omit<UnexpectedParseError, "tag">
-  ): UnexpectedParseError => ({
-    tag: "Unexpected",
-    ...params
-  }),
-  /** Creates a CustomParseError with a custom message */
-  custom: (params: Omit<CustomParseError, "tag">): CustomParseError => ({
-    tag: "Custom",
-    ...params
-  }),
-  /** Creates a FatalParseError that cannot be recovered from */
-  fatal: (params: Omit<FatalParseError, "tag">): FatalParseError => ({
-    tag: "Fatal",
-    ...params
-  })
-}
-
-/**
- * A CustomParseError whose message may be provided as a thunk, so the
- * (template-string) message is only materialized when the error is actually
- * read. Class instances share one hidden class, keeping the parser failure
- * path allocation-cheap.
- * @internal
- */
-export class LazyCustomError {
-  readonly tag = "Custom" as const
-  span: Span
-  context: string[]
-  hints: string[] = []
-  #message: string | (() => string)
-
-  constructor(span: Span, message: string | (() => string), context: string[]) {
-    this.span = span
-    this.#message = message
-    this.context = context
-  }
-
-  get message(): string {
-    if (typeof this.#message === "function") {
-      this.#message = this.#message()
-    }
-    return this.#message
-  }
-}
-
-/**
- * A collection of parsing errors with formatting and analysis capabilities.
- * Automatically determines the primary (furthest) error for reporting.
- * @example
- * ```typescript
- * const errors = [
- *   ParseError.expected({ span: spanAt10, items: ["("], context: [] }),
- *   ParseError.unexpected({ span: spanAt15, found: ")", context: [] })
- * ];
- * const bundle = new ParseErrorBundle(errors, sourceCode);
- *
- * console.log(bundle.toString()); // Shows the furthest error
- * console.log(bundle.format("ansi")); // Formatted with colors
- * ```
- */
-export class ParseErrorBundle {
-  /**
-   * Creates a new ParseErrorBundle.
-   * @param errors - Array of parsing errors
-   * @param source - The original source code being parsed
-   * @returns {ParseErrorBundle} A new ParseErrorBundle instance containing the errors and source
-   */
-  errors: ParseError[]
-  source: string
-
-  constructor(errors: ParseError[], source: string) {
-    this.errors = errors
-    this.source = source
-  }
-
-  /**
-   * Gets the primary error (the one that occurred furthest in the input).
-   * This is typically the most relevant error to show to the user.
-   * @returns {ParseError} The error with the highest offset position
-   */
-  get primary(): ParseError {
-    return this.errors.reduce((furthest, current) =>
-      current.span.offset > furthest.span.offset ? current : furthest
-    )
-  }
-
-  /**
-   * Gets all errors that occurred at the same position as the primary error.
-   * Useful when multiple parse attempts failed at the same location.
-   * @returns {ParseError[]} Array of errors at the furthest position
-   */
-  get primaryErrors(): ParseError[] {
-    const maxOffset = this.primary.span.offset
-    return this.errors.filter(err => err.span.offset === maxOffset)
-  }
-
-  /**
-   * Converts the primary error to a simple string representation.
-   * @returns {string} A human-readable error message
-   */
-  toString(): string {
-    const err = this.primary
-    switch (err.tag) {
-      case "Expected":
-        return `Expected ${err.items.join(" or ")}${err.found ? `, found ${err.found}` : ""}`
-      case "Unexpected":
-        return `Unexpected ${err.found}`
-      case "Custom":
-        return err.message
-      case "Fatal":
-        return `Fatal: ${err.message}`
-    }
-  }
-
-  /**
-   * Formats the error bundle using the specified formatter.
-   * @param format - The output format ("plain", "ansi", "html", or "json")
-   * @returns {string} Formatted error message with context and highlighting
-   */
-  format(format: "plain" | "ansi" | "html" | "json" = "plain"): string {
-    return new ErrorFormatter(format).format(this)
-  }
+export function spanAt(start: number, end = start): Span {
+  return { start, end }
 }

@@ -1,7 +1,7 @@
 {
   "name": "parserator",
-  "version": "0.1.41",
-  "description": "An elegant parser combinators library for Typescript",
+  "version": "0.2.0",
+  "description": "Readable, type-safe parsers for small TypeScript application languages",
   "keywords": [
     "functional-programming",
     "parser",
@@ -20,7 +20,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "type": "module",
   "sideEffects": false,
@@ -29,7 +30,18 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./advanced": {
+      "types": "./dist/advanced.d.ts",
+      "import": "./dist/advanced.js",
+      "default": "./dist/advanced.js"
+    },
+    "./diagnostics": {
+      "types": "./dist/diagnostics.d.ts",
+      "import": "./dist/diagnostics.js",
+      "default": "./dist/diagnostics.js"
     }
   },
   "publishConfig": {
@@ -47,11 +59,12 @@
     "lint": "oxlint",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "ci": "pnpm typecheck && pnpm build && pnpm test && pnpm lint && pnpm format:check",
+    "pack:smoke": "node scripts/pack-smoke.mjs",
+    "ci": "pnpm typecheck && pnpm build && pnpm test && pnpm lint && pnpm format:check && pnpm pack:smoke",
     "prepublishOnly": "pnpm run ci",
-    "release:patch": "npm version patch && pnpm publish",
-    "release:minor": "npm version minor && pnpm publish",
-    "release:major": "npm version major && pnpm publish",
+    "release:patch": "npm version patch",
+    "release:minor": "npm version minor",
+    "release:major": "npm version major",
     "preversion": "pnpm run ci",
     "postversion": "git push && git push --tags"
   },
@@ -67,7 +80,7 @@
     "vitest": "^4.0.0"
   },
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=22"
   },
   "packageManager": "pnpm@11.11.0"
 }

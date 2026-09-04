@@ -7,7 +7,6 @@
  */
 import { bench, group, run, summary } from "mitata"
 import { json as parseratorJson } from "../examples/json-parser.ts"
-import { ParseErrorBundle } from "../src/index.ts"
 import { parseJson as parsimmonJson } from "./json-parsimmon.ts"
 import {
   jsonLarge,
@@ -18,9 +17,9 @@ import {
 } from "./fixtures.ts"
 
 function parserator(input: string): unknown {
-  const result = parseratorJson.parseOrError(input)
-  if (result instanceof ParseErrorBundle) throw new Error("parse failed")
-  return result
+  const result = parseratorJson.parse(input)
+  if (!result.success) throw result.error
+  return result.value
 }
 
 // Sanity: all parsers must agree with JSON.parse before we measure anything.
@@ -44,15 +43,15 @@ for (const [name, fixture] of Object.entries({
 }
 
 const fixtures = [
-  ["small (~150B)", jsonSmall],
-  ["medium (~20KB)", jsonMedium],
-  ["large (~350KB)", jsonLarge],
-  ["strings (~60KB)", jsonStrings],
-  ["numbers (~16KB)", jsonNumbers]
+  ["small", jsonSmall],
+  ["medium", jsonMedium],
+  ["large", jsonLarge],
+  ["strings", jsonStrings],
+  ["numbers", jsonNumbers]
 ] as const
 
 for (const [label, fixture] of fixtures) {
-  group(`JSON ${label}`, () => {
+  group(`JSON ${label} (${fixture.length} UTF-16 units)`, () => {
     summary(() => {
       bench("parserator", () => parserator(fixture))
       bench("parsimmon", () => parsimmonJson(fixture))
