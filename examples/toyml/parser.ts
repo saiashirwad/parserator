@@ -15,6 +15,8 @@ import {
   regex,
   sepBy,
   sepBy1,
+  sepEndBy,
+  sepEndBy1,
   skipMany,
   literal,
   succeed
@@ -345,8 +347,7 @@ const tupleOrParenExpr: Parser<Expr> = parser(function* () {
 const listExpr: Parser<Expr> = parser(function* () {
   yield* token(char("["))
   yield* commit()
-  const elements = yield* sepBy(nonSequenceExpr, token(char(";")))
-  yield* optional(token(char(";")))
+  const elements = yield* sepEndBy(nonSequenceExpr, token(char(";")))
   yield* token(char("]")).expected("closing bracket for list")
   return Expr.list(elements)
 })
@@ -355,7 +356,7 @@ const recordExpr: Parser<Expr> = attempt(
   parser(function* () {
     yield* token(char("{"))
     yield* commit()
-    const fields = yield* sepBy1(
+    const fields = yield* sepEndBy1(
       parser(function* () {
         const label = yield* lowercaseIdent
         yield* token(char("=")).expected("'=' in record field")
@@ -364,7 +365,6 @@ const recordExpr: Parser<Expr> = attempt(
       }),
       token(char(";"))
     )
-    yield* optional(token(char(";")))
     yield* token(char("}")).expected("closing brace for record")
     return Expr.record(fields)
   })
@@ -629,8 +629,7 @@ const recordTypeDef: Parser<TypeDef> = parser(function* () {
   yield* token(char("=")).expected("'=' in record type definition")
   yield* token(char("{"))
   yield* commit()
-  const fields = yield* sepBy1(recordField, token(char(";")))
-  yield* optional(token(char(";")))
+  const fields = yield* sepEndBy1(recordField, token(char(";")))
   yield* token(char("}")).expected("'}' in record type definition")
   return TypeDef.record(params, name, fields)
 })

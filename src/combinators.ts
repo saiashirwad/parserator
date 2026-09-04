@@ -483,7 +483,27 @@ export const sepEndBy1 = <T, S>(
 export function skipMany<T>(inner: Parser<T>): Parser<void>
 export function skipMany(inner: Parser<any>): Parser<void>
 export function skipMany<T>(inner: Parser<T>): Parser<void> {
-  return many(inner).map(() => undefined)
+  return makeParser(state => {
+    let current = state
+    while (true) {
+      const entryGeneration = current.cutGeneration
+      const reply = runParser(inner, current)
+      if (!reply.result.ok) {
+        const control = reply.result.failure.control
+        if (
+          control.kind === "fatal" ||
+          (control.kind === "recoverable" &&
+            control.cutGeneration > entryGeneration)
+        ) {
+          return reply as ParserReply<never> as ParserReply<void>
+        }
+        return replySuccess(undefined, current)
+      }
+      if (reply.state.offset <= current.offset)
+        throw new Error("repeated parser must consume input")
+      current = reply.state
+    }
+  })
 }
 
 function scanUntil<T>(inner: Parser<T>, consumeMatch: boolean): Parser<string> {
@@ -564,7 +584,8 @@ export const regex = (expression: RegExp): Parser<string> => {
   const sticky = new RegExp(expression.source, flags)
   return makeParser(state => {
     sticky.lastIndex = state.offset
-    if (sticky.test(state.source)) {
+    const match = sticky.exec(state.source)
+    if (match?.index === state.offset) {
       const end = sticky.lastIndex
       return replySuccess(
         state.source.slice(state.offset, end),

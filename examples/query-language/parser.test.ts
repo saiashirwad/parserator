@@ -50,6 +50,14 @@ describe("query language", () => {
     })
   })
 
+  test.each([
+    ["version:123abc", "123abc"],
+    ["path:2026/09", "2026/09"],
+    ["version:1.2.3", "1.2.3"]
+  ])("keeps a digit-leading bare value in %s as text", (input, expected) => {
+    expect(query.parseOrThrow(input)).toMatchObject({ value: expected })
+  })
+
   test("rejects keyword prefixes as identifiers", () => {
     const result = query.parse("status:open ANDY owner:me")
     expect(result.success).toBe(false)

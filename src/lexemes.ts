@@ -1,5 +1,9 @@
 import { choice, eof, literal, lookahead } from "./combinators.ts"
-import { anyKeywordWithHints, keywordWithHints } from "./hints.ts"
+import {
+  anyKeywordWithHints,
+  generateHints,
+  keywordWithHints
+} from "./hints.ts"
 import {
   fail,
   failRich,
@@ -9,11 +13,12 @@ import {
   succeed,
   type Parser
 } from "./parser.ts"
-import type { ParserReply } from "./state.ts"
+import { State, type ParserReply } from "./state.ts"
 
 /** Options used to build a small character-stream lexer. */
 export type LexemeOptions<K extends readonly string[]> = {
   readonly trivia: Parser<unknown>
+  /** A raw identifier parser. Its full match also sets keyword boundaries. */
   readonly identifier: Parser<string>
   readonly keywords?: K
 }
@@ -43,8 +48,59 @@ export function createLexemes<const K extends readonly string[]>(
     throw new TypeError("keywords must not contain an empty string")
   }
   const hintedKeyword = keywordWithHints(configuredKeywords)
+  const keywordAtIdentifierBoundary = (
+    candidates: readonly string[],
+    fallback: Parser<string>
+  ): Parser<string> => {
+    const longestFirst = [...candidates].sort((a, b) => b.length - a.length)
+    return makeParser(state => {
+      const matching = longestFirst.filter(word =>
+        State.startsWith(state, word)
+      )
+      if (!matching.length) return runParser(fallback, state)
+
+      const identifier = runParser(options.identifier, state)
+      if (
+        !identifier.result.ok &&
+        identifier.result.failure.control.kind === "fatal"
+      ) {
+        return identifier as ParserReply<never> as ParserReply<string>
+      }
+      const identifierEnd = identifier.result.ok
+        ? identifier.state.offset
+        : state.offset
+      const word = matching.find(
+        candidate => identifierEnd <= state.offset + candidate.length
+      )
+      if (word) return replySuccess(word, State.consume(state, word.length))
+
+      const found = state.source.slice(state.offset, identifierEnd)
+      const hints = generateHints(found, configuredKeywords)
+      return failRich(
+        {
+          diagnostic: {
+            kind: "expected",
+            span: { start: state.offset, end: identifierEnd },
+            expected: longestFirst.map(value => JSON.stringify(value)),
+            found,
+            ...(hints.length ? { hints } : {})
+          },
+          control: {
+            kind: "recoverable",
+            cutGeneration: state.cutGeneration
+          }
+        },
+        state
+      ) as ParserReply<string>
+    })
+  }
   const keywordEndProbe = configuredKeywords.length
-    ? lookahead(anyKeywordWithHints(configuredKeywords)).flatMap(word =>
+    ? lookahead(
+        keywordAtIdentifierBoundary(
+          configuredKeywords,
+          anyKeywordWithHints(configuredKeywords)
+        )
+      ).flatMap(word =>
         fail(`Unexpected trailing keyword ${JSON.stringify(word)}`)
       )
     : undefined
@@ -55,7 +111,9 @@ export function createLexemes<const K extends readonly string[]>(
   const keyword = <const W extends K[number]>(word: W): Parser<W> => {
     if (!(configuredKeywords as readonly string[]).includes(word))
       throw new RangeError(`Keyword ${JSON.stringify(word)} is not configured`)
-    return token(hintedKeyword(word)) as Parser<W>
+    return token(
+      keywordAtIdentifierBoundary([word], hintedKeyword(word))
+    ) as Parser<W>
   }
 
   const identifier = token(options.identifier).flatMap(value =>

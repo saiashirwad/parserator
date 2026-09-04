@@ -62,9 +62,9 @@
     "pack:smoke": "node scripts/pack-smoke.mjs",
     "ci": "pnpm typecheck && pnpm build && pnpm test && pnpm lint && pnpm format:check && pnpm pack:smoke",
     "prepublishOnly": "pnpm run ci",
-    "release:patch": "npm version patch && pnpm publish --provenance --no-git-checks",
-    "release:minor": "npm version minor && pnpm publish --provenance --no-git-checks",
-    "release:major": "npm version major && pnpm publish --provenance --no-git-checks",
+    "release:patch": "npm version patch",
+    "release:minor": "npm version minor",
+    "release:major": "npm version major",
     "preversion": "pnpm run ci",
     "postversion": "git push && git push --tags"
   },

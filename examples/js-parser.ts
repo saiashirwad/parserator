@@ -7,6 +7,7 @@ import {
   fail,
   fatal,
   many,
+  notFollowedBy,
   optional,
   precedence,
   choice,
@@ -274,16 +275,32 @@ const binaryOperator = <T extends string>(
     right
   }))
 
+const nonAssignmentOperator = <const T extends string>(
+  operator: T
+): Parser<T> => literal(operator).zipLeft(notFollowedBy(char("=")))
+
 const binaryExpression: Parser<Expression> = precedence(unaryExpression, [
   {
     associativity: "left",
     operators: [
-      binaryOperator(token(choice(literal("*"), literal("/"), literal("%"))))
+      binaryOperator(
+        token(
+          choice(
+            nonAssignmentOperator("*"),
+            nonAssignmentOperator("/"),
+            literal("%")
+          )
+        )
+      )
     ]
   },
   {
     associativity: "left",
-    operators: [binaryOperator(token(choice(literal("+"), literal("-"))))]
+    operators: [
+      binaryOperator(
+        token(choice(nonAssignmentOperator("+"), nonAssignmentOperator("-")))
+      )
+    ]
   },
   {
     associativity: "left",

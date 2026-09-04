@@ -3,6 +3,7 @@ import {
   choice,
   createLexemes,
   literal,
+  notFollowedBy,
   parser,
   precedence,
   recursive,
@@ -31,7 +32,11 @@ const quotedValue: Parser<string> = lex.token(
 
 const bareValue: Parser<string> = lex.token(regex(/[A-Za-z0-9_./-]+/))
 const numberValue: Parser<number> = lex
-  .token(regex(/-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?/))
+  .token(
+    regex(/-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?/).zipLeft(
+      notFollowedBy(regex(/[A-Za-z0-9_./-]/))
+    )
+  )
   .map(Number)
 const value: Parser<Value> = choice(numberValue, quotedValue, bareValue)
   .expected("query value")

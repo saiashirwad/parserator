@@ -410,9 +410,31 @@ describe("repetition and sequence", () => {
     expect(() => many(succeed("x")).parsePrefix("input")).toThrow(
       /consume input/
     )
+    expect(() => skipMany(succeed("x")).parsePrefix("input")).toThrow(
+      /consume input/
+    )
     expect(() => sepBy(succeed("x"), literal(",")).parse(",")).toThrow(
       /consume input/
     )
+  })
+
+  test("skipMany discards each repeated value", () => {
+    const marker = {}
+    const originalPush = Array.prototype.push
+    Array.prototype.push = function <T>(this: T[], ...items: T[]): number {
+      if (items.some(item => item === marker))
+        throw new Error("skipMany retained a value")
+      return Reflect.apply(originalPush, this, items) as number
+    }
+
+    let result: ParseResult<void> | undefined
+    try {
+      result = skipMany(digit.map(() => marker)).parse("123")
+    } finally {
+      Array.prototype.push = originalPush
+    }
+
+    expect(result).toEqual({ success: true, value: undefined })
   })
 
   test("many1 and atLeast enforce their lower bounds", () => {
@@ -487,6 +509,14 @@ describe("primitive correctness", () => {
     expect(succeeds(regex(/foo/i).parse("FOO"))).toBe("FOO")
     expect(succeeds(regex(/a.b/s).parse("a\nb"))).toBe("a\nb")
     expect(succeeds(regex(/foo/g).parse("foo"))).toBe("foo")
+    expect(succeeds(regex(/😀/u).parse("😀"))).toBe("😀")
+  })
+
+  test("Unicode regex cannot move a sticky match before the current offset", () => {
+    const splitSurrogate = regex(/./).zipRight(regex(/(?=😀)/u))
+    expect(() => splitSurrogate.parse("😀")).not.toThrow()
+    expect(splitSurrogate.parse("😀").success).toBe(false)
+    expect(regex(/./).zipRight(regex(/😀/u)).parse("😀").success).toBe(false)
   })
 
   test("character parsers consume Unicode code points", () => {
