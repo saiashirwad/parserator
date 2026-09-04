@@ -1,12 +1,24 @@
 # Parserator
 
-Parser combinators for TypeScript, written as generator functions.
+Readable, type-safe parsers for small TypeScript application languages.
 
-```typescript
-import { parser, char, regex } from "parserator"
+Parserator is for the point where a regular expression has become brittle,
+but a parser generator would be too much. Grammars are ordinary generator
+functions, so local variables, conditions, and loops stay visible.
+
+```sh
+npm install parserator
+```
+
+Parserator is ESM-only, has no runtime dependencies, targets ES2022, and
+supports Node 22 and newer.
+
+## A small parser
+
+```ts
+import { char, parser, regex } from "parserator"
 
 const number = regex(/-?\d+/).map(Number)
-
 const point = parser(function* () {
   yield* char("(")
   const x = yield* number
@@ -16,212 +28,198 @@ const point = parser(function* () {
   return { x, y }
 })
 
-point.parseOrThrow("(10,20)") // { x: 10, y: 20 }
+point.parseOrThrow("(10,20)")
+// { x: 10, y: 20 }
 ```
 
-## Install
+## A useful application grammar
 
-```bash
-npm install parserator
+The query example parses a filter that an application could put in a search
+box:
+
+```ts
+import { query, queryLexemes } from "./examples/query-language/parser.ts"
+import { evaluate } from "./examples/query-language/evaluate.ts"
+
+const filter = query.parseOrThrow("status:open AND (owner:me OR priority >= 3)")
+
+evaluate(filter, { status: "open", owner: "other", priority: 3 })
+// true
+
+console.dir(filter, { depth: null })
+// {
+//   type: "logical", operator: "AND",
+//   left: { type: "comparison", field: "status", operator: ":", value: "open" },
+//   right: {
+//     type: "logical", operator: "OR",
+//     left: { type: "comparison", field: "owner", operator: ":", value: "me" },
+//     right: { type: "comparison", field: "priority", operator: ">=", value: 3 }
+//   }
+// }
 ```
 
-ESM only. Node 20.19 or newer. No runtime dependencies, and `sideEffects: false`, so it tree-shakes.
+The example has a typed AST, keyword boundaries, parentheses, comparisons,
+operator precedence, dotted fields, evaluation, and malformed-input tests.
+It is in [`examples/query-language/`](examples/query-language).
 
-Version 0.x, one author. The API can change between minor versions. The test suite is still thin, so if an edge case surprises you, trust the source and file an issue. The examples and benchmarks import TypeScript files directly, so running them needs Node 22.6 or newer.
+Malformed input stays structured and points to the operand that is missing:
 
-## What makes it different
+```ts
+const result = query.parse("status:open AND owner:")
+if (!result.success) {
+  result.error.diagnostic
+  // {
+  //   kind: "expected", span: { start: 22, end: 22 },
+  //   expected: ["query value"], context: ["comparison"]
+  // }
+  console.error(result.error.format({ style: "plain" }))
+}
+```
 
-Most combinator libraries make you sequence parsers with `.chain()` or `.then()`. That works until you need an `if` in the middle of a rule, and then the code stops looking like the grammar. Inside `parser(function* () { ... })` you get `if`, `while`, and local variables, and TypeScript still infers the result type from `return`.
+The lexical layer also suggests a known keyword for a close typo:
 
-Errors point at the mistake rather than at wherever the parser gave up. `commit()` marks the place past which a rule will not be abandoned, so `let x 42` reports the missing `=` instead of quietly reading `let` as a variable name. Keyword parsers suggest corrections by edit distance.
+```ts
+const keyword = queryLexemes.keyword("AND").parse("AN")
+if (!keyword.success) keyword.error.diagnostic.hints // ["AND", "OR"]
+```
 
-The state is a string and an offset, with no line or column to maintain. Those get computed only when someone formats an error, and the failure messages of `char`, `string`, and `regex` are thunks that never get built on branches nobody looks at. On the JSON benchmark it beats Parsimmon by 1.6 to 2.6x.
+## The core idea
 
-## Backtracking by default
+`parser(function* () {})` sequences parsers with `yield*`. The yielded value
+has the parser's result type, and the generator's `return` type becomes the
+new parser's type.
 
-One choice shapes everything else: parserator always backtracks. When an alternative fails, `or` tries the next one from the offset where the choice began, no matter how much input the failed branch consumed. If you come from Parsec or Parsimmon, this is inverted. There is no `try` or `attempt` here, because you never need one.
+`choice(a, b, c)` tries alternatives in order and backtracks input by default,
+even when an alternative consumed text. Use `commit()` after the input has
+identified a branch:
 
-The opt-out is `commit()`. Once a branch commits, its failure is final: `or` stops trying alternatives, `many` stops treating it as end of list, `optional` stops treating it as absent. The [errors section](#errors-that-point-at-the-mistake) shows why you want that.
+```ts
+import { commit, literal, parser, regex } from "parserator"
 
-## When not to use it
-
-The whole input is one string in memory, so there is no streaming. A parse stops at the first error it cannot backtrack from; there is no recovery mode that keeps going to report more. Left-recursive grammars loop forever, as in any recursive descent parser. Deep nesting is bounded by the JS call stack: around five thousand levels of recursion throw a `RangeError`. If you need any of those, look elsewhere.
-
-## A tour
-
-### Sequencing
-
-Any `Parser<T>` can be `yield*`ed inside a `parser` block. The yield evaluates to `T`. It must be `yield*`, not a bare `yield`.
-
-```typescript
-import { parser, char, regex, Parser } from "parserator"
-
-const ws = regex(/\s*/)
-const token = <T>(p: Parser<T>) => p.thenDiscard(ws)
-const number = token(regex(/-?\d+/)).map(Number)
-
-const assignment = parser(function* () {
-  const name = yield* token(regex(/[a-z]+/))
-  yield* token(char("="))
-  const value = yield* number
-  return { name, value }
+const identifier = regex(/[A-Za-z_][A-Za-z0-9_]*/)
+const letExpression = parser(function* () {
+  yield* literal("let")
+  yield* commit()
+  const name = yield* identifier.expected("variable name")
+  yield* literal("=").expected("'=' after variable name")
+  return name
 })
 ```
 
-`token` and `number` are reused in the samples below.
+The cut is a generation, not a shared Boolean flag. A cut affects the choice,
+optional parser, or repetition boundary that surrounds it. A nested boundary
+can still make its own decision. `attempt(parser)` isolates cuts made by a
+parser when it fails. A fatal failure always stops recovery.
 
-Method chains are there when a rule is one line. `.map`, `.flatMap`, `.zip`, `.then`, `.thenDiscard`, and `.trim` all return a new parser.
+Keep parser callbacks pure. A speculative branch may run more than once after
+backtracking; perform side effects only after parsing succeeds.
 
-Three things about the block itself. It re-runs from the top every time the parser runs, which means once per `or` alternative tried and once per `many` iteration, so side effects fire on backtracked paths too. A parse failure is not an exception, so you cannot `catch` it inside the block; recover with `or` or `optional` around the whole parser. And when a parse fails partway through a block, the driver abandons the generator without closing it, so `try/finally` and `using` do not run their cleanup. Keep side effects out of parser blocks.
+## Results and diagnostics
 
-### Choice, repetition, recursion
+`parse()` consumes the complete input and returns a discriminated result:
 
-```typescript
-import { or, sepBy, between, Parser } from "parserator"
-
-const list: Parser<unknown[]> = Parser.lazy(() =>
-  between(
-    token(char("[")),
-    token(char("]")),
-    sepBy(or(number, list), token(char(",")))
-  )
-)
-
-list.parseOrThrow("[1, [2, 3], []]") // [1, [2, 3], []]
+```ts
+const result = point.parse("(10,20)")
+if (result.success) {
+  result.value
+} else {
+  console.error(result.error.format({ style: "plain" }))
+}
 ```
 
-`Parser.lazy` delays construction so a parser can refer to itself; the factory runs once and the result is cached. `or` tries its alternatives in order and takes the first that succeeds.
+Use `parsePrefix()` when a caller deliberately wants a prefix and the rest:
 
-For repetition there are `many`, `many1`, `manyN`, `sepBy`, `sepBy1`, and `sepEndBy`. Two list semantics hide behind the similar names: `many0`, `many1`, and `manyN` take an optional separator and accept a trailing one, while `sepBy` rejects it. Pick by whether `1, 2, 3,` should parse. A parser that succeeds without consuming input inside any repeater throws a real `Error` rather than looping forever.
+```ts
+const prefix = number.parsePrefix("42 remaining")
+if (prefix.success) prefix.value.rest // " remaining"
+```
 
-`optional(p)` returns `undefined` instead of failing. `sequence` runs a tuple of parsers and returns a tuple. `lookahead(p)` peeks: it returns `p`'s value if `p` matches here and `undefined` if not, consumes nothing, and never fails. `notFollowedBy(p)` is the one that fails, when `p` does match.
+`parseOrThrow()` returns the value or throws a `ParseError`. A parse error is a
+real `Error` with a source span, structured expectations, context, and a stable
+`toJSON()` representation. `format()` supports plain and ANSI output.
 
-### Errors that point at the mistake
+## Building grammars
 
-```typescript
-import { parser, char, regex, or, commit, string } from "parserator"
+The root API is deliberately small:
 
-const name = token(regex(/[a-z]+/))
+- Primitives: `literal`, `char`, `regex`, `satisfy`, `anyChar`, `eof`.
+- Construction: `succeed`, `fail`, and `fatal` create simple parser results.
+- Composition: `choice`, `optional`, `many`, `many1`, `count`, `sepBy`,
+  `sepBy1`, `sepEndBy`, `between`, `recursive`.
+- Control: `commit`, `attempt`, `lookahead`, `notFollowedBy`.
+- Expression helpers: `chainLeft1`, `chainRight1`, `prefix`, `postfix`,
+  `precedence`.
+- Lexical helpers: `createLexemes` with `token`, `symbol`, `keyword`,
+  `identifier`, `trivia`, and `complete`.
 
-const letExpr = parser(function* () {
-  yield* token(string("let"))
-  yield* commit() // past here, don't backtrack into other branches
-  const n = yield* name.expect("a variable name")
-  yield* token(char("=")).expect("'=' after variable name")
-  const value = yield* number.expect("a number")
-  return { type: "let", name: n, value }
+Parser methods include `map`, `flatMap`, `zip`, `zipLeft`, `zipRight`,
+`expected`, `context`, `validate`, and `withSpan`.
+
+### Cookbook
+
+Whitespace and tokens:
+
+```ts
+import { createLexemes, regex } from "parserator"
+
+const lex = createLexemes({
+  trivia: regex(/[ \t\r\n]*/),
+  identifier: regex(/[A-Za-z_][A-Za-z0-9_]*/),
+  keywords: ["AND", "OR"] as const
 })
 
-const variable = name.map(n => ({ type: "var", name: n }))
-
-const expr = or(letExpr, variable)
-const { result } = expr.parse("let x 42")
-
-if (result._tag === "Left") console.log(result.left.format("plain"))
-else console.log(result.right)
+const open = lex.symbol("(")
+const and = lex.keyword("AND")
 ```
 
-```
-Error at line 1, column 7:
-  >   1 | let x 42
-                ^
-Expected '=' after variable name
-```
+Lists use explicit names for their trailing-separator rules:
+`sepBy` rejects a trailing separator, while `sepEndBy` accepts one. A parser
+inside `many` must consume input when it succeeds.
 
-Now delete the `commit()` line and run it again:
+For expressions, make each operator return a function and list precedence
+levels from tightest to loosest:
 
-```
-{ type: "var", name: "let" }
-```
-
-Without `commit()`, `letExpr` fails at the missing `=`, `or` backtracks to `variable`, and `variable` is happy to read `let` as a name. The parse succeeds with the wrong answer. With `commit()`, the failure inside `letExpr` is final and you get the error above. The same rule applies inside `many` and `optional`: a committed failure is an error, not "end of list" or "not present".
-
-`cut` is an alias of `commit`, for the Prolog-minded. `Parser.fatal(msg)` commits and tags the error as fatal; to the control flow it is `commit()` plus an error nothing softens, and the tag also changes how the error renders.
-
-`.expect(msg)` replaces the error with `Expected <msg>` at the point of failure, so write the message without the word "Expected". `.label(name)` replaces the error with `Expected: <name>`, reported at the start of the labeled parser rather than where it failed, and adds the name to the `Context:` trail in formatted output.
-
-`atomic(p)` clears the commit flag when `p` fails, so a committed or fatal failure inside becomes recoverable at its boundary. That is its whole job: the input position already resets on every backtrack, atomic or not.
-
-Two warnings about the commit flag. First, `.label()` returns the entry state on failure, which silently drops the flag, so `or(letExpr.label("let expression"), variable)` brings back the exact wrong-answer parse shown above. Label the parts inside a committed rule, never the rule you hand to `or`. Second, `or` only honors commits made after it started, so a `commit()` before a choice point turns off commit-awareness for every `or` under it.
-
-Keyword parsers can also suggest a fix:
-
-```typescript
-import { anyKeywordWithHints } from "parserator"
-
-const keyword = anyKeywordWithHints(["let", "match", "fun"])
-const { result } = keyword.parse("mtch")
-if (result._tag === "Left") console.log(result.left.format("plain"))
+```ts
+const expression = precedence(atom, [
+  { associativity: "left", operators: [multiply, divide] },
+  { associativity: "left", operators: [add, subtract] }
+])
 ```
 
-```
-Error at line 1, column 1:
-  >   1 | mtch
-          ^^^^
-Unexpected: mtch
+Use `withSpan` when AST nodes need source locations, and `validate` for local
+semantic checks that belong in the grammar.
 
-  Did you mean: match?
-```
+## Best fit
 
-Suggestions come from Levenshtein distance, two edits or fewer, at most three of them. At distance two, short tokens can draw wrong guesses.
+Parserator works well for search and filter syntax, configuration formats,
+formulas, protocol strings, structured CLI fields, and small internal DSLs.
 
-### Getting results out
+It is not a streaming parser, does not support left recursion, and does not
+provide multi-error recovery. Input is a string held in memory. For a large
+language, token recovery, grammar analysis, or generated syntax diagrams, use
+a parser toolkit built for compilers.
 
-| Method                  | Returns                                                  |
-| ----------------------- | -------------------------------------------------------- |
-| `p.parseOrThrow(input)` | `T`, or throws `ParseErrorBundle`                        |
-| `p.parseOrError(input)` | `T \| ParseErrorBundle`                                  |
-| `p.parse(input)`        | `{ state, result }`, success in `Right`, error in `Left` |
+## Examples and benchmarks
 
-None of these require the parser to reach the end of the input. Add `.thenDiscard(eof)` when the whole string must parse.
+- [`examples/query-language/`](examples/query-language) — typed query AST and
+  evaluator; the main application example.
+- [`examples/json-parser.ts`](examples/json-parser.ts) — recursive grammar and
+  escaping example; not a replacement for `JSON.parse`.
+- [`examples/toyml/`](examples/toyml) — an ML-like grammar with recursion,
+  patterns, records, and variants.
+- [`examples/ini-parser.ts`](examples/ini-parser.ts) and
+  [`examples/scheme-parser.ts`](examples/scheme-parser.ts) — smaller complete
+  grammars.
+- [`bench/`](bench) — reproducible performance and profiling harnesses.
 
-One surprise: `ParseErrorBundle` is not an `Error` subclass, and `parseOrThrow` throws it anyway. It has no `.stack`, and `instanceof Error` is false.
+Benchmarks report environment-specific measurements when run. They validate
+the successful fixtures before timing and do not make a general speed claim.
 
-`or` collects the errors of the alternatives it tried into the bundle; `.expect` and `.label` throw that collection away and start a fresh one. `.primary` is the error that got furthest into the input; on a tie the first one recorded wins, which follows grammar order and is not always the best message.
+## Advanced entry points
 
-`.format()` takes exactly one argument: `"plain"`, `"ansi"`, `"html"`, or `"json"`. To set options, such as context lines (`maxContextLines`, default 3) or hints off (`showHints`), build a `new ErrorFormatter(format, options)` and call its `.format(bundle)`. An options object passed to `.format()` itself is silently ignored.
-
-## Examples
-
-Full parsers live in [`examples/`](examples).
-
-- [`json-parser.ts`](examples/json-parser.ts) is the JSON parser the benchmarks use, and the best first read: a recursive grammar in under a hundred lines.
-- [`ini-parser.ts`](examples/ini-parser.ts) parses INI files and wraps each section in `atomic` so a bad section backtracks cleanly.
-- [`scheme-parser.ts`](examples/scheme-parser.ts) parses S-expressions with `lambda`, `let`, and `if` as special forms, and uses `Parser.fatal`.
-- [`js-parser.ts`](examples/js-parser.ts) handles a JavaScript subset and rejects reserved words as identifiers.
-- [`toyml/`](examples/toyml) is an ML-like language with `let rec`, `match`, records, and variants. Its `if`, `match`, and `fun` rules are the best place to see `commit()` in real use. Its operator precedence is a table of `{ ops, assoc }` levels folded over a parser-building function: the textbook technique, and worth reading if you have not seen it done with combinators.
-
-`node examples/main.ts` runs each one against good and bad input and prints the formatted errors.
-
-## Performance
-
-Mean time to parse, Apple Silicon, Node 24, mitata's default warmup and iteration counts.
-
-| Input           | parserator | parsimmon | `JSON.parse` |
-| --------------- | ---------: | --------: | -----------: |
-| small (~120B)   |      6.3µs |    11.4µs |        229ns |
-| medium (~34KB)  |     1.71ms |    3.03ms |       89.8µs |
-| large (~1.4MB)  |     77.3ms |   136.2ms |       6.17ms |
-| strings (~66KB) |     2.10ms |    3.28ms |       75.4µs |
-| numbers (~11KB) |      406µs |    1.04ms |       15.9µs |
-
-The harness checks both parsers against `JSON.parse` output before timing. `JSON.parse` itself is still 12 to 28x faster, which is the price of combinators.
-
-A few rules hold up in the micro benchmarks. For a run of characters, use `regex`, about 80x faster than `many1(digit)` plus a join, or `takeWhileChar1`, about 16x faster. Put the likeliest alternative first in `or`. Build parsers once, outside any loop. A generator block costs about 2.7x more than a `.zip` or `.then` chain for the same rule, so use chains for the tight inner rules and generators for the grammar above them. The suite is in [`bench/`](bench) and runs with `pnpm bench`.
-
-## API
-
-The package exports about 80 names; every one has JSDoc with an example, so editor hover gives the full signature. The ones I reach for most:
-
-- Primitives: `char`, `string`, `regex`, `anyChar`, `oneOfChars`, `anyOfStrings`, `digit`, `alphabet`, `takeWhileChar`, `takeWhileChar1`, `takeUntil`, `takeUpto`, `eof`, `position`
-- Combinators: `or`, `optional`, `many`, `many1`, `manyN`, `sepBy`, `sepBy1`, `sepEndBy`, `between`, `sequence`, `count`, `lookahead`, `notFollowedBy`, `commit` (alias `cut`), `atomic`
-- Parser methods: `map`, `flatMap`, `zip`, `then`, `thenDiscard`, `trim`, `expect`, `label`, `spanned`, `tap`
-- Constructors: `parser(function* () {})`, `Parser.lazy`, `Parser.lift`, `Parser.error`, `Parser.fatal`
-- Errors and hints: `ParseErrorBundle`, `ErrorFormatter`, `formatError`, `anyKeywordWithHints`, `keywordWithHints`, `stringWithHints`
-
-Beyond these live skip helpers (`skipSpaces`, `skipMany0`, ...), character-class repeaters (`many1Digit`, ...), debug utilities (`peek*`), and the `State`, `Span`, and `Either` layer you need to write a raw `new Parser(state => ...)`. Browse [`src/index.ts`](src/index.ts) and follow the re-exports.
-
-One deliberate absence: there is no standalone `then` export, because a module member named `then` makes the namespace thenable and breaks `await import()`. Use `zipRight`.
+The package root contains the supported application API. Low-level parser
+construction is available from `parserator/advanced`; structured diagnostic
+types are available from `parserator/diagnostics`.
 
 ## License
 
