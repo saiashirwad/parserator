@@ -1,4 +1,4 @@
-import { Either, ErrorFormatter, Parser } from "../src/index.ts"
+import type { Parser } from "../src/index.ts"
 import { dollarKeyword } from "./hints-example.ts"
 import { iniFile } from "./ini-parser.ts"
 import { json } from "./json-parser.ts"
@@ -9,8 +9,6 @@ import {
   programParser as toymlProgram
 } from "./toyml/parser.ts"
 
-const formatter = new ErrorFormatter("ansi")
-
 function truncate(s: string, max = 200): string {
   return s.length > max ? `${s.slice(0, max)}...` : s
 }
@@ -20,12 +18,12 @@ function demo<T>(title: string, p: Parser<T>, inputs: string[]) {
 
   for (const input of inputs) {
     console.log(`Input: ${truncate(input.replace(/\n\s*/g, " "), 60)}`)
-    const { result } = p.parse(input)
+    const result = p.parse(input)
 
-    if (Either.isLeft(result)) {
-      console.log(formatter.format(result.left))
+    if (!result.success) {
+      console.log(result.error.format({ style: "ansi" }))
     } else {
-      console.log("Parsed:", truncate(JSON.stringify(result.right)))
+      console.log("Parsed:", truncate(JSON.stringify(result.value)))
     }
     console.log()
   }

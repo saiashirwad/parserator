@@ -1,217 +1,188 @@
-import { Parser } from "./parser.ts"
-import { type ParseError, Span } from "./errors.ts"
-import { type ParserState, State } from "./state.ts"
+import type { Diagnostic } from "./errors.ts"
+import {
+  failRich,
+  makeParser,
+  replySuccess,
+  runParser,
+  type Parser
+} from "./parser.ts"
+import type { ParserState } from "./state.ts"
+import { State } from "./state.ts"
 
-/**
- * Calculate the Levenshtein distance between two strings.
- * This measures the minimum number of single-character edits (insertions, deletions, or substitutions)
- * required to change one string into another.
- *
- * @param a - The first string
- * @param b - The second string
- * @returns The edit distance between the strings
- */
 export function levenshteinDistance(a: string, b: string): number {
-  // Two-row formulation: previous and current row of the edit matrix
-  let previous: number[] = Array.from({ length: a.length + 1 }, (_, i) => i)
-
+  let previous = Array.from({ length: a.length + 1 }, (_, index) => index)
   for (let j = 1; j <= b.length; j++) {
-    const current: number[] = [j]
-    for (let i = 1; i <= a.length; i++) {
-      const indicator = a[i - 1] === b[j - 1] ? 0 : 1
+    const current = [j]
+    for (let i = 1; i <= a.length; i++)
       current[i] = Math.min(
-        (current[i - 1] ?? Infinity) + 1, // deletion
-        (previous[i] ?? Infinity) + 1, // insertion
-        (previous[i - 1] ?? Infinity) + indicator // substitution
+        current[i - 1]! + 1,
+        previous[i]! + 1,
+        previous[i - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1)
       )
-    }
     previous = current
   }
-
-  return previous[a.length] ?? 0
+  return previous[a.length]!
 }
 
-/**
- * Generate helpful hints for a user's input based on a list of expected values.
- * Uses edit distance to find the closest matches and suggests them as "Did you mean..." options.
- *
- * @param found - The string the user actually typed
- * @param expected - Array of valid/expected strings
- * @param maxDistance - Maximum edit distance to consider (default: 2)
- * @param maxHints - Maximum number of hints to return (default: 3)
- * @returns Array of suggested strings, sorted by edit distance
- */
 export function generateHints(
   found: string,
-  expected: string[],
-  maxDistance: number = 2,
-  maxHints: number = 3
+  expected: readonly string[],
+  maxDistance = 2,
+  maxHints = 3
 ): string[] {
-  const hints: Array<{ word: string; distance: number }> = []
-
-  for (const candidate of expected) {
-    const distance = levenshteinDistance(found, candidate)
-    if (distance <= maxDistance && distance > 0) {
-      hints.push({ word: candidate, distance })
-    }
-  }
-
-  return hints
+  return expected
+    .map(word => ({ word, distance: levenshteinDistance(found, word) }))
+    .filter(item => item.distance > 0 && item.distance <= maxDistance)
     .sort((a, b) => a.distance - b.distance)
     .slice(0, maxHints)
-    .map(h => h.word)
+    .map(item => item.word)
 }
 
-/**
- * Enhanced keyword parser that provides intelligent hints when the user types something similar.
- *
- * @param keywords - Array of valid keywords to match against
- * @returns A function that creates a parser for a specific keyword with hint generation
- *
- * @example
- * ```ts
- * const schemeKeywords = ["lambda", "let", "if", "cond", "define", "quote"]
- * const lambdaParser = keywordWithHints(schemeKeywords)("lambda")
- *
- * // Parsing "lamdba" will suggest "lambda" as a hint
- * const result = lambdaParser.parse("lamdba")
- * ```
- */
-function extractIdentifier(state: ParserState): string {
+const identifierChar = (char: string): boolean => /[A-Za-z0-9_']/u.test(char)
+
+function identifierAt(state: ParserState): string {
   const remaining = State.remaining(state)
-  const match = remaining.match(/^[a-zA-Z_][a-zA-Z0-9_]*/)
-  return match ? match[0] : remaining[0] || "end of input"
+  const match = remaining.match(/^[A-Za-z_][A-Za-z0-9_']*/u)
+  return match?.[0] ?? State.charAt(state)
 }
 
-function unexpectedKeywordError(
+function keywordFailure(
   state: ParserState,
   found: string,
-  keywords: string[]
-): ParseError {
+  expected: readonly string[],
+  keywords: readonly string[]
+): ReturnType<typeof makeParser<never>> {
   const hints = generateHints(found, keywords)
-  return {
-    tag: "Unexpected",
-    span: Span(state, found.length),
-    found,
-    context: state.labelStack || [],
-    ...(hints.length > 0 && { hints })
+  const diagnostic: Diagnostic = {
+    kind: "expected",
+    span: { start: state.offset, end: state.offset + found.length },
+    expected: expected.map(value => JSON.stringify(value)),
+    ...(found ? { found } : {}),
+    ...(hints.length ? { hints } : {})
   }
+  return makeParser(current =>
+    failRich(
+      {
+        diagnostic,
+        control: { kind: "recoverable", cutGeneration: current.cutGeneration }
+      },
+      current
+    )
+  )
 }
 
-export const keywordWithHints =
-  (keywords: string[]): ((keyword: string) => Parser<string>) =>
-  (keyword: string) =>
-    new Parser(state => {
-      const remaining = State.remaining(state)
-      if (remaining.startsWith(keyword)) {
-        return Parser.succeed(keyword, State.consume(state, keyword.length))
-      }
-
-      const found = extractIdentifier(state)
-      return Parser.failRich(
-        { errors: [unexpectedKeywordError(state, found, keywords)] },
-        state
-      )
-    })
-
-/**
- * Creates a parser that matches any of the provided keywords with hint generation.
- *
- * @param keywords - Array of valid keywords
- * @returns A parser that matches any keyword and provides hints for typos
- *
- * @example
- * ```ts
- * const jsKeywords = ["function", "const", "let", "var", "class", "if", "else"]
- * const keywordParser = anyKeywordWithHints(jsKeywords)
- *
- * // Parsing "functoin" will suggest "function"
- * const result = keywordParser.parse("functoin")
- * ```
- */
-export function anyKeywordWithHints(keywords: string[]): Parser<string> {
-  return new Parser(state => {
-    const remaining = State.remaining(state)
-
-    for (const keyword of keywords) {
-      if (remaining.startsWith(keyword)) {
-        return Parser.succeed(keyword, State.consume(state, keyword.length))
-      }
+function sanitizeText(value: string): string {
+  let result = ""
+  for (let offset = 0; offset < value.length;) {
+    const state: ParserState = {
+      source: value,
+      offset,
+      cutGeneration: 0
     }
+    const point = State.charAt(state)
+    result += point
+    offset += State.charWidthAt(state)
+  }
+  return result
+}
 
-    const found = extractIdentifier(state)
-    return Parser.failRich(
-      { errors: [unexpectedKeywordError(state, found, keywords)] },
+function keywordParser(
+  keyword: string,
+  keywords: readonly string[]
+): Parser<string> {
+  return makeParser(state => {
+    if (State.startsWith(state, keyword)) {
+      const next = state.source[state.offset + keyword.length] ?? ""
+      if (!next || !identifierChar(next))
+        return replySuccess(keyword, State.consume(state, keyword.length))
+    }
+    return runParser(
+      keywordFailure(state, identifierAt(state), [keyword], keywords),
       state
     )
   })
 }
 
-/**
- * Creates a parser for string literals with hint generation for common mistakes.
- *
- * @param validStrings - Array of valid string values
- * @returns A parser that matches quoted strings and provides hints for typos
- *
- * @example
- * ```ts
- * const colorParser = stringWithHints(["red", "green", "blue", "yellow"])
- *
- * // Parsing '"gren"' will suggest "green"
- * const result = colorParser.parse('"gren"')
- * ```
- */
-export function stringWithHints(validStrings: string[]): Parser<string> {
-  return new Parser(state => {
-    const remaining = State.remaining(state)
+export const keywordWithHints =
+  (keywords: readonly string[]) =>
+  (keyword: string): Parser<string> =>
+    keywordParser(keyword, keywords)
 
-    // Must start with quote
-    if (!remaining.startsWith('"')) {
-      const error: ParseError = {
-        tag: "Expected",
-        span: Span(state, 1),
-        items: ["string literal"],
-        context: state.labelStack || []
+export function anyKeywordWithHints(
+  keywords: readonly string[]
+): Parser<string> {
+  const sorted = [...keywords].sort((a, b) => b.length - a.length)
+  return makeParser(state => {
+    for (const keyword of sorted) {
+      if (State.startsWith(state, keyword)) {
+        const next = state.source[state.offset + keyword.length] ?? ""
+        if (!next || !identifierChar(next))
+          return replySuccess(keyword, State.consume(state, keyword.length))
       }
-      return Parser.failRich({ errors: [error] }, state)
     }
+    return runParser(
+      keywordFailure(state, identifierAt(state), sorted, sorted),
+      state
+    )
+  })
+}
 
-    // Find the closing quote
-    let i = 1
-    const chars: string[] = []
-    while (i < remaining.length && remaining[i] !== '"') {
-      chars.push(remaining[i]!)
-      i++
+export function stringWithHints(
+  validStrings: readonly string[]
+): Parser<string> {
+  return makeParser(state => {
+    if (State.charAt(state) !== '"') {
+      const found = State.charAt(state)
+      return failRich(
+        {
+          diagnostic: {
+            kind: "expected",
+            span: { start: state.offset, end: state.offset + found.length },
+            expected: ["string literal"],
+            ...(found ? { found } : {})
+          },
+          control: { kind: "recoverable", cutGeneration: state.cutGeneration }
+        },
+        state
+      )
     }
-
-    if (i >= remaining.length) {
-      const error: ParseError = {
-        tag: "Expected",
-        span: Span(state, i),
-        items: ["closing quote"],
-        context: state.labelStack || []
-      }
-      return Parser.failRich({ errors: [error] }, state)
+    let offset = state.offset + 1
+    while (offset < state.source.length && state.source[offset] !== '"')
+      offset++
+    if (offset >= state.source.length)
+      return failRich(
+        {
+          diagnostic: {
+            kind: "expected",
+            span: { start: offset, end: offset },
+            expected: ["closing quote"],
+            message: "Expected closing quote"
+          },
+          control: { kind: "recoverable", cutGeneration: state.cutGeneration }
+        },
+        state
+      )
+    const value = state.source.slice(state.offset + 1, offset)
+    if (validStrings.includes(value))
+      return replySuccess(
+        value,
+        State.consume(state, offset - state.offset + 1)
+      )
+    const hints = generateHints(value, validStrings)
+    const diagnostic: Diagnostic = {
+      kind: "unexpected",
+      span: { start: state.offset, end: offset + 1 },
+      found: JSON.stringify(sanitizeText(value)),
+      ...(hints.length
+        ? { hints: hints.map(hint => JSON.stringify(hint)) }
+        : {})
     }
-
-    const content = chars.join("")
-
-    // Check if content is valid
-    if (validStrings.includes(content)) {
-      return Parser.succeed(content, State.consume(state, i + 1))
-    }
-
-    // Generate hints for invalid content
-    const hints = generateHints(content, validStrings)
-
-    const error: ParseError = {
-      tag: "Unexpected",
-      span: Span(state, i + 1),
-      found: `"${content}"`,
-      context: state.labelStack || [],
-      ...(hints.length > 0 && { hints: hints.map(h => `"${h}"`) })
-    }
-
-    return Parser.failRich({ errors: [error] }, state)
+    return failRich(
+      {
+        diagnostic,
+        control: { kind: "recoverable", cutGeneration: state.cutGeneration }
+      },
+      state
+    )
   })
 }

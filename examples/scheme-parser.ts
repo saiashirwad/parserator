@@ -1,20 +1,22 @@
 import {
-  atomic,
+  attempt,
   char,
   commit,
   digit,
   eof,
+  fatal,
   many,
   many1,
   optional,
-  or,
+  choice,
   parser,
-  Parser,
+  recursive,
   regex,
-  skipMany0,
-  string,
+  skipMany,
+  literal,
   takeUpto
 } from "../src/index.ts"
+import type { Parser } from "../src/index.ts"
 import { peekAhead } from "../src/utils.ts"
 
 export namespace LispExpr {
@@ -94,13 +96,13 @@ export const LispExpr = {
 // Lexical Elements
 // =============================================================================
 
-const whitespace = regex(/\s+/).label("whitespace")
-const lineComment = regex(/;[^\n]*/).label("line comment")
-const space = or(whitespace, lineComment)
-const spaces = skipMany0(space)
+const whitespace = regex(/\s+/).context("whitespace")
+const lineComment = regex(/;[^\n]*/).context("line comment")
+const space = choice(whitespace, lineComment)
+const spaces = skipMany(space)
 
 function token<T>(parser: Parser<T>): Parser<T> {
-  return parser.trimLeft(spaces)
+  return spaces.zipRight(parser)
 }
 
 // =============================================================================
@@ -112,9 +114,9 @@ export let expr: Parser<LispExpr.LispExpr>
 
 const symbol = token(
   parser(function* () {
-    const name = yield* regex(/[^()\s;]+/).label("symbol name")
+    const name = yield* regex(/[^()\s;]+/).context("symbol name")
     if (name === "") {
-      return yield* Parser.fatal("Empty symbol")
+      return yield* fatal("Empty symbol")
     }
     return LispExpr.symbol(name)
   })
@@ -123,12 +125,12 @@ const symbol = token(
 const number = token(
   parser(function* () {
     const sign = (yield* optional(char("-"))) ?? ""
-    const digits = yield* many1(digit).expect("Expected digit in number")
+    const digits = yield* many1(digit).expected("digit in number")
     const decimalPart = yield* optional(
       parser(function* () {
         yield* char(".")
-        const fractionalDigits = yield* many1(digit).expect(
-          "Expected digits after decimal point"
+        const fractionalDigits = yield* many1(digit).expected(
+          "digits after decimal point"
         )
         return "." + fractionalDigits.join("")
       })
@@ -146,29 +148,29 @@ const stringLiteral = token(
     yield* commit()
 
     const value = yield* takeUpto(char('"'))
-    yield* char('"').expect("closing quote for string literal")
+    yield* char('"').expected("closing quote for string literal")
     return LispExpr.string(value)
   })
 )
 
 const boolean = token(
-  or(
-    string("#t").map(() => LispExpr.bool(true)),
-    string("#f").map(() => LispExpr.bool(false))
-  ).label("boolean")
+  choice(
+    literal("#t").map(() => LispExpr.bool(true)),
+    literal("#f").map(() => LispExpr.bool(false))
+  ).context("boolean")
 )
 
-const atom = or(boolean, number, stringLiteral, symbol)
+const atom = choice(boolean, number, stringLiteral, symbol)
 
 // List parsing with better error handling
-const list = atomic(
+const list = attempt(
   parser(function* () {
     yield* token(char("("))
     yield* commit()
 
-    const items = yield* many(Parser.lazy(() => expr))
+    const items = yield* many(recursive(() => expr))
 
-    yield* token(char(")")).expect("closing parenthesis ')'")
+    yield* token(char(")")).expected("closing parenthesis ')'")
     return items
   })
 )
@@ -177,7 +179,7 @@ const list = atomic(
 const lambdaParser = (items: LispExpr.LispExpr[]) =>
   parser(function* () {
     if (items.length !== 3) {
-      return yield* Parser.fatal(
+      return yield* fatal(
         "Lambda requires exactly 3 elements: (lambda (params...) body)"
       )
     }
@@ -190,17 +192,17 @@ const lambdaParser = (items: LispExpr.LispExpr[]) =>
     ]
 
     if (lambdaSymbol.type !== "Symbol" || lambdaSymbol.name !== "lambda") {
-      return yield* Parser.fatal("Expected 'lambda' keyword")
+      return yield* fatal("Expected 'lambda' keyword")
     }
 
     if (paramsExpr.type !== "List") {
-      return yield* Parser.fatal("Lambda parameters must be a list")
+      return yield* fatal("Lambda parameters must be a list")
     }
 
     const params: string[] = []
     for (const param of paramsExpr.items) {
       if (param.type !== "Symbol") {
-        return yield* Parser.fatal("Lambda parameters must be symbols")
+        return yield* fatal("Lambda parameters must be symbols")
       }
       params.push(param.name)
     }
@@ -211,7 +213,7 @@ const lambdaParser = (items: LispExpr.LispExpr[]) =>
 const letParser = (items: LispExpr.LispExpr[]) =>
   parser(function* () {
     if (items.length !== 3) {
-      return yield* Parser.fatal(
+      return yield* fatal(
         "Let requires exactly 3 elements: (let ((var val)...) body)"
       )
     }
@@ -224,17 +226,17 @@ const letParser = (items: LispExpr.LispExpr[]) =>
     ]
 
     if (letSymbol.type !== "Symbol" || letSymbol.name !== "let") {
-      return yield* Parser.fatal("Expected 'let' keyword")
+      return yield* fatal("Expected 'let' keyword")
     }
 
     if (bindingsExpr.type !== "List") {
-      return yield* Parser.fatal("Let bindings must be a list")
+      return yield* fatal("Let bindings must be a list")
     }
 
     const bindings: LispExpr.Let["bindings"] = []
     for (const binding of bindingsExpr.items) {
       if (binding.type !== "List" || binding.items.length !== 2) {
-        return yield* Parser.fatal(
+        return yield* fatal(
           "Each let binding must be a list of exactly 2 elements"
         )
       }
@@ -245,7 +247,7 @@ const letParser = (items: LispExpr.LispExpr[]) =>
         LispExpr.LispExpr
       ]
       if (nameExpr.type !== "Symbol") {
-        return yield* Parser.fatal("Let binding name must be a symbol")
+        return yield* fatal("Let binding name must be a symbol")
       }
 
       bindings.push({ name: nameExpr.name, value: valueExpr })
@@ -257,7 +259,7 @@ const letParser = (items: LispExpr.LispExpr[]) =>
 const ifParser = (items: LispExpr.LispExpr[]) =>
   parser(function* () {
     if (items.length !== 4) {
-      return yield* Parser.fatal(
+      return yield* fatal(
         "If requires exactly 4 elements: (if condition consequent alternate)"
       )
     }
@@ -271,7 +273,7 @@ const ifParser = (items: LispExpr.LispExpr[]) =>
     ]
 
     if (ifSymbol.type !== "Symbol" || ifSymbol.name !== "if") {
-      return yield* Parser.fatal("Expected 'if' keyword")
+      return yield* fatal("Expected 'if' keyword")
     }
 
     return LispExpr.if(condition, consequent, alternate)
@@ -281,7 +283,7 @@ const ifParser = (items: LispExpr.LispExpr[]) =>
 const listParser = list.flatMap(items =>
   parser(function* () {
     if (items.length === 0) {
-      return yield* Parser.fatal("Empty list not allowed")
+      return yield* fatal("Empty list not allowed")
     }
 
     const first = items[0]! // non-empty: checked above
@@ -316,10 +318,10 @@ export const program = parser(function* () {
   yield* spaces
   const expressions = yield* many(expr)
   yield* spaces
-  yield* eof.expect("end of input")
+  yield* eof.expected("end of input")
 
   if (expressions.length === 0) {
-    return yield* Parser.fatal("Expected at least one expression")
+    return yield* fatal("Expected at least one expression")
   }
 
   return expressions
@@ -330,6 +332,6 @@ export const lispParser = parser(function* () {
   yield* spaces
   const result = yield* expr
   yield* spaces
-  yield* eof.expect("end of input")
+  yield* eof.expected("end of input")
   return result
 })

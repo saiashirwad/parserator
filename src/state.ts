@@ -1,212 +1,128 @@
-import type { Either } from "./either.ts"
-import { type ParseErrorBundle, positionAt, type Span } from "./errors.ts"
+import { SourceText, type Failure, type Span } from "./errors.ts"
 
-export type Spanned<T> = [value: T, span: Span]
+export type Spanned<T> = { readonly value: T; readonly span: Span }
 
-/**
- * Represents the output of a parser operation, containing both the updated state
- * and the parsing result (either success or error).
- * @template T - The type of the successfully parsed value
- */
-export type ParserOutput<T> = {
-  /** The parser state after the operation */
-  state: ParserState
-  /** Either a successful result of type T or a ParseErrorBundle */
-  result: Either<T, ParseErrorBundle>
+export type ParserState = {
+  readonly source: string
+  readonly offset: number
+  readonly cutGeneration: number
+  /** Context from the last parser wrapped in `context`, used by full-input parsing. */
+  readonly completionContext?: readonly string[]
 }
 
-/**
- * Factory function for creating ParserOutput objects.
- * @template T - The type of the successfully parsed value
- * @param state - The parser state after the operation
- * @param result - Either a successful result or error bundle
- * @returns A new ParserOutput object
- */
+export type Success<T> = { readonly ok: true; readonly value: T }
+export type FailureResult = { readonly ok: false; readonly failure: Failure }
+export type ParserReply<T> = {
+  readonly state: ParserState
+  readonly result: Success<T> | FailureResult
+}
+export type Reply<T> = ParserReply<T>
+export type ParserOutput<T> = ParserReply<T>
+
 export const ParserOutput = <T>(
   state: ParserState,
-  result: Either<T, ParseErrorBundle>
-): ParserOutput<T> => ({
-  state,
-  result
-})
+  result: Success<T> | FailureResult
+): ParserReply<T> => ({ state, result })
 
-/**
- * Represents a position within source code with line, column, and byte offset.
- * Line and column are 1-indexed for human readability.
- */
 export type SourcePosition = {
-  /** Line number (1-indexed) */
-  line: number
-  /** Column number (1-indexed) */
-  column: number
-  /** Byte offset from start of input (0-indexed) */
-  offset: number
+  readonly line: number
+  readonly column: number
+  readonly offset: number
 }
 
-/**
- * Represents the complete state of a parser at any point during parsing.
- * Contains the input being parsed, current position, and optional context information.
- *
- * Note: line/column are not tracked here — they are derived lazily from
- * (source, offset) only when an error is displayed. This keeps advancing
- * the parser O(1) instead of O(n) per consumed character.
- */
-export type ParserState = {
-  /** The complete original input string */
-  source: string
-  /** Current byte offset from start of input (0-indexed) */
-  offset: number
-  /** Stack of parsing context labels for error reporting */
-  labelStack?: string[] | undefined
-  /** Whether the parser has committed to this parse path */
-  committed?: boolean | undefined
-}
-
-/**
- * Creates a new state at the given offset, preserving source and context.
- * Prefer this over object spread in hot paths — it creates a single
- * consistent hidden class for all parser states.
- */
 const advanced = (state: ParserState, offset: number): ParserState => ({
   source: state.source,
   offset,
-  labelStack: state.labelStack,
-  committed: state.committed
+  cutGeneration: state.cutGeneration,
+  ...(state.completionContext
+    ? { completionContext: state.completionContext }
+    : {})
 })
 
-/**
- * Utility object containing static methods for creating and manipulating parser state.
- */
-export const State = {
-  /**
-   * Creates a new parser state from an input string.
-   *
-   * @param input - The input string to parse
-   * @returns A new parser state initialized at the start of the input
-   */
-  fromInput(input: string): ParserState {
-    return {
-      source: input,
-      offset: 0,
-      labelStack: undefined,
-      committed: undefined
-    }
-  },
+function codePointAt(
+  source: string,
+  offset: number
+): {
+  readonly value: string
+  readonly width: number
+} {
+  const first = source.charCodeAt(offset)
+  if (Number.isNaN(first)) return { value: "", width: 0 }
 
-  /**
-   * Gets the remaining unparsed portion of the input.
-   * Note: this allocates a new string. Prefer peek() or charAt() in hot code.
-   *
-   * @param state - The current parser state
-   * @returns The remaining input string from current offset
-   */
+  if (first >= 0xd800 && first <= 0xdbff) {
+    const second = source.charCodeAt(offset + 1)
+    if (second >= 0xdc00 && second <= 0xdfff) {
+      return { value: source.slice(offset, offset + 2), width: 2 }
+    }
+    return { value: "\ufffd", width: 1 }
+  }
+
+  if (first >= 0xdc00 && first <= 0xdfff) {
+    return { value: "\ufffd", width: 1 }
+  }
+
+  return { value: source[offset]!, width: 1 }
+}
+
+export const State = {
+  fromInput(input: string): ParserState {
+    return { source: input, offset: 0, cutGeneration: 0 }
+  },
   remaining(state: ParserState): string {
     return state.source.slice(state.offset)
   },
-
-  /**
-   * Gets the character at the current offset.
-   *
-   * @param state - The current parser state
-   * @returns The character at current offset, or empty string if at end
-   */
+  /** Returns one Unicode code point, while offsets remain UTF-16 indices. */
   charAt(state: ParserState): string {
-    return state.source[state.offset] || ""
+    return codePointAt(state.source, state.offset).value
   },
-
-  /**
-   * Checks if remaining input starts with the given string.
-   *
-   * @param state - The current parser state
-   * @param str - The string to check for
-   * @returns True if remaining input starts with str
-   */
-  startsWith(state: ParserState, str: string): boolean {
-    return state.source.startsWith(str, state.offset)
+  charWidthAt(state: ParserState): number {
+    return codePointAt(state.source, state.offset).width
   },
-
-  /**
-   * Creates a new state by consuming n characters from the current state.
-   *
-   * @param state - The current parser state
-   * @param n - Number of characters to consume
-   * @returns A new state with n characters consumed
-   * @throws Error if attempting to consume more characters than remaining
-   */
+  startsWith(state: ParserState, value: string): boolean {
+    return state.source.startsWith(value, state.offset)
+  },
   consume(state: ParserState, n: number): ParserState {
-    if (n === 0) return state
-    if (n > state.source.length - state.offset) {
-      throw new Error("Cannot consume more characters than remaining")
-    }
-    return advanced(state, state.offset + n)
+    if (!Number.isSafeInteger(n) || n < 0)
+      throw new RangeError("consume expects a safe nonnegative integer")
+    if (n > state.source.length - state.offset)
+      throw new RangeError("Cannot consume more input than remains")
+    return n === 0 ? state : advanced(state, state.offset + n)
   },
-
-  /**
-   * Creates a new state by consuming characters while a predicate is true.
-   *
-   * @param state - The current parser state
-   * @param predicate - Function that tests each character
-   * @returns A new state with matching characters consumed
-   */
   consumeWhile(
     state: ParserState,
     predicate: (char: string) => boolean
   ): ParserState {
-    const source = state.source
-    const length = source.length
-    let end = state.offset
-    while (end < length && predicate(source.charAt(end))) {
-      end++
+    let offset = state.offset
+    while (offset < state.source.length) {
+      const point = codePointAt(state.source, offset)
+      if (!point.value || !predicate(point.value)) break
+      offset += point.width
     }
-    if (end === state.offset) return state
-    return advanced(state, end)
+    return offset === state.offset ? state : advanced(state, offset)
   },
-
-  /**
-   * Gets the next n characters from the input without consuming them.
-   *
-   * @param state - The current parser state
-   * @param n - Number of characters to peek (default: 1)
-   * @returns The next n characters as a string
-   */
-  peek(state: ParserState, n: number = 1): string {
-    return state.source.slice(state.offset, state.offset + n)
+  peek(state: ParserState, n = 1): string {
+    if (!Number.isSafeInteger(n) || n < 0)
+      throw new RangeError("peek expects a safe nonnegative integer")
+    let result = ""
+    let offset = state.offset
+    for (let index = 0; index < n && offset < state.source.length; index++) {
+      const point = codePointAt(state.source, offset)
+      result += point.value
+      offset += point.width
+    }
+    return result
   },
-
-  /**
-   * Checks if the parser has reached the end of input.
-   *
-   * @param state - The current parser state
-   * @returns True if at end of input, false otherwise
-   */
   isAtEnd(state: ParserState): boolean {
     return state.offset >= state.source.length
   },
-
-  /**
-   * Creates a human-readable string representation of the current parser position.
-   *
-   * @param state - The current parser state
-   * @returns A formatted string showing line, column, and offset
-   */
   printPosition(state: ParserState): string {
-    const { line, column } = positionAt(state.source, state.offset)
-    return `line ${line}, column ${column}, offset ${state.offset}`
+    const source = new SourceText(state.source)
+    const position = source.positionAt(state.offset)
+    return `line ${position.line}, column ${position.column}, offset ${state.offset}`
   },
-
-  /**
-   * Creates a SourcePosition from the current parser state.
-   * Line and column are computed on demand from the source.
-   *
-   * @param state - The current parser state
-   * @returns A SourcePosition object
-   */
   toPosition(state: ParserState): SourcePosition {
-    const { line, column } = positionAt(state.source, state.offset)
-    return {
-      line,
-      column,
-      offset: state.offset
-    }
+    const source = new SourceText(state.source)
+    const position = source.positionAt(state.offset)
+    return { ...position, offset: state.offset }
   }
 }
