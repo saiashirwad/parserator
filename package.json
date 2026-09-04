@@ -1,6 +1,6 @@
 {
   "name": "parserator",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Readable, type-safe parsers for small TypeScript application languages",
   "keywords": [
     "functional-programming",
