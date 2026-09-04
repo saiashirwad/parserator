@@ -328,14 +328,9 @@ const tupleOrParenExpr: Parser<Expr> = parser(function* () {
   yield* token(char("("))
   const first = yield* optional(expr)
   if (first === undefined) {
+    const op = yield* optional(operator)
     yield* token(char(")")).expected("closing paren")
-    return Expr.unit()
-  }
-
-  const hasOp = yield* optional(operator)
-  if (hasOp && first.tag === "EVar") {
-    yield* token(char(")")).expected("closing paren for operator section")
-    return Expr.var(hasOp)
+    return op === undefined ? Expr.unit() : Expr.var(op)
   }
 
   const rest = yield* many(token(char(",")).zipRight(expr))
@@ -493,7 +488,7 @@ const prefixExpr: Parser<Expr> = choice(
   parser(function* () {
     const op = yield* choice(
       token(char("-")).zipLeft(notFollowedBy(regex(/[0-9]/))),
-      token(literal("not"))
+      keyword("not")
     )
     const arg = yield* applicationExpr
     return Expr.prefix(op, arg)

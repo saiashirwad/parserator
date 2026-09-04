@@ -30,6 +30,15 @@ export type SourcePosition = {
   readonly offset: number
 }
 
+// Keep only the last source so position reads share an index without an
+// unbounded cache of completed inputs.
+let positionSource: SourceText | undefined
+
+function sourceForPosition(text: string): SourceText {
+  if (positionSource?.text !== text) positionSource = new SourceText(text)
+  return positionSource
+}
+
 const advanced = (state: ParserState, offset: number): ParserState => ({
   source: state.source,
   offset,
@@ -116,12 +125,11 @@ export const State = {
     return state.offset >= state.source.length
   },
   printPosition(state: ParserState): string {
-    const source = new SourceText(state.source)
-    const position = source.positionAt(state.offset)
+    const position = State.toPosition(state)
     return `line ${position.line}, column ${position.column}, offset ${state.offset}`
   },
   toPosition(state: ParserState): SourcePosition {
-    const source = new SourceText(state.source)
+    const source = sourceForPosition(state.source)
     const position = source.positionAt(state.offset)
     return { ...position, offset: state.offset }
   }

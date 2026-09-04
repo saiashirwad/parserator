@@ -39,10 +39,11 @@ export function generateHints(
 }
 
 const identifierChar = (char: string): boolean => /[A-Za-z0-9_']/u.test(char)
+const identifierPattern = /[A-Za-z_][A-Za-z0-9_']*/uy
 
 function identifierAt(state: ParserState): string {
-  const remaining = State.remaining(state)
-  const match = remaining.match(/^[A-Za-z_][A-Za-z0-9_']*/u)
+  identifierPattern.lastIndex = state.offset
+  const match = identifierPattern.exec(state.source)
   return match?.[0] ?? State.charAt(state)
 }
 

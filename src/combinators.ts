@@ -376,8 +376,9 @@ export function optional<T>(inner: Parser<T>): Parser<T | undefined> {
 export function many1<T>(inner: Parser<T>): Parser<T[]>
 export function many1(inner: Parser<any>): Parser<any[]>
 export function many1<T>(inner: Parser<T>): Parser<T[]> {
+  const repeated = many(inner)
   return makeParser(state => {
-    const reply = runParser(many(inner), state)
+    const reply = runParser(repeated, state)
     if (!reply.result.ok) return reply
     if (reply.result.value.length) return reply
     return failureAt(state, {

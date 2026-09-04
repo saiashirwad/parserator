@@ -39,14 +39,11 @@ writeFileSync(
     type: "module"
   })
 )
-run("npm", [
-  "install",
-  "--ignore-scripts",
-  "--no-package-lock",
-  "--prefix",
-  consumer,
-  tarballPath
-])
+run(
+  "npm",
+  ["install", "--ignore-scripts", "--no-package-lock", tarballPath],
+  consumer
+)
 
 writeFileSync(
   join(consumer, "index.mjs"),

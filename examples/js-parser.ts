@@ -26,7 +26,7 @@ import type { Parser } from "../src/index.ts"
 // =============================================================================
 
 const whitespace = regex(/\s+/).context("whitespace")
-const lineComment = regex(/\/\/[^\n]*/).context("line comment")
+const lineComment = regex(/\/\/[^\r\n\u2028\u2029]*/).context("line comment")
 const blockComment = regex(/\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\//).context(
   "block comment"
 )
@@ -433,7 +433,13 @@ const ifStatement: Parser<Statement> = parser(function* () {
 const returnStatement: Parser<Statement> = parser(function* () {
   yield* keyword("return")
 
-  const value = yield* optional(regex(/(?![;\n])/).zipRight(expression))
+  const trivia = yield* many(space)
+  if (trivia.some(text => /[\r\n\u2028\u2029]/u.test(text))) {
+    yield* optional(char(";"))
+    return { type: "return" as const, value: undefined }
+  }
+
+  const value = yield* optional(expression)
 
   yield* token(char(";")).expected("semicolon after return statement")
 

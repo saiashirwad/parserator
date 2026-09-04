@@ -5,16 +5,19 @@ import {
   digit,
   literal,
   parser,
+  position,
   sequence,
   Parser
 } from "../src/index"
-import type { ParseResult } from "../src/index"
+import type { ParseResult, SourcePosition } from "../src/index"
 
 // This file is included by the repository's strict tsc check. The assignments
 // below are compile-time assertions; `void` keeps the assertion values live
 // without adding runtime tests.
 
 const literalResult: ParseResult<"let"> = literal("let").parse("let")
+const parsedPosition: SourcePosition = position.parseOrThrow("")
+void parsedPosition
 if (literalResult.success) {
   const value: "let" = literalResult.value
   void value

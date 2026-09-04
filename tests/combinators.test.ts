@@ -33,6 +33,13 @@ import {
   takeUpto,
   attempt
 } from "../src/index"
+import {
+  anyKeywordWithHints,
+  keywordWithHints,
+  position,
+  SourceText
+} from "../src/index"
+import { State } from "../src/state"
 import { peekUntil } from "../src/utils"
 import { ParseError } from "../src/index"
 import type { ParseResult, Parser as ParserType } from "../src/index"
@@ -92,6 +99,47 @@ describe("parse boundary and results", () => {
 })
 
 describe("errors", () => {
+  test("position reads stay correct when inputs and offsets change", () => {
+    const p = many(anyChar().zipRight(position))
+    expect(p.parseOrThrow("a\r\nb")).toEqual([
+      { line: 1, column: 2, offset: 1 },
+      { line: 1, column: 3, offset: 2 },
+      { line: 2, column: 1, offset: 3 },
+      { line: 2, column: 2, offset: 4 }
+    ])
+    expect(p.parseOrThrow("xy")).toEqual([
+      { line: 1, column: 2, offset: 1 },
+      { line: 1, column: 3, offset: 2 }
+    ])
+    expect(
+      State.printPosition(State.consume(State.fromInput("a\r\nb"), 3))
+    ).toBe("line 2, column 1, offset 3")
+  })
+
+  test.each(["", "a\n", "a\rb\r\n", "a\nb\rc\r\nd"])(
+    "cached line counts match positions for %j",
+    text => {
+      const source = new SourceText(text)
+      expect(source.lineCount).toBe(source.positionAt(text.length).line)
+    }
+  )
+
+  test("keyword hints match at the current offset across repeated failures", () => {
+    for (const keyword of [
+      keywordWithHints(["return"])("return"),
+      anyKeywordWithHints(["return"])
+    ]) {
+      const p = literal("xx ").zipRight(keyword)
+      for (const input of ["xx retrn", "xx !", "xx retrn"]) {
+        const error = fails(p.parse(input))
+        expect(error.diagnostic.span.start).toBe(3)
+        expect(error.diagnostic.found).toBe(input.slice(3))
+        if (input.endsWith("retrn"))
+          expect(error.diagnostic.hints).toContain("return")
+      }
+    }
+  })
+
   test("errors are Error instances with formatting and JSON", () => {
     const error = fails(
       sequence([literal("a"), literal("b").expected("the second letter")])

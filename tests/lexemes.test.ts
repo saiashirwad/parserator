@@ -2,6 +2,20 @@ import { describe, expect, test } from "vitest"
 import { createLexemes, fatal, literal, regex } from "../src/index.ts"
 
 describe("createLexemes", () => {
+  test("reserved-word errors cover the identifier before trailing trivia", () => {
+    const lex = createLexemes({
+      trivia: regex(/\s*/),
+      identifier: regex(/[A-Za-z]+/),
+      keywords: ["AND"] as const
+    })
+    const result = lex.complete(lex.identifier).parse("  AND \n next")
+    expect(result.success).toBe(false)
+    if (result.success) return
+    expect(result.error.diagnostic.span).toEqual({ start: 2, end: 5 })
+    expect(result.error.diagnostic.message).toBe('"AND" is a reserved keyword')
+    expect(result.error.format()).toContain("line 1, column 3")
+  })
+
   test.each([
     [/[A-Za-z_][A-Za-z0-9_.]*/, "AND.owner"],
     [/[A-Za-z_][A-Za-z0-9_-]*/, "AND-owner"],

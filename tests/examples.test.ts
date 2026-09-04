@@ -8,6 +8,60 @@ import {
 } from "../examples/toyml/parser.ts"
 
 describe("shipped examples", () => {
+  test.each([
+    "\n",
+    " \n ",
+    "\r",
+    "\r\n",
+    "\u2028",
+    "\u2029",
+    " /*\n*/ ",
+    " // comment\r\n"
+  ])("a return ends before a line break in %j", trivia => {
+    expect(jsProgram.parseOrThrow(`return${trivia}value;`)).toEqual([
+      { type: "return", value: undefined },
+      { type: "expression", expression: { type: "identifier", name: "value" } }
+    ])
+    expect(jsProgram.parseOrThrow(`return${trivia};`)).toEqual([
+      { type: "return", value: undefined }
+    ])
+  })
+
+  test("a return accepts an expression after same-line trivia", () => {
+    expect(jsProgram.parseOrThrow("return /* comment */ value;")).toEqual([
+      { type: "return", value: { type: "identifier", name: "value" } }
+    ])
+    expect(jsProgram.parseOrThrow("return ;")).toEqual([
+      { type: "return", value: undefined }
+    ])
+  })
+
+  test("ToyML keeps identifiers that start with not intact", () => {
+    expect(toymlExpression.parseOrThrow("notable")).toEqual({
+      tag: "EVar",
+      name: "notable"
+    })
+    expect(toymlExpression.parseOrThrow("not x")).toMatchObject({
+      tag: "EPrefix",
+      op: "not"
+    })
+  })
+
+  test("ToyML accepts parenthesized operators, unit, and expressions", () => {
+    expect(toymlExpression.parseOrThrow("(+)")).toEqual({
+      tag: "EVar",
+      name: "+"
+    })
+    expect(toymlExpression.parseOrThrow("()")).toEqual(
+      toymlExpression.parseOrThrow("( )")
+    )
+    expect(toymlExpression.parseOrThrow("(x)")).toEqual({
+      tag: "EVar",
+      name: "x"
+    })
+    expect(toymlExpression.parse("(x +)").success).toBe(false)
+  })
+
   test("the JSON example enforces complete, strict JSON input", () => {
     expect(json.parse('{"ok": [true, null, 2]}').success).toBe(true)
     expect(json.parse("1 trailing").success).toBe(false)

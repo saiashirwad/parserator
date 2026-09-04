@@ -37,6 +37,10 @@ export class SourceText {
     return starts
   }
 
+  get lineCount(): number {
+    return this.lineStarts().length
+  }
+
   positionAt(offset: number): { line: number; column: number } {
     const starts = this.lineStarts()
     const bounded = Math.max(0, Math.min(offset, this.text.length))
@@ -59,7 +63,7 @@ export class SourceText {
   }
 }
 
-function messageFor(diagnostic: Diagnostic): string {
+export function diagnosticMessage(diagnostic: Diagnostic): string {
   if (diagnostic.kind === "fatal") return fatalMessage(diagnostic.message)
   if (diagnostic.message) return diagnostic.message
   if (diagnostic.kind === "expected") {
@@ -82,7 +86,7 @@ export class ParseError extends Error {
   readonly source: SourceText
 
   constructor(diagnostic: Diagnostic, source: SourceText | string) {
-    super(messageFor(diagnostic))
+    super(diagnosticMessage(diagnostic))
     this.name = "ParseError"
     this.diagnostic = diagnostic
     this.source = typeof source === "string" ? new SourceText(source) : source

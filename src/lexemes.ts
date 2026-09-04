@@ -116,10 +116,29 @@ export function createLexemes<const K extends readonly string[]>(
     ) as Parser<W>
   }
 
-  const identifier = token(options.identifier).flatMap(value =>
-    configuredKeywords.includes(value)
-      ? fail(`${JSON.stringify(value)} is a reserved keyword`)
-      : succeed(value)
+  const identifier = token(
+    options.identifier
+      .withSpan((value, span) => ({ value, span }))
+      .flatMap(({ value, span }) =>
+        configuredKeywords.includes(value)
+          ? makeParser(state =>
+              failRich(
+                {
+                  diagnostic: {
+                    kind: "custom",
+                    span,
+                    message: `${JSON.stringify(value)} is a reserved keyword`
+                  },
+                  control: {
+                    kind: "recoverable",
+                    cutGeneration: state.cutGeneration
+                  }
+                },
+                state
+              )
+            )
+          : succeed(value)
+      )
   )
 
   return {
