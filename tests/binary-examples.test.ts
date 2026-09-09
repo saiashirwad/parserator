@@ -70,6 +70,7 @@ describe("binary examples", () => {
       /^IDAT CRC mismatch: expected 0x[0-9a-f]{8}, found 0x[0-9a-f]{8}$/
     )
     expect(error.format()).toContain("corrupt.png: byte 54")
+    expect(error.format()).toContain("while parsing PNG > IDAT > checksum")
 
     const iend = new TextEncoder().encode("IEND")
     const payload = Uint8Array.from([...iend, 0x00])

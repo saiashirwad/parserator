@@ -39,7 +39,7 @@ export class SourceBytes {
   }
 }
 
-/** Renders byte and bit positions over a hex row of the failing bytes. */
+/** Renders byte and bit positions over a hex excerpt of the failing bytes. */
 export class BinaryParseError extends DiagnosticError<
   SourceBytes,
   BinaryDiagnostic
@@ -50,7 +50,7 @@ export class BinaryParseError extends DiagnosticError<
     this.name = "BinaryParseError"
   }
 
-  /** Render the failing hex row, span marker, context, and hints. */
+  /** Render up to four hex rows with span markers, context, and hints. */
   format(): string {
     const { diagnostic, source } = this
     const offset = diagnostic.span.start
@@ -58,21 +58,34 @@ export class BinaryParseError extends DiagnosticError<
       ? `, bit ${diagnostic.bitSpan.start % 8}`
       : ""
     const location = `${source.name ? `${source.name}: ` : ""}byte ${offset}${bit}`
-    const start = Math.max(0, Math.floor(offset / 16) * 16)
-    const row = Array.from(
-      source.bytes.subarray(start, start + 16),
-      hexByte
-    ).join(" ")
-    const label = start.toString(16).padStart(8, "0")
-    const covered = Math.min(diagnostic.span.end, start + 16) - offset
-    const carets = "^".repeat(Math.max(1, covered * 3 - 1))
-    const marker = " ".repeat(label.length + 2 + (offset - start) * 3) + carets
+    const firstRow = Math.max(0, Math.floor(offset / 16) * 16)
+    const end = Math.min(diagnostic.span.end, source.bytes.length)
+    const lastRow = Math.floor(Math.max(offset, end - 1) / 16) * 16
+    const excerpt: string[] = []
+    for (let start = firstRow; start <= lastRow; start += 16) {
+      // Large validation spans can cover megabytes; show both ends compactly.
+      if (start === firstRow + 32 && lastRow - firstRow >= 64) {
+        excerpt.push("...")
+        start = lastRow - 16
+      }
+      const row = Array.from(
+        source.bytes.subarray(start, start + 16),
+        hexByte
+      ).join(" ")
+      const label = start.toString(16).padStart(8, "0")
+      const markerStart = Math.max(offset, start)
+      const covered = Math.min(end, start + 16) - markerStart
+      const carets = "^".repeat(Math.max(1, covered * 3 - 1))
+      const marker =
+        " ".repeat(label.length + 2 + (markerStart - start) * 3) + carets
+      excerpt.push(`${label}  ${row}`, marker)
+    }
     const context = diagnostic.context?.length
       ? `\nwhile parsing ${[...diagnostic.context].reverse().join(" > ")}`
       : ""
     const hints =
       diagnostic.hints?.map(hint => `\nhint: ${hint}`).join("") ?? ""
-    return `${location}: ${this.message}\n${label}  ${row}\n${marker}${context}${hints}`
+    return `${location}: ${this.message}\n${excerpt.join("\n")}${context}${hints}`
   }
 
   /** Serialize the diagnostic with explicit byte units and any source name. */

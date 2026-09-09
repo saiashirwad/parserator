@@ -530,6 +530,46 @@ describe("binary diagnostics", () => {
     expect(() => b.uint32BE.parseOrThrow(input())).toThrow(b.BinaryParseError)
   })
 
+  test("shows every checksum byte when its span crosses a hex row", () => {
+    const source = new Uint8Array(19)
+    source.set([0x56, 0x02, 0xcb, 0x66], 15)
+    const failure = error(
+      b.bytes(15).zipRight(b.uint32BE.validate(() => "CRC mismatch")),
+      source
+    )
+    expect(failure.format()).toBe(
+      "packet.bin: byte 15: CRC mismatch\n" +
+        "00000000  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 56\n" +
+        " ".repeat(55) +
+        "^^\n" +
+        "00000010  02 cb 66\n" +
+        "          ^^^^^^^^"
+    )
+  })
+
+  test("a span ending on a row boundary does not add an empty row", () => {
+    const failure = error(
+      b.bytes(16).validate(() => "invalid block"),
+      new Uint8Array(16)
+    )
+    expect(failure.format().split("\n")).toHaveLength(3)
+    expect(failure.format()).not.toContain("00000010")
+  })
+
+  test("large validation spans show both ends in a bounded excerpt", () => {
+    const failure = error(
+      b.rest.validate(() => "invalid payload"),
+      new Uint8Array(1024 * 1024)
+    )
+    const lines = failure.format().split("\n")
+    expect(lines).toHaveLength(10)
+    expect(lines[1]).toMatch(/^00000000 /)
+    expect(lines[3]).toMatch(/^00000010 /)
+    expect(lines[5]).toBe("...")
+    expect(lines[6]).toMatch(/^000fffe0 /)
+    expect(lines[8]).toMatch(/^000ffff0 /)
+  })
+
   test("EOF, completion context, and label overrides remain structured", () => {
     const failure = error(b.uint8.context("header"), input(1, 2))
     expect(failure.diagnostic).toMatchObject({

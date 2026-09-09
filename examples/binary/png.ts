@@ -42,7 +42,7 @@ const chunk = <T>(body: BinaryParser<T>, expected?: string) =>
     const signed = yield* lookahead(bytes(4 + length))
     const type = yield* chunkType(expected)
     const data = yield* within(length, body).context(`${type} data`)
-    yield* checksum(type, crc32(signed))
+    yield* checksum(type, crc32(signed)).context("checksum").context(type)
     return { type, data }
   })
 
@@ -60,7 +60,7 @@ export const png = parser(function* () {
   }
   yield* eof
   return { header, chunks }
-})
+}).context("PNG")
 
 /** Read a four-byte ASCII chunk name and optionally require a specific type. */
 const chunkType = (expected?: string) =>
