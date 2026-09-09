@@ -59,6 +59,15 @@ if (parsePrefixResult.success) {
   void rest
 }
 
+const compiledLiteral: Parser<"let"> = literal("let").compile()
+const compiledGenerator: typeof generatorParser = generatorParser.compile()
+const compiledTuple: Parser<["(", string, ")"]> = sequence([
+  literal("("),
+  digit,
+  literal(")")
+]).compile()
+void [compiledLiteral, compiledGenerator, compiledTuple]
+
 // The implementation constructor is intentionally not part of the public API.
 const assertNotConstructible = () => {
   // @ts-expect-error Parser values must come from parser/combinator factories.

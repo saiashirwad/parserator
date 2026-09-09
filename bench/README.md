@@ -9,6 +9,7 @@ package. Node 22.6 or newer can run these TypeScript files directly.
 pnpm bench          # JSON and micro benchmarks
 pnpm bench:json     # JSON parser, Parsimmon, and JSON.parse
 pnpm bench:micro    # individual combinators and failure paths
+pnpm bench:compile  # identical grammars, interpreted vs compiled
 pnpm bench:profile  # V8 CPU profile of the JSON workload
 ```
 
@@ -16,6 +17,13 @@ pnpm bench:profile  # V8 CPU profile of the JSON workload
 successful fixtures against `JSON.parse` before timing. `micro.bench.ts` covers
 character runs, alternatives, sequencing, lists, and backtracking failures.
 The profile scripts summarize V8 self-time by function.
+
+`compile.bench.ts` compares literal/character repetition, alternative-heavy
+parsing, static and generator CSV rows, recursive JSON, and malformed inputs.
+It checks values and structured diagnostics before timing, warms lazy compilation,
+and measures fresh construction plus compilation in its own group. The parsing
+groups exclude compilation. Run this comparison on the runtime where the grammar
+will be used: code generation does not guarantee a speedup for every workload.
 
 ## Reading results
 

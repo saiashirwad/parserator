@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Added opt-in `Parser.compile()` using runtime JavaScript generation, with a
+  cached result that preserves the parser API, inferred types, and diagnostics.
+- Specialized static compositions and repetition, with lazy compilation for
+  reusable dynamic parsers and recursive grammars.
+- Added interpreted/compiled benchmarks, including malformed inputs and a
+  separate compilation-cost measurement (`pnpm bench:compile`).
+
 ## 0.2.0
 
 This release defines a smaller, safer public API. It is a breaking release;

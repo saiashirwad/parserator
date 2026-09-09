@@ -1,9 +1,12 @@
+import { planned } from "./compiler.ts"
 import type { Diagnostic, Failure } from "./errors.ts"
 import {
   Parser,
   parser,
   recursive,
   makeParser,
+  makePlannedParser,
+  transformParser,
   runParser,
   replySuccess,
   fail,
@@ -151,12 +154,15 @@ function literalFailure(state: ParserState, value: string): ParserReply<never> {
 }
 
 export const literal = <const S extends string>(value: S): Parser<S> =>
-  makeParser(state => {
-    if (State.startsWith(state, value)) {
-      return replySuccess(value, State.consume(state, value.length))
-    }
-    return literalFailure(state, value) as ParserReply<S>
-  })
+  makePlannedParser(
+    state => {
+      if (State.startsWith(state, value)) {
+        return replySuccess(value, State.consume(state, value.length))
+      }
+      return literalFailure(state, value) as ParserReply<S>
+    },
+    { kind: "literal", value }
+  )
 
 export const oneOfLiterals = <
   const Values extends readonly [string, ...string[]]
@@ -195,10 +201,12 @@ export const char = <const C extends string>(value: C): Parser<C> => {
   ) {
     throw new TypeError("char expects one Unicode code point")
   }
-  return makeParser(state =>
-    State.charAt(state) === value
-      ? replySuccess(value, State.consume(state, value.length))
-      : (expected(state, JSON.stringify(value)) as ParserReply<C>)
+  return makePlannedParser(
+    state =>
+      State.charAt(state) === value
+        ? replySuccess(value, State.consume(state, value.length))
+        : (expected(state, JSON.stringify(value)) as ParserReply<C>),
+    { kind: "char", value }
   )
 }
 
@@ -206,12 +214,19 @@ export function satisfy(
   predicate: (char: string) => boolean,
   description = "character"
 ): Parser<string> {
-  return makeParser(state => {
-    const value = State.charAt(state)
-    return value && predicate(value)
-      ? replySuccess(value, State.consume(state, value.length))
-      : (expected(state, description) as ParserReply<string>)
-  })
+  return makePlannedParser(
+    state => {
+      const value = State.charAt(state)
+      return value && predicate(value)
+        ? replySuccess(value, State.consume(state, value.length))
+        : (expected(state, description) as ParserReply<string>)
+    },
+    {
+      kind: "satisfy",
+      predicate,
+      failure: state => expected(state, description)
+    }
+  )
 }
 
 export function anyChar(): Parser<string> {
@@ -235,8 +250,7 @@ export function oneOfChars(chars: string): Parser<string> {
 }
 
 export function notFollowedBy<T>(inner: Parser<T>): Parser<true> {
-  return makeParser(state => {
-    const reply = runParser(inner, state)
+  return transformParser(inner, (reply, state) => {
     if (!reply.result.ok) {
       const control = reply.result.failure.control
       if (control.kind === "fatal") {
@@ -254,8 +268,7 @@ export function notFollowedBy<T>(inner: Parser<T>): Parser<true> {
 }
 
 export function lookahead<T>(inner: Parser<T>): Parser<T> {
-  return makeParser(state => {
-    const reply = runParser(inner, state)
+  return transformParser(inner, (reply, state) => {
     if (!reply.result.ok) {
       if (reply.result.failure.control.kind === "fatal") {
         return reply as ParserReply<never> as ParserReply<T>
@@ -273,8 +286,7 @@ export function lookahead<T>(inner: Parser<T>): Parser<T> {
 }
 
 export function probe<T>(inner: Parser<T>): Parser<T | undefined> {
-  return makeParser(state => {
-    const reply = runParser(inner, state)
+  return transformParser(inner, (reply, state) => {
     if (reply.result.ok) return replySuccess(reply.result.value, state)
     if (reply.result.failure.control.kind === "fatal") {
       return reply as ParserReply<never> as ParserReply<T | undefined>
@@ -286,10 +298,13 @@ export function probe<T>(inner: Parser<T>): Parser<T | undefined> {
 export function takeWhileChar(
   predicate: (char: string) => boolean
 ): Parser<string> {
-  return makeParser(state => {
-    const end = State.consumeWhile(state, predicate)
-    return replySuccess(state.source.slice(state.offset, end.offset), end)
-  })
+  return makePlannedParser(
+    state => {
+      const end = State.consumeWhile(state, predicate)
+      return replySuccess(state.source.slice(state.offset, end.offset), end)
+    },
+    { kind: "takeWhile", predicate }
+  )
 }
 export function takeWhileChar1(
   predicate: (char: string) => boolean,
@@ -336,35 +351,37 @@ function ensureCount(n: number): void {
 export function many<T>(inner: Parser<T>): Parser<T[]>
 export function many(inner: Parser<any>): Parser<any[]>
 export function many<T>(inner: Parser<T>): Parser<T[]> {
-  return makeParser(state => {
-    const values: T[] = []
-    let current = state
-    while (true) {
-      const entryGeneration = current.cutGeneration
-      const reply = runParser(inner, current)
-      if (!reply.result.ok) {
-        const control = reply.result.failure.control
-        if (
-          control.kind === "fatal" ||
-          (control.kind === "recoverable" &&
-            control.cutGeneration > entryGeneration)
-        )
-          return reply as ParserReply<never> as ParserReply<T[]>
-        return replySuccess(values, current)
+  return makePlannedParser(
+    state => {
+      const values: T[] = []
+      let current = state
+      while (true) {
+        const entryGeneration = current.cutGeneration
+        const reply = runParser(inner, current)
+        if (!reply.result.ok) {
+          const control = reply.result.failure.control
+          if (
+            control.kind === "fatal" ||
+            (control.kind === "recoverable" &&
+              control.cutGeneration > entryGeneration)
+          )
+            return reply as ParserReply<never> as ParserReply<T[]>
+          return replySuccess(values, current)
+        }
+        if (reply.state.offset <= current.offset)
+          throw new Error("repeated parser must consume input")
+        values.push(reply.result.value)
+        current = reply.state
       }
-      if (reply.state.offset <= current.offset)
-        throw new Error("repeated parser must consume input")
-      values.push(reply.result.value)
-      current = reply.state
-    }
-  })
+    },
+    { kind: "many", inner, discard: false }
+  )
 }
 
 export function optional<T>(inner: Parser<T>): Parser<T | undefined>
 export function optional(inner: Parser<any>): Parser<any>
 export function optional<T>(inner: Parser<T>): Parser<T | undefined> {
-  return makeParser(state => {
-    const reply = runParser(inner, state)
+  return transformParser(inner, (reply, state) => {
     if (reply.result.ok) return replySuccess(reply.result.value, reply.state)
     const control = reply.result.failure.control
     if (control.kind === "fatal" || control.cutGeneration > state.cutGeneration)
@@ -377,8 +394,7 @@ export function many1<T>(inner: Parser<T>): Parser<T[]>
 export function many1(inner: Parser<any>): Parser<any[]>
 export function many1<T>(inner: Parser<T>): Parser<T[]> {
   const repeated = many(inner)
-  return makeParser(state => {
-    const reply = runParser(repeated, state)
+  return transformParser(repeated, (reply, state) => {
     if (!reply.result.ok) return reply
     if (reply.result.value.length) return reply
     return failureAt(state, {
@@ -400,11 +416,14 @@ export function atLeast<T>(inner: Parser<T>, n: number): Parser<T[]> {
 
 export function count<T>(inner: Parser<T>, n: number): Parser<T[]> {
   ensureCount(n)
-  return parser(function* () {
-    const values: T[] = []
-    for (let i = 0; i < n; i++) values.push(yield* inner)
-    return values
-  })
+  return planned(
+    parser(function* () {
+      const values: T[] = []
+      for (let i = 0; i < n; i++) values.push(yield* inner)
+      return values
+    }),
+    { kind: "count", inner, count: n }
+  )
 }
 
 function list<T, S>(
@@ -413,55 +432,58 @@ function list<T, S>(
   allowTrailing: boolean,
   requireOne: boolean
 ): Parser<T[]> {
-  return makeParser(state => {
-    const first = runParser(inner, state)
-    if (!first.result.ok) {
-      if (
-        !requireOne &&
-        first.result.failure.control.kind === "recoverable" &&
-        first.result.failure.control.cutGeneration <= state.cutGeneration
-      ) {
-        return replySuccess([], state)
-      }
-      return first as ParserReply<never> as ParserReply<T[]>
-    }
-    const values = [first.result.value]
-    let current = first.state
-    while (true) {
-      const iterationGeneration = current.cutGeneration
-      const sep = runParser(separator, current)
-      if (!sep.result.ok) {
-        const control = sep.result.failure.control
+  return makePlannedParser(
+    state => {
+      const first = runParser(inner, state)
+      if (!first.result.ok) {
         if (
-          control.kind === "fatal" ||
-          (control.kind === "recoverable" &&
-            control.cutGeneration > iterationGeneration)
+          !requireOne &&
+          first.result.failure.control.kind === "recoverable" &&
+          first.result.failure.control.cutGeneration <= state.cutGeneration
         ) {
-          return sep as ParserReply<never> as ParserReply<T[]>
+          return replySuccess([], state)
         }
-        return replySuccess(values, current)
+        return first as ParserReply<never> as ParserReply<T[]>
       }
-      const item = runParser(inner, sep.state)
-      if (!item.result.ok) {
-        const control = item.result.failure.control
-        if (
-          control.kind === "fatal" ||
-          (control.kind === "recoverable" &&
-            control.cutGeneration > iterationGeneration)
-        ) {
+      const values = [first.result.value]
+      let current = first.state
+      while (true) {
+        const iterationGeneration = current.cutGeneration
+        const sep = runParser(separator, current)
+        if (!sep.result.ok) {
+          const control = sep.result.failure.control
+          if (
+            control.kind === "fatal" ||
+            (control.kind === "recoverable" &&
+              control.cutGeneration > iterationGeneration)
+          ) {
+            return sep as ParserReply<never> as ParserReply<T[]>
+          }
+          return replySuccess(values, current)
+        }
+        const item = runParser(inner, sep.state)
+        if (!item.result.ok) {
+          const control = item.result.failure.control
+          if (
+            control.kind === "fatal" ||
+            (control.kind === "recoverable" &&
+              control.cutGeneration > iterationGeneration)
+          ) {
+            return item as ParserReply<never> as ParserReply<T[]>
+          }
+          if (allowTrailing) return replySuccess(values, sep.state)
           return item as ParserReply<never> as ParserReply<T[]>
         }
-        if (allowTrailing) return replySuccess(values, sep.state)
-        return item as ParserReply<never> as ParserReply<T[]>
+        if (item.state.offset <= sep.state.offset)
+          throw new Error("list item must consume input")
+        if (item.state.offset <= current.offset)
+          throw new Error("list iteration must consume input")
+        values.push(item.result.value)
+        current = item.state
       }
-      if (item.state.offset <= sep.state.offset)
-        throw new Error("list item must consume input")
-      if (item.state.offset <= current.offset)
-        throw new Error("list iteration must consume input")
-      values.push(item.result.value)
-      current = item.state
-    }
-  })
+    },
+    { kind: "list", inner, separator, allowTrailing, requireOne }
+  )
 }
 
 export const sepBy = <T, S>(
@@ -484,27 +506,30 @@ export const sepEndBy1 = <T, S>(
 export function skipMany<T>(inner: Parser<T>): Parser<void>
 export function skipMany(inner: Parser<any>): Parser<void>
 export function skipMany<T>(inner: Parser<T>): Parser<void> {
-  return makeParser(state => {
-    let current = state
-    while (true) {
-      const entryGeneration = current.cutGeneration
-      const reply = runParser(inner, current)
-      if (!reply.result.ok) {
-        const control = reply.result.failure.control
-        if (
-          control.kind === "fatal" ||
-          (control.kind === "recoverable" &&
-            control.cutGeneration > entryGeneration)
-        ) {
-          return reply as ParserReply<never> as ParserReply<void>
+  return makePlannedParser(
+    state => {
+      let current = state
+      while (true) {
+        const entryGeneration = current.cutGeneration
+        const reply = runParser(inner, current)
+        if (!reply.result.ok) {
+          const control = reply.result.failure.control
+          if (
+            control.kind === "fatal" ||
+            (control.kind === "recoverable" &&
+              control.cutGeneration > entryGeneration)
+          ) {
+            return reply as ParserReply<never> as ParserReply<void>
+          }
+          return replySuccess(undefined, current)
         }
-        return replySuccess(undefined, current)
+        if (reply.state.offset <= current.offset)
+          throw new Error("repeated parser must consume input")
+        current = reply.state
       }
-      if (reply.state.offset <= current.offset)
-        throw new Error("repeated parser must consume input")
-      current = reply.state
-    }
-  })
+    },
+    { kind: "many", inner, discard: true }
+  )
 }
 
 function scanUntil<T>(inner: Parser<T>, consumeMatch: boolean): Parser<string> {
@@ -547,22 +572,25 @@ export function choice<
 export function choice(...parsers: Parser<any>[]): Parser<any> {
   if (parsers.length === 0)
     throw new TypeError("choice requires at least one parser")
-  return makeParser(state => {
-    const failures: Failure[] = []
-    for (const alternative of parsers) {
-      const reply = runParser(alternative, state)
-      if (reply.result.ok) return reply
-      const failure = reply.result.failure
-      if (
-        failure.control.kind === "fatal" ||
-        (failure.control.kind === "recoverable" &&
-          failure.control.cutGeneration > state.cutGeneration)
-      )
-        return reply
-      failures.push(failure)
-    }
-    return failRich(mergeFailures(failures as [Failure, ...Failure[]]), state)
-  })
+  return makePlannedParser(
+    state => {
+      const failures: Failure[] = []
+      for (const alternative of parsers) {
+        const reply = runParser(alternative, state)
+        if (reply.result.ok) return reply
+        const failure = reply.result.failure
+        if (
+          failure.control.kind === "fatal" ||
+          (failure.control.kind === "recoverable" &&
+            failure.control.cutGeneration > state.cutGeneration)
+        )
+          return reply
+        failures.push(failure)
+      }
+      return failRich(mergeFailures(failures as [Failure, ...Failure[]]), state)
+    },
+    { kind: "choice", alternatives: parsers, merge: mergeFailures }
+  )
 }
 
 export const sequence = <const Parsers extends readonly Parser<unknown>[]>(
@@ -570,31 +598,37 @@ export const sequence = <const Parsers extends readonly Parser<unknown>[]>(
 ): Parser<{
   -readonly [K in keyof Parsers]: Parsers[K] extends Parser<infer T> ? T : never
 }> =>
-  parser(function* () {
-    const values: unknown[] = []
-    for (const item of parsers) values.push(yield* item)
-    return values as {
-      -readonly [K in keyof Parsers]: Parsers[K] extends Parser<infer T>
-        ? T
-        : never
-    }
-  })
+  planned(
+    parser(function* () {
+      const values: unknown[] = []
+      for (const item of parsers) values.push(yield* item)
+      return values as {
+        -readonly [K in keyof Parsers]: Parsers[K] extends Parser<infer T>
+          ? T
+          : never
+      }
+    }),
+    { kind: "sequence", items: parsers }
+  )
 
 export const regex = (expression: RegExp): Parser<string> => {
   const flags = `${expression.flags.replace(/[gy]/g, "")}y`
   const sticky = new RegExp(expression.source, flags)
-  return makeParser(state => {
-    sticky.lastIndex = state.offset
-    const match = sticky.exec(state.source)
-    if (match?.index === state.offset) {
-      const end = sticky.lastIndex
-      return replySuccess(
-        state.source.slice(state.offset, end),
-        State.consume(state, end - state.offset)
-      )
-    }
-    return expected(state, expression.toString()) as ParserReply<string>
-  })
+  return makePlannedParser(
+    state => {
+      sticky.lastIndex = state.offset
+      const match = sticky.exec(state.source)
+      if (match?.index === state.offset) {
+        const end = sticky.lastIndex
+        return replySuccess(
+          state.source.slice(state.offset, end),
+          State.consume(state, end - state.offset)
+        )
+      }
+      return expected(state, expression.toString()) as ParserReply<string>
+    },
+    { kind: "regex", expression: sticky }
+  )
 }
 
 export const eof = makeParser<void>(state =>
@@ -615,8 +649,7 @@ export const commit = (): Parser<void> =>
 export const lookaheadParser = lookahead
 
 export function attempt<T>(inner: Parser<T>): Parser<T> {
-  return makeParser(state => {
-    const reply = runParser(inner, state)
+  return transformParser(inner, (reply, state) => {
     if (reply.result.ok || reply.result.failure.control.kind === "fatal")
       return reply
     return failRich(

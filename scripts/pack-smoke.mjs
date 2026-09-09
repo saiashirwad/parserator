@@ -51,7 +51,7 @@ writeFileSync(
     'import { literal } from "parserator"',
     'import { makeParser } from "parserator/advanced"',
     'import { ParseError } from "parserator/diagnostics"',
-    'if (!literal("ok").parseOrThrow("ok")) process.exit(1)',
+    'if (!literal("ok").compile().parseOrThrow("ok")) process.exit(1)',
     'if (typeof makeParser !== "function" || typeof ParseError !== "function") process.exit(1)',
     ""
   ].join("\n")
@@ -64,7 +64,7 @@ writeFileSync(
     'import { literal } from "parserator"',
     'import { makeParser } from "parserator/advanced"',
     'import { ParseError, type Span } from "parserator/diagnostics"',
-    'const parser = literal("ok")',
+    'const parser = literal("ok").compile()',
     'parser.parseOrThrow("ok")',
     "void [makeParser, ParseError, {} as Span]",
     ""

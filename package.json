@@ -54,6 +54,7 @@
     "bench": "node bench/json.bench.ts && node bench/micro.bench.ts",
     "bench:json": "node bench/json.bench.ts",
     "bench:micro": "node bench/micro.bench.ts",
+    "bench:compile": "node bench/compile.bench.ts",
     "bench:profile": "rm -rf bench/.profiles && node --cpu-prof --cpu-prof-dir=bench/.profiles bench/profile-json.ts && node bench/analyze-profile.ts bench/.profiles/*.cpuprofile",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint",

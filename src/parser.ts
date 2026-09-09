@@ -1,3 +1,4 @@
+import { compile, planned, type Plan } from "./compiler.ts"
 import type { Diagnostic, Failure, ParseError, Span } from "./errors.ts"
 import { ParseError as ParseErrorClass, SourceText } from "./errors.ts"
 import {
@@ -20,6 +21,8 @@ export type PrefixParseResult<T> = ParseResult<PrefixResult<T>>
 
 /** A parser value. Construction lives in the advanced entry point. */
 export interface Parser<T> {
+  /** Generate and cache a specialized parser. Requires runtime code generation. */
+  compile(): Parser<T>
   map<B>(f: (value: T) => B): Parser<B>
   flatMap<B>(f: (value: T) => Parser<B>): Parser<B>
   zip<B>(other: Parser<B>): Parser<[T, B]>
@@ -69,54 +72,76 @@ class ParserValue<T> implements Parser<T> {
     runners.set(this, runner as Runner<unknown>)
   }
 
+  compile(): Parser<T> {
+    return compile(this)
+  }
+
   map<B>(f: (value: T) => B): Parser<B> {
-    return makeParser(state => {
-      const reply = runParser(this, state)
-      return reply.result.ok
-        ? successReply(f(reply.result.value), reply.state)
-        : (reply as ParserReply<never> as ParserReply<B>)
-    })
+    return makePlannedParser(
+      state => {
+        const reply = runParser(this, state)
+        return reply.result.ok
+          ? successReply(f(reply.result.value), reply.state)
+          : (reply as ParserReply<never> as ParserReply<B>)
+      },
+      { kind: "map", inner: this, callback: f }
+    )
   }
 
   flatMap<B>(f: (value: T) => Parser<B>): Parser<B> {
-    return makeParser(state => {
-      const reply = runParser(this, state)
-      return reply.result.ok
-        ? runParser(f(reply.result.value), reply.state)
-        : (reply as ParserReply<never> as ParserReply<B>)
-    })
+    return makePlannedParser(
+      state => {
+        const reply = runParser(this, state)
+        return reply.result.ok
+          ? runParser(f(reply.result.value), reply.state)
+          : (reply as ParserReply<never> as ParserReply<B>)
+      },
+      { kind: "flatMap", inner: this, callback: f }
+    )
   }
 
   zip<B>(other: Parser<B>): Parser<[T, B]> {
-    return makeParser(state => {
-      const left = runParser(this, state)
-      if (!left.result.ok)
-        return left as ParserReply<never> as ParserReply<[T, B]>
-      const right = runParser(other, left.state)
-      if (!right.result.ok)
-        return right as ParserReply<never> as ParserReply<[T, B]>
-      return successReply([left.result.value, right.result.value], right.state)
-    })
+    return makePlannedParser(
+      state => {
+        const left = runParser(this, state)
+        if (!left.result.ok)
+          return left as ParserReply<never> as ParserReply<[T, B]>
+        const right = runParser(other, left.state)
+        if (!right.result.ok)
+          return right as ParserReply<never> as ParserReply<[T, B]>
+        return successReply(
+          [left.result.value, right.result.value],
+          right.state
+        )
+      },
+      { kind: "zip", left: this, right: other }
+    )
   }
 
   zipRight<B>(other: Parser<B>): Parser<B> {
-    return makeParser(state => {
-      const left = runParser(this, state)
-      return left.result.ok
-        ? runParser(other, left.state)
-        : (left as ParserReply<never> as ParserReply<B>)
-    })
+    return makePlannedParser(
+      state => {
+        const left = runParser(this, state)
+        return left.result.ok
+          ? runParser(other, left.state)
+          : (left as ParserReply<never> as ParserReply<B>)
+      },
+      { kind: "zipRight", left: this, right: other }
+    )
   }
 
   zipLeft<B>(other: Parser<B>): Parser<T> {
-    return makeParser(state => {
-      const left = runParser(this, state)
-      if (!left.result.ok) return left
-      const right = runParser(other, left.state)
-      return right.result.ok
-        ? successReply(left.result.value, right.state)
-        : (right as ParserReply<never> as ParserReply<T>)
-    })
+    return makePlannedParser(
+      state => {
+        const left = runParser(this, state)
+        if (!left.result.ok) return left
+        const right = runParser(other, left.state)
+        return right.result.ok
+          ? successReply(left.result.value, right.state)
+          : (right as ParserReply<never> as ParserReply<T>)
+      },
+      { kind: "zipLeft", left: this, right: other }
+    )
   }
 
   *[Symbol.iterator](): Generator<Parser<T>, T, any> {
@@ -124,8 +149,7 @@ class ParserValue<T> implements Parser<T> {
   }
 
   expected(description: string): Parser<T> {
-    return makeParser(state => {
-      const reply = runParser(this, state)
+    return transformParser(this, reply => {
       if (reply.result.ok) return reply
       if (reply.result.failure.control.kind === "fatal") return reply
       const old = reply.result.failure.diagnostic
@@ -144,8 +168,7 @@ class ParserValue<T> implements Parser<T> {
   }
 
   context(description: string): Parser<T> {
-    return makeParser(state => {
-      const reply = runParser(this, state)
+    return transformParser(this, reply => {
       if (reply.result.ok) {
         const previous = reply.state.completionContext ?? []
         return ParserOutput(
@@ -163,8 +186,7 @@ class ParserValue<T> implements Parser<T> {
   }
 
   withSpan<B>(f: (value: T, span: Span) => B): Parser<B> {
-    return makeParser(state => {
-      const reply = runParser(this, state)
+    return transformParser(this, (reply, state) => {
       return reply.result.ok
         ? successReply(
             f(reply.result.value, {
@@ -200,8 +222,7 @@ class ParserValue<T> implements Parser<T> {
   }
 
   commit(): Parser<T> {
-    return makeParser(state => {
-      const reply = runParser(this, state)
+    return transformParser(this, reply => {
       return reply.result.ok
         ? ParserOutput(
             {
@@ -300,9 +321,29 @@ export function runParser<T>(
   parser: Parser<T>,
   state: ParserState
 ): ParserReply<T> {
+  return getRunner(parser)(state)
+}
+
+export function getRunner<T>(parser: Parser<T>): Runner<T> {
   const runner = runners.get(parser) as Runner<T> | undefined
   if (!runner) throw new TypeError("Not a Parser")
-  return runner(state)
+  return runner
+}
+
+/** Internal construction with compiler metadata; advanced makeParser stays opaque. */
+export function makePlannedParser<T>(runner: Runner<T>, plan: Plan): Parser<T> {
+  return planned(makeParser(runner), plan)
+}
+
+export function transformParser<A, B>(
+  inner: Parser<A>,
+  transform: (reply: ParserReply<A>, entry: ParserState) => ParserReply<B>
+): Parser<B> {
+  return makePlannedParser(state => transform(runParser(inner, state), state), {
+    kind: "reply",
+    inner,
+    transform
+  })
 }
 
 export function makeParser<T>(runner: Runner<T>): Parser<T> {
@@ -310,7 +351,10 @@ export function makeParser<T>(runner: Runner<T>): Parser<T> {
 }
 
 export function succeed<T>(value: T): Parser<T> {
-  return makeParser(current => successReply(value, current))
+  return makePlannedParser(current => successReply(value, current), {
+    kind: "succeed",
+    value
+  })
 }
 
 export function fail(message: string): Parser<never> {
@@ -353,41 +397,46 @@ export function failRich(
 }
 
 export function parser<T>(f: () => Generator<Parser<any>, T, any>): Parser<T> {
-  return makeParser(state => {
-    const iterator = f()
-    let closed = false
-    const close = (): void => {
-      if (closed) return
-      closed = true
-      iterator.return?.(undefined as never)
-    }
-    try {
-      let current = iterator.next()
-      let currentState = state
-      while (!current.done) {
-        const reply = runParser(current.value, currentState)
-        if (!reply.result.ok) {
-          close()
-          return reply as ParserReply<never> as ParserReply<T>
-        }
-        currentState = reply.state
-        current = iterator.next(reply.result.value)
+  return makePlannedParser(
+    state => {
+      const iterator = f()
+      let closed = false
+      const close = (): void => {
+        if (closed) return
+        closed = true
+        iterator.return?.(undefined as never)
       }
-      closed = true
-      return successReply(current.value, currentState)
-    } catch (error) {
-      close()
-      throw error
-    }
-  })
+      try {
+        let current = iterator.next()
+        let currentState = state
+        while (!current.done) {
+          const reply = runParser(current.value, currentState)
+          if (!reply.result.ok) {
+            close()
+            return reply as ParserReply<never> as ParserReply<T>
+          }
+          currentState = reply.state
+          current = iterator.next(reply.result.value)
+        }
+        closed = true
+        return successReply(current.value, currentState)
+      } catch (error) {
+        close()
+        throw error
+      }
+    },
+    { kind: "generator", factory: f }
+  )
 }
 
 export function recursive<T>(
   builder: (self: Parser<T>) => Parser<T>
 ): Parser<T> {
   let built: Parser<T> | undefined
-  const self: Parser<T> = makeParser(state =>
-    runParser((built ??= builder(self)), state)
-  )
+  const get = () => (built ??= builder(self))
+  const self: Parser<T> = makePlannedParser(state => runParser(get(), state), {
+    kind: "recursive",
+    get
+  })
   return self
 }

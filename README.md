@@ -189,6 +189,44 @@ const expression = precedence(atom, [
 Use `withSpan` when AST nodes need source locations, and `validate` for local
 semantic checks that belong in the grammar.
 
+## Compile a parser
+
+Keep writing the same parsers, then opt in once at the application boundary:
+
+```ts
+const fastPoint = point.compile()
+
+fastPoint.parseOrThrow("(10,20)") // { x: 10, y: 20 }
+fastPoint.parse("(10,20)")
+fastPoint.parsePrefix("(10,20) remaining")
+```
+
+`.compile()` returns a normal `Parser<T>` with the same result type, methods,
+backtracking rules, cuts, spans, and diagnostics. The original parser stays
+interpreted. Compilation is cached: calling it again returns the same compiled
+parser, and compiled parsers can still be composed and yielded with `yield*`.
+
+The compiler uses `new Function` to generate direct calls and specialized loops
+for static compositions. It avoids intermediate success replies on those paths
+and delays diagnostics for alternatives ruled out by literal or regex prefixes.
+Grammar strings and callbacks are passed as data, never interpolated as code.
+
+Generators keep their ordinary JavaScript control flow. Their reusable yielded
+parsers, and parsers returned by `flatMap`, compile lazily when reused. Recursive
+builders also remain lazy. One-off dynamic parsers and opaque advanced runners
+use their existing implementation. Callbacks execute during parsing, including
+normal speculative calls during backtracking; compilation does not execute them.
+
+Compile outside the parse loop and reuse the result. Hoist reusable parsers out
+of generators when practical. Static compositions typically benefit most;
+generator-heavy grammars and failure-heavy inputs can see smaller gains or a
+slowdown. Measure your grammar with `pnpm bench:compile`, which compares identical
+inputs and reports construction/compilation separately from warmed parsing.
+
+Runtime compilation requires an environment that permits `new Function`. It
+throws if code generation is blocked (for example by a browser's Content Security
+Policy). Ordinary parsing never requires runtime code generation.
+
 ## Best fit
 
 Parserator works well for search and filter syntax, configuration formats,
