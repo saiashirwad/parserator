@@ -3,7 +3,6 @@
  * LEB128 varint gives the payload length, and the payload is parsed by kind.
  */
 import {
-  commit,
   eof,
   fail,
   many,
@@ -15,7 +14,10 @@ import {
   type BinaryParser
 } from "../../src/binary/index.ts"
 
-export type Frame = typeof frame.Type
+export type Frame =
+  | { readonly kind: "ping" }
+  | { readonly kind: "text"; readonly text: string }
+  | { readonly kind: "point"; readonly x: number; readonly y: number }
 
 /** Unsigned LEB128: seven bits per byte, low group first, high bit continues. */
 export const varint = parser(function* () {
@@ -35,23 +37,24 @@ const payload = <T>(body: BinaryParser<T>) =>
     return yield* within(length, body).context("payload")
   })
 
+const ping = payload(eof).map(() => ({ kind: "ping" }) as const)
+const text = payload(utf8()).map(text => ({ kind: "text", text }) as const)
+const point = payload(uint16BE.zip(uint16BE)).map(
+  ([x, y]) => ({ kind: "point", x, y }) as const
+)
+
+const kinds: Record<number, BinaryParser<Frame>> = {
+  1: ping,
+  2: text,
+  3: point
+}
+
 /** Once the tag is read there is no other frame it could be, so commit. */
 export const frame = parser(function* () {
-  const tag = yield* uint8.context("tag")
-  yield* commit()
-  switch (tag) {
-    case 0x01:
-      yield* payload(eof)
-      return { kind: "ping" } as const
-    case 0x02:
-      return { kind: "text", text: yield* payload(utf8()) } as const
-    case 0x03: {
-      const [x, y] = yield* payload(uint16BE.zip(uint16BE))
-      return { kind: "point", x, y } as const
-    }
-    default:
-      return yield* fail(`unknown frame tag ${tag}`)
-  }
+  const tag = yield* uint8
+    .commit()
+    .validate(t => t in kinds || `unknown frame tag ${t}`)
+  return yield* kinds[tag]!
 }).context("frame")
 
 export const frames = many(frame).zipLeft(eof)

@@ -46,7 +46,9 @@ export class BinaryParseError extends DiagnosticError<
       hexByte
     ).join(" ")
     const label = start.toString(16).padStart(8, "0")
-    const marker = " ".repeat(label.length + 2 + (offset - start) * 3) + "^"
+    const covered = Math.min(diagnostic.span.end, start + 16) - offset
+    const carets = "^".repeat(Math.max(1, covered * 3 - 1))
+    const marker = " ".repeat(label.length + 2 + (offset - start) * 3) + carets
     const context = diagnostic.context?.length
       ? `\nwhile parsing ${[...diagnostic.context].reverse().join(" > ")}`
       : ""

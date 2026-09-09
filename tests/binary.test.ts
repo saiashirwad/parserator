@@ -500,7 +500,7 @@ describe("binary diagnostics", () => {
     expect(failure.format()).toBe(
       "packet.bin: byte 1: Expected uint32BE (4 bytes); only 2 bytes remain\n" +
         "00000000  09 aa bb\n" +
-        "             ^\nwhile parsing payload"
+        "             ^^^^^\nwhile parsing payload"
     )
     expect(failure.toJSON()).toMatchObject({
       unit: "byte",

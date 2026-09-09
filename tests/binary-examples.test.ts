@@ -68,7 +68,7 @@ describe("binary examples", () => {
     expect(error.message).toMatch(
       /^IDAT CRC mismatch: expected 0x[0-9a-f]{8}, found 0x[0-9a-f]{8}$/
     )
-    expect(error.format()).toContain("corrupt.png: byte 58")
+    expect(error.format()).toContain("corrupt.png: byte 54")
 
     expect(failure(png.parse(hex("89 50 4e 47 00"))).message).toBe(
       "Expected PNG signature, found 0x00"
@@ -101,7 +101,7 @@ describe("binary examples", () => {
 
     const ipv6 = failure(ipv4Header.parse(hex("60 00 00 00 00 00 00 00")))
     expect(ipv6.message).toBe("IP version must be 4")
-    expect(ipv6.format()).toContain("byte 0, bit 4")
+    expect(ipv6.format()).toContain("byte 0, bit 0")
   })
 
   test("varint reads LEB128 and frames round-trip through encode", () => {
@@ -115,7 +115,7 @@ describe("binary examples", () => {
 
     const badTag = failure(frames.parse(hex("01 00 09 00")))
     expect(badTag.message).toBe("unknown frame tag 9")
-    expect(badTag.diagnostic.span).toEqual({ start: 3, end: 3 })
+    expect(badTag.diagnostic.span).toEqual({ start: 2, end: 3 })
 
     const short = failure(frame.parse(hex("03 04 02 80")))
     expect(short.message).toBe("Expected 4 bytes; only 2 bytes remain")

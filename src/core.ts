@@ -375,15 +375,21 @@ export function createParserEngine<I, E extends Error>(
       })
     }
 
+    /** Rejections point at the value that was parsed, not at what follows it. */
     validate(
       predicate: (value: T) => boolean | string,
       message = "valid value"
     ): Parser<T> {
-      return this.flatMap(value => {
-        const result = predicate(value)
-        return result === true
-          ? succeed(value)
-          : fail(typeof result === "string" ? result : message)
+      return makeParser(state => {
+        const reply = runParser(this, state)
+        if (!reply.result.ok) return reply
+        const result = predicate(reply.result.value)
+        if (result === true) return reply
+        return failureAt(reply.state, {
+          kind: "custom",
+          span: { start: state.offset, end: reply.state.offset },
+          message: typeof result === "string" ? result : message
+        }) as Reply<T>
       })
     }
 
@@ -489,11 +495,12 @@ export function createParserEngine<I, E extends Error>(
     return makeParser(state => replySuccess(value, state))
   }
 
-  function fail(message: string): Parser<never> {
+  /** Fails at the current position, or over `span` when the caller knows it. */
+  function fail(message: string, span?: Span): Parser<never> {
     return makeParser(state =>
       failureAt(state, {
         kind: "custom",
-        span: { start: state.offset, end: state.offset },
+        span: span ?? { start: state.offset, end: state.offset },
         message
       })
     )
