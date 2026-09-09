@@ -1,13 +1,14 @@
+import { isFinal, waitForInput } from "./core.ts"
 import type { Diagnostic } from "./errors.ts"
 import {
   failRich,
-  makeParser,
+  makeResumable,
   replySuccess,
-  runParser,
+  runResumable,
   type Parser
 } from "./parser.ts"
 import type { ParserState } from "./state.ts"
-import { State } from "./state.ts"
+import { State, waitForPoint } from "./state.ts"
 
 export function levenshteinDistance(a: string, b: string): number {
   let previous = Array.from({ length: a.length + 1 }, (_, index) => index)
@@ -52,7 +53,7 @@ function keywordFailure(
   found: string,
   expected: readonly string[],
   keywords: readonly string[]
-): ReturnType<typeof makeParser<never>> {
+): Parser<never> {
   const hints = generateHints(found, keywords)
   const diagnostic: Diagnostic = {
     kind: "expected",
@@ -61,7 +62,7 @@ function keywordFailure(
     ...(found ? { found } : {}),
     ...(hints.length ? { hints } : {})
   }
-  return makeParser(current =>
+  return makeResumable(current =>
     failRich(
       {
         diagnostic,
@@ -87,17 +88,45 @@ function sanitizeText(value: string): string {
   return result
 }
 
+/** Resolve candidate prefixes and the identifier used in failure suggestions. */
+function* waitForKeyword(
+  state: ParserState,
+  keywords: readonly string[]
+): Generator<void, void, void> {
+  for (const keyword of keywords) {
+    let matched = 0
+    while (matched < keyword.length) {
+      while (state.offset + matched >= state.source.length && !isFinal(state))
+        yield* waitForInput(state)
+      if (state.source[state.offset + matched] !== keyword[matched]) break
+      matched++
+    }
+    if (matched === keyword.length)
+      yield* waitForPoint(state, state.offset + matched)
+  }
+  yield* waitForPoint(state)
+  if (!/[A-Za-z_]/u.test(State.charAt(state))) return
+  let end = state.offset
+  while (true) {
+    yield* waitForPoint(state, end)
+    const next = state.source[end]
+    if (!next || !identifierChar(next)) return
+    end++
+  }
+}
+
 function keywordParser(
   keyword: string,
   keywords: readonly string[]
 ): Parser<string> {
-  return makeParser(state => {
+  return makeResumable(function* (state) {
+    yield* waitForKeyword(state, [keyword])
     if (State.startsWith(state, keyword)) {
       const next = state.source[state.offset + keyword.length] ?? ""
       if (!next || !identifierChar(next))
         return replySuccess(keyword, State.consume(state, keyword.length))
     }
-    return runParser(
+    return yield* runResumable(
       keywordFailure(state, identifierAt(state), [keyword], keywords),
       state
     )
@@ -113,7 +142,8 @@ export function anyKeywordWithHints(
   keywords: readonly string[]
 ): Parser<string> {
   const sorted = [...keywords].sort((a, b) => b.length - a.length)
-  return makeParser(state => {
+  return makeResumable(function* (state) {
+    yield* waitForKeyword(state, sorted)
     for (const keyword of sorted) {
       if (State.startsWith(state, keyword)) {
         const next = state.source[state.offset + keyword.length] ?? ""
@@ -121,7 +151,7 @@ export function anyKeywordWithHints(
           return replySuccess(keyword, State.consume(state, keyword.length))
       }
     }
-    return runParser(
+    return yield* runResumable(
       keywordFailure(state, identifierAt(state), sorted, sorted),
       state
     )
@@ -131,7 +161,8 @@ export function anyKeywordWithHints(
 export function stringWithHints(
   validStrings: readonly string[]
 ): Parser<string> {
-  return makeParser(state => {
+  return makeResumable(function* (state) {
+    yield* waitForPoint(state)
     if (State.charAt(state) !== '"') {
       const found = State.charAt(state)
       return failRich(
@@ -148,8 +179,12 @@ export function stringWithHints(
       )
     }
     let offset = state.offset + 1
-    while (offset < state.source.length && state.source[offset] !== '"')
-      offset++
+    while (true) {
+      while (offset < state.source.length && state.source[offset] !== '"')
+        offset++
+      if (offset < state.source.length || isFinal(state)) break
+      yield* waitForInput(state)
+    }
     if (offset >= state.source.length)
       return failRich(
         {

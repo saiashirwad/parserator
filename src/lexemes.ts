@@ -7,9 +7,9 @@ import {
 import {
   fail,
   failRich,
-  makeParser,
+  makeResumable,
   replySuccess,
-  runParser,
+  runResumable,
   succeed,
   type Parser
 } from "./parser.ts"
@@ -53,13 +53,18 @@ export function createLexemes<const K extends readonly string[]>(
     fallback: Parser<string>
   ): Parser<string> => {
     const longestFirst = [...candidates].sort((a, b) => b.length - a.length)
-    return makeParser(state => {
-      const matching = longestFirst.filter(word =>
-        State.startsWith(state, word)
-      )
-      if (!matching.length) return runParser(fallback, state)
-
-      const identifier = runParser(options.identifier, state)
+    const prefix = longestFirst.length
+      ? choice(
+          ...(longestFirst.map(literal) as [
+            Parser<string>,
+            ...Parser<string>[]
+          ])
+        )
+      : fail("keyword")
+    return makeResumable(function* (state) {
+      const matched = yield* runResumable(prefix, state)
+      if (!matched.result.ok) return yield* runResumable(fallback, state)
+      const identifier = yield* runResumable(options.identifier, state)
       if (
         !identifier.result.ok &&
         identifier.result.failure.control.kind === "fatal"
@@ -69,6 +74,9 @@ export function createLexemes<const K extends readonly string[]>(
       const identifierEnd = identifier.result.ok
         ? identifier.state.offset
         : state.offset
+      const matching = longestFirst.filter(word =>
+        State.startsWith(state, word)
+      )
       const word = matching.find(
         candidate => identifierEnd <= state.offset + candidate.length
       )
@@ -121,7 +129,7 @@ export function createLexemes<const K extends readonly string[]>(
       .withSpan((value, span) => ({ value, span }))
       .flatMap(({ value, span }) =>
         configuredKeywords.includes(value)
-          ? makeParser(state =>
+          ? makeResumable(state =>
               failRich(
                 {
                   diagnostic: {
@@ -176,20 +184,20 @@ function completeParser<T>(
   trivia: Parser<unknown>,
   end: Parser<unknown>
 ): Parser<T> {
-  return makeParser(state => {
-    const leading = runParser(trivia, state)
+  return makeResumable(function* (state) {
+    const leading = yield* runResumable(trivia, state)
     if (!leading.result.ok)
       return leading as ParserReply<never> as ParserReply<T>
 
-    const parsed = runParser(inner, leading.state)
+    const parsed = yield* runResumable(inner, leading.state)
     if (!parsed.result.ok) return parsed
     const context = parsed.state.completionContext
 
-    const trailing = runParser(trivia, parsed.state)
+    const trailing = yield* runResumable(trivia, parsed.state)
     if (!trailing.result.ok)
       return addContext(trailing, context) as ParserReply<T>
 
-    const finished = runParser(end, trailing.state)
+    const finished = yield* runResumable(end, trailing.state)
     if (!finished.result.ok)
       return addContext(finished, context) as ParserReply<T>
     return replySuccess(parsed.result.value, finished.state)

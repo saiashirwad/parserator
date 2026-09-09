@@ -39,3 +39,7 @@ Those cases matter for parser diagnostics and backtracking costs.
 - State whether parser construction is included.
 - Report input lengths in UTF-16 code units, matching JavaScript offsets.
 - Use medians and a measure of variation rather than a single run.
+
+`node bench/incremental.bench.ts` compares complete-input parsing with the
+same grammar fed in chunks. It covers length-prefixed binary messages and
+delimited text records, including one input unit per chunk.

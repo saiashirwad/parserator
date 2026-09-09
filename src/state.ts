@@ -1,6 +1,8 @@
 import {
   advanceTo,
   initialState,
+  isFinal,
+  waitForInput,
   type CoreReply,
   type CoreState
 } from "./core.ts"
@@ -113,4 +115,21 @@ export const State = {
     const position = source.positionAt(state.offset)
     return { ...position, offset: state.offset }
   }
+}
+
+/** True when the cursor holds a complete code point, including malformed UTF-16. */
+export function hasPoint(state: ParserState, offset = state.offset): boolean {
+  const first = state.source.charCodeAt(offset)
+  return (
+    offset < state.source.length &&
+    !(first >= 0xd800 && first <= 0xdbff && offset + 1 === state.source.length)
+  )
+}
+
+/** A trailing high surrogate may be the first half of the next code point. */
+export function* waitForPoint(
+  state: ParserState,
+  offset = state.offset
+): Generator<void, void, void> {
+  while (!isFinal(state) && !hasPoint(state, offset)) yield* waitForInput(state)
 }

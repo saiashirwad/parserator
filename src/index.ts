@@ -67,3 +67,5 @@ export {
   keywordWithHints,
   stringWithHints
 } from "./hints.ts"
+
+export type { IncrementalParser, IncrementalResult } from "./parser.ts"

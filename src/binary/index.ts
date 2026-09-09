@@ -1,8 +1,15 @@
 /** Byte-oriented parsers. Offsets are relative to the supplied input view. */
-import { advanceTo, ensureCount, makeReply } from "../core.ts"
+import {
+  advanceTo,
+  ensureCount,
+  makeReply,
+  isFinal,
+  waitForInput
+} from "../core.ts"
 import {
   binaryEngine,
   requireBytes,
+  waitForBytes,
   type BinaryParser,
   type BinaryState
 } from "./engine.ts"
@@ -10,6 +17,8 @@ import { hexByte } from "./errors.ts"
 
 export type {
   BinaryParser,
+  BinaryIncrementalParser,
+  BinaryIncrementalResult,
   BinaryParseResult,
   BinaryPrefixResult,
   BinaryPrefixParseResult
@@ -50,7 +59,8 @@ export const {
   struct
 } = binaryEngine
 
-const { makeParser, runParser, replySuccess, failureAt } = binaryEngine
+const { makeRead, makeResumable, runResumable, replySuccess, failureAt } =
+  binaryEngine
 
 /** Move the byte cursor forward while retaining state metadata. */
 const advance = (state: BinaryState, n: number): BinaryState =>
@@ -60,28 +70,31 @@ const advance = (state: BinaryState, n: number): BinaryState =>
 export function bytes(n: number): BinaryParser<Uint8Array> {
   ensureCount(n)
   const description = `${n} bytes`
-  return makeParser(
+  return makeRead(
     state =>
       requireBytes(state, n, description) ??
       replySuccess(
         state.source.subarray(state.offset, state.offset + n),
         advance(state, n)
-      )
+      ),
+    state => state.source.length - state.offset >= n
   )
 }
 
 /** The length of the input, or of the enclosing `within` region. */
-export const size: BinaryParser<number> = makeParser(state =>
-  replySuccess(state.source.length, state)
-)
+export const size: BinaryParser<number> = makeResumable(function* (state) {
+  while (!isFinal(state)) yield* waitForInput(state)
+  return replySuccess(state.source.length, state)
+})
 
 /** Every byte left in the input, or in the enclosing `within` region. */
-export const rest: BinaryParser<Uint8Array> = makeParser(state =>
-  replySuccess(
+export const rest: BinaryParser<Uint8Array> = makeResumable(function* (state) {
+  while (!isFinal(state)) yield* waitForInput(state)
+  return replySuccess(
     state.source.subarray(state.offset),
     advanceTo(state, state.source.length)
   )
-)
+})
 
 /**
  * Run `inner` over exactly the next `n` bytes. Inside, `rest` and `eof` see
@@ -90,15 +103,17 @@ export const rest: BinaryParser<Uint8Array> = makeParser(state =>
  */
 export function within<T>(n: number, inner: BinaryParser<T>): BinaryParser<T> {
   ensureCount(n)
-  return makeParser(state => {
+  return makeResumable(function* (state) {
+    yield* waitForBytes(state, n)
     const failure = requireBytes(state, n)
     if (failure) return failure
     const end = state.offset + n
-    const reply = runParser(inner, {
+    const reply = yield* runResumable(inner, {
       ...state,
-      source: state.source.subarray(0, end)
+      source: state.source.subarray(0, end),
+      input: undefined
     })
-    const after = { ...reply.state, source: state.source }
+    const after = { ...reply.state, source: state.source, input: state.input }
     if (!reply.result.ok) return makeReply(after, reply.result)
     if (after.offset !== end) {
       return failureAt(after, {
@@ -123,9 +138,10 @@ export function magic(
   }
   const expected = Uint8Array.from(signature)
   const description = `[${Array.from(expected, hexByte).join(" ")}]`
-  return makeParser(state => {
+  return makeResumable(function* (state) {
     for (let index = 0; index < expected.length; index++) {
       const offset = state.offset + index
+      yield* waitForBytes(state, index + 1)
       const found = state.source[offset]
       if (found !== expected[index]) {
         return failureAt(state, {
@@ -184,10 +200,11 @@ function numeric<T>(
   read: (source: Uint8Array, offset: number) => T
 ): BinaryParser<T> {
   const description = `${name} (${width} byte${width === 1 ? "" : "s"})`
-  return makeParser(
+  return makeRead(
     state =>
       requireBytes(state, width, description) ??
-      replySuccess(read(state.source, state.offset), advance(state, width))
+      replySuccess(read(state.source, state.offset), advance(state, width)),
+    state => state.source.length - state.offset >= width
   )
 }
 
@@ -253,10 +270,11 @@ export const float64LE = le.float64
 /** Consume `n` bytes and discard them. */
 export function skip(n: number): BinaryParser<void> {
   ensureCount(n)
-  return makeParser(
+  return makeRead(
     state =>
       requireBytes(state, n, `${n} bytes to skip`) ??
-      replySuccess(undefined, advance(state, n))
+      replySuccess(undefined, advance(state, n)),
+    state => state.source.length - state.offset >= n
   )
 }
 
@@ -264,9 +282,13 @@ export function skip(n: number): BinaryParser<void> {
 export function takeWhile(
   predicate: (byte: number) => boolean
 ): BinaryParser<Uint8Array> {
-  return makeParser(state => {
+  return makeResumable(function* (state) {
     let end = state.offset
-    while (end < state.source.length && predicate(state.source[end]!)) end++
+    while (true) {
+      while (end < state.source.length && predicate(state.source[end]!)) end++
+      if (end < state.source.length || isFinal(state)) break
+      yield* waitForInput(state)
+    }
     return replySuccess(
       state.source.subarray(state.offset, end),
       advanceTo(state, end)
@@ -279,8 +301,15 @@ export function bytesUntil(byte: number): BinaryParser<Uint8Array> {
   if (!Number.isInteger(byte) || byte < 0 || byte > 255)
     throw new RangeError("bytesUntil expects a byte between 0 and 255")
   const description = `0x${hexByte(byte)} before the end of input`
-  return makeParser(state => {
-    const end = state.source.indexOf(byte, state.offset)
+  return makeResumable(function* (state) {
+    let searched = state.offset
+    let end: number
+    while (true) {
+      end = state.source.indexOf(byte, searched)
+      if (end >= 0 || isFinal(state)) break
+      searched = state.source.length
+      yield* waitForInput(state)
+    }
     if (end < 0) {
       return failureAt(state, {
         kind: "expected",
@@ -333,7 +362,9 @@ export const cstring: BinaryParser<string> = bytesUntil(0)
  */
 export function at<T>(offset: number, inner: BinaryParser<T>): BinaryParser<T> {
   ensureCount(offset)
-  return makeParser(state => {
+  return makeResumable(function* (state) {
+    while (offset > state.source.length && !isFinal(state))
+      yield* waitForInput(state)
     const size = state.source.length
     if (offset > size) {
       return failureAt(state, {
@@ -343,7 +374,7 @@ export function at<T>(offset: number, inner: BinaryParser<T>): BinaryParser<T> {
         message: `Offset ${offset} is past the end of the ${size}-byte input`
       })
     }
-    const reply = runParser(inner, advanceTo(state, offset))
+    const reply = yield* runResumable(inner, advanceTo(state, offset))
     if (!reply.result.ok) return reply
     return replySuccess(reply.result.value, {
       ...reply.state,

@@ -1,10 +1,12 @@
-import { ensureCount } from "./core.ts"
+import { ensureCount, isFinal, waitForInput } from "./core.ts"
 import type { Failure } from "./errors.ts"
 import {
   type Parser,
   textEngine,
   makeParser,
-  runParser,
+  makeRead,
+  makeResumable,
+  runResumable,
   replySuccess,
   fail,
   failRich,
@@ -17,7 +19,9 @@ import {
   type ParserReply,
   type ParserState,
   type SourcePosition,
-  State
+  State,
+  hasPoint,
+  waitForPoint
 } from "./state.ts"
 
 const digitTest = (c: string) => c >= "0" && c <= "9"
@@ -52,13 +56,29 @@ function literalFailure(state: ParserState, value: string): ParserReply<never> {
   })
 }
 
-export const literal = <const S extends string>(value: S): Parser<S> =>
-  makeParser(state => {
-    if (State.startsWith(state, value)) {
-      return replySuccess(value, State.consume(state, value.length))
+export const literal = <const S extends string>(value: S): Parser<S> => {
+  const read = (state: ParserState): ParserReply<S> =>
+    State.startsWith(state, value)
+      ? replySuccess(value, State.consume(state, value.length))
+      : literalFailure(state, value)
+  function* match(state: ParserState): Generator<void, ParserReply<S>, void> {
+    for (let index = 0; index < value.length; index++) {
+      const offset = state.offset + index
+      while (offset >= state.source.length && !isFinal(state))
+        yield* waitForInput(state)
+      if (state.source[offset] !== value[index]) {
+        yield* waitForPoint(state, offset)
+        return literalFailure(state, value)
+      }
     }
-    return literalFailure(state, value) as ParserReply<S>
-  })
+    return read(state)
+  }
+  return makeResumable(state =>
+    isFinal(state) || State.startsWith(state, value)
+      ? read(state)
+      : match(state)
+  )
+}
 
 export const oneOfLiterals = <
   const Values extends readonly [string, ...string[]]
@@ -68,21 +88,18 @@ export const oneOfLiterals = <
   if (values.length === 0)
     throw new TypeError("oneOfLiterals requires at least one literal")
   const sorted = [...values].sort((a, b) => b.length - a.length)
-  return makeParser(state => {
-    for (const value of sorted)
-      if (State.startsWith(state, value))
-        return replySuccess(
-          value as Values[number],
-          State.consume(state, value.length)
-        )
-    const failures = values
-      .map(value => {
-        const reply = literalFailure(state, value)
-        return reply.result.ok ? undefined : reply.result.failure
-      })
-      .filter((failure): failure is Failure => failure !== undefined)
+  const alternatives = sorted.map(value => literal(value))
+  return makeResumable(function* (state) {
+    const failures = new Map<string, Failure>()
+    for (let index = 0; index < alternatives.length; index++) {
+      const reply = yield* runResumable(alternatives[index]!, state)
+      if (reply.result.ok) return reply as ParserReply<Values[number]>
+      failures.set(sorted[index]!, reply.result.failure)
+    }
     return failRich(
-      mergeFailures(failures as [Failure, ...Failure[]]),
+      mergeFailures(
+        values.map(value => failures.get(value)!) as [Failure, ...Failure[]]
+      ),
       state
     ) as ParserReply<Values[number]>
   })
@@ -97,10 +114,12 @@ export const char = <const C extends string>(value: C): Parser<C> => {
   ) {
     throw new TypeError("char expects one Unicode code point")
   }
-  return makeParser(state =>
-    State.charAt(state) === value
-      ? replySuccess(value, State.consume(state, value.length))
-      : (expected(state, JSON.stringify(value)) as ParserReply<C>)
+  return makeRead(
+    state =>
+      State.charAt(state) === value
+        ? replySuccess(value, State.consume(state, value.length))
+        : (expected(state, JSON.stringify(value)) as ParserReply<C>),
+    hasPoint
   )
 }
 
@@ -108,12 +127,12 @@ export function satisfy(
   predicate: (char: string) => boolean,
   description = "character"
 ): Parser<string> {
-  return makeParser(state => {
+  return makeRead(state => {
     const value = State.charAt(state)
     return value && predicate(value)
       ? replySuccess(value, State.consume(state, value.length))
       : (expected(state, description) as ParserReply<string>)
-  })
+  }, hasPoint)
 }
 
 export function anyChar(): Parser<string> {
@@ -139,9 +158,22 @@ export function oneOfChars(chars: string): Parser<string> {
 export function takeWhileChar(
   predicate: (char: string) => boolean
 ): Parser<string> {
-  return makeParser(state => {
-    const end = State.consumeWhile(state, predicate)
-    return replySuccess(state.source.slice(state.offset, end.offset), end)
+  return makeResumable(function* (state) {
+    if (isFinal(state)) {
+      const end = State.consumeWhile(state, predicate)
+      return replySuccess(state.source.slice(state.offset, end.offset), end)
+    }
+    let current = state
+    while (true) {
+      yield* waitForPoint(current)
+      const value = State.charAt(current)
+      if (!value || !predicate(value)) break
+      current = State.consume(current, State.charWidthAt(current))
+    }
+    return replySuccess(
+      state.source.slice(state.offset, current.offset),
+      current
+    )
   })
 }
 export function takeWhileChar1(
@@ -174,10 +206,10 @@ export const manyWhitespace = () =>
   takeWhileChar(whitespaceTest).map(value => [...value])
 
 function scanUntil<T>(inner: Parser<T>, consumeMatch: boolean): Parser<string> {
-  return makeParser(state => {
+  return makeResumable(function* (state) {
     let current = state
     while (true) {
-      const reply = runParser(inner, current)
+      const reply = yield* runResumable(inner, current)
       if (reply.result.ok) {
         const end = consumeMatch
           ? { ...reply.state, cutGeneration: current.cutGeneration }
@@ -191,6 +223,7 @@ function scanUntil<T>(inner: Parser<T>, consumeMatch: boolean): Parser<string> {
       if (control.kind === "fatal") {
         return reply as ParserReply<never> as ParserReply<string>
       }
+      yield* waitForPoint(current)
       if (State.isAtEnd(current)) {
         return replySuccess(state.source.slice(state.offset), current)
       }
@@ -222,18 +255,33 @@ export const regex = (expression: RegExp): Parser<string> => {
   })
 }
 
-export const position: Parser<SourcePosition> = makeParser(state =>
-  replySuccess(State.toPosition(state), state)
+export const position: Parser<SourcePosition> = makeResumable(
+  function* (state) {
+    // A trailing CR may join an LF; resolve that boundary before computing lines.
+    while (
+      !isFinal(state) &&
+      state.offset === state.source.length &&
+      state.source.endsWith("\r")
+    )
+      yield* waitForInput(state)
+    return replySuccess(State.toPosition(state), state)
+  }
 )
 
 export function takeN(n: number): Parser<string> {
   ensureCount(n)
-  return makeParser(state => {
-    const value = State.peek(state, n)
-    if ([...value].length < n) {
-      return expected(state, `${n} characters`) as ParserReply<string>
+  return makeResumable(function* (state) {
+    let current = state
+    for (let index = 0; index < n; index++) {
+      yield* waitForPoint(current)
+      const value = State.charAt(current)
+      if (!value)
+        return expected(state, `${n} characters`) as ParserReply<string>
+      current = State.consume(current, State.charWidthAt(current))
     }
-    return replySuccess(value, State.consume(state, value.length))
+    // Preserve the existing replacement-character behavior on malformed UTF-16.
+    const value = State.peek(state, n)
+    return replySuccess(value, current)
   })
 }
 

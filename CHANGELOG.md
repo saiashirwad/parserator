@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Added `incremental()` sessions and `stream(chunks)` for text and binary
+  parsers, using the same generators and combinators as complete-input parsing.
+- Incremental sessions return `needMore`, `done`, or `error`; `finish()` marks
+  actual end-of-input, and `cancel()` closes suspended generators.
+- Preserve parser progress, backtracking, cuts, and bounded binary regions
+  across chunks. Character readers handle split UTF-16 surrogate pairs.
+- Regex and existing synchronous custom primitives wait for end-of-input.
+  Advanced integrations can opt into `makeResumable` and `runResumable`.
+
 ## 0.2.0
 
 This release defines a smaller, safer public API. It is a breaking release;
