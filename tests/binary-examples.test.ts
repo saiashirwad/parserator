@@ -148,6 +148,14 @@ describe("binary examples", () => {
     expect(short.message).toBe("Expected 4 bytes; only 2 bytes remain")
   })
 
+  test.each(["\uFEFFhello", "A".repeat(500_000)])(
+    "text frames preserve contents across encoding and parsing (%#)",
+    text => {
+      const items = [{ kind: "text" as const, text }, { kind: "ping" as const }]
+      expect(frames.parseOrThrow(encode(items))).toEqual(items)
+    }
+  )
+
   test("encode rejects point coordinates that do not fit in a uint16", () => {
     const point = (x: number, y: number) => [{ kind: "point" as const, x, y }]
     expect(frames.parseOrThrow(encode(point(0, 0xffff)))).toEqual(

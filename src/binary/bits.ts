@@ -63,7 +63,7 @@ function readBits(input: BitInput, offset: number, n: number): number {
   for (let i = 0; i < n; i++) {
     const at = offset + i
     const shift = msbFirst ? 7 - (at & 7) : at & 7
-    const bit = (bytes[at >> 3]! >> shift) & 1
+    const bit = (bytes[Math.floor(at / 8)]! >> shift) & 1
     if (msbFirst) value = value * 2 + bit
     else {
       value += bit * weight

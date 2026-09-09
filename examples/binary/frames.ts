@@ -79,7 +79,7 @@ export function encode(items: readonly Frame[]): Uint8Array {
       const encoded = new TextEncoder().encode(item.text)
       out.push(0x02)
       pushVarint(encoded.length)
-      out.push(...encoded)
+      for (const byte of encoded) out.push(byte)
     } else {
       for (const value of [item.x, item.y]) {
         if (!Number.isInteger(value) || value < 0 || value > 0xffff)

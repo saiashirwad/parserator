@@ -20,6 +20,20 @@ function failure<T>(parser: BinaryParser<T>, source: Uint8Array) {
 }
 
 describe("bounded bit fields", () => {
+  test("reads beyond the signed 32-bit bit-offset boundary", () => {
+    const offset = 2 ** 31
+    const source = new Uint8Array(offset / 8 + 1)
+    source[source.length - 1] = 0xff
+    for (const order of ["msb-first", "lsb-first"] as const) {
+      expect(
+        bit.skip(offset).zipRight(bit.uint(8)).parseOrThrow({
+          bytes: source,
+          order
+        })
+      ).toBe(255)
+    }
+  })
+
   test("reads flags and then resumes byte parsing", () => {
     const flags = bitFields(
       1,

@@ -635,7 +635,7 @@ const typeDef: Parser<TypeDef> = choice(
   aliasTypeDef
 )
 
-const typeDecl: Parser<Declaration> = parser(function* () {
+const typeDecl = parser(function* () {
   yield* keyword("type")
   yield* commit()
   const first = yield* typeDef.expected("type definition after 'type'")

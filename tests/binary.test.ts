@@ -36,6 +36,22 @@ describe("hex", () => {
 })
 
 describe("binary input and byte primitives", () => {
+  test("struct retains prototype-named fields as own data properties", () => {
+    for (const field of [b.uint8, b.uint8.map(value => ({ value }))]) {
+      const result = b
+        .struct({ ["__proto__"]: field, tail: b.uint8 })
+        .parseOrThrow(input(7, 9))
+      expect(Object.getOwnPropertyDescriptor(result, "__proto__")).toEqual({
+        value: field.parseOrThrow(input(7)),
+        enumerable: true,
+        configurable: true,
+        writable: true
+      })
+      expect(Object.getPrototypeOf(result)).toBe(Object.prototype)
+      expect(result.tail).toBe(9)
+    }
+  })
+
   test("parses a length-prefixed packet and rejects every truncation", () => {
     const source = input(0xca, 0xfe, 1, 0, 3, 0x10, 0x20, 0x30)
     expect(packet.parseOrThrow(source)).toEqual({
@@ -275,6 +291,18 @@ describe("byte runs and strings", () => {
     const expected = "A".repeat(source.length)
     expect(b.ascii().parseOrThrow(source)).toBe(expected)
     expect(b.ascii(source.length).parseOrThrow(source)).toBe(expected)
+  })
+
+  test("utf8 and cstring preserve leading U+FEFF in each field", () => {
+    const text = "\uFEFFhello"
+    const encoded = new TextEncoder().encode(text)
+    expect(b.utf8().parseOrThrow(encoded)).toBe(text)
+    expect(b.utf8(encoded.length).parseOrThrow(encoded)).toBe(text)
+    expect(
+      b.cstring
+        .zip(b.cstring)
+        .parseOrThrow(new TextEncoder().encode(`${text}\0${text}\0`))
+    ).toEqual([text, text])
   })
 
   test("ascii, utf8, and cstring decode and reject bad bytes", () => {

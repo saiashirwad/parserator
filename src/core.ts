@@ -858,7 +858,12 @@ export function createParserEngine<I, E extends Error>(
         const reply = runParser(field, current)
         if (!reply.result.ok)
           return reply as Reply<never> as Reply<StructValue<Fields>>
-        value[key] = reply.result.value
+        Object.defineProperty(value, key, {
+          value: reply.result.value,
+          enumerable: true,
+          configurable: true,
+          writable: true
+        })
         current = reply.state
       }
       return replySuccess(value as StructValue<Fields>, current)

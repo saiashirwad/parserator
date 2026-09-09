@@ -296,7 +296,7 @@ export function bytesUntil(byte: number): BinaryParser<Uint8Array> {
   })
 }
 
-const utf8Decoder = new TextDecoder("utf-8", { fatal: true })
+const utf8Decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true })
 
 /** Turn invalid UTF-8 into a parser failure instead of a decoder exception. */
 const decodeUtf8 = (raw: Uint8Array): BinaryParser<string> => {
