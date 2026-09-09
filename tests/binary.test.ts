@@ -270,6 +270,13 @@ describe("byte runs and strings", () => {
     expect(() => b.bytesUntil(256)).toThrow(RangeError)
   })
 
+  test("ascii decodes large inputs without exceeding the argument limit", () => {
+    const source = new Uint8Array(500_000).fill(0x41)
+    const expected = "A".repeat(source.length)
+    expect(b.ascii().parseOrThrow(source)).toBe(expected)
+    expect(b.ascii(source.length).parseOrThrow(source)).toBe(expected)
+  })
+
   test("ascii, utf8, and cstring decode and reject bad bytes", () => {
     expect(b.ascii(4).parseOrThrow(input(0x49, 0x48, 0x44, 0x52))).toBe("IHDR")
     expect(error(b.ascii(2), input(0x49, 0xc3)).message).toBe(

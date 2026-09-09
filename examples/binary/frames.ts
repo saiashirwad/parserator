@@ -65,6 +65,7 @@ export const frames = many(frame).zipLeft(eof)
 /** Encodes frames back to bytes, so round trips can be checked. */
 export function encode(items: readonly Frame[]): Uint8Array {
   const out: number[] = []
+  /** Append a payload length in unsigned LEB128 form. */
   const pushVarint = (n: number) => {
     do {
       const group = n % 128

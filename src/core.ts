@@ -19,11 +19,13 @@ export type CoreReply<T, I> = {
   readonly result: Success<T> | FailureResult
 }
 
+/** Pair a parser result with its resulting state without altering either. */
 export const makeReply = <T, I>(
   state: CoreState<I>,
   result: Success<T> | FailureResult
 ): CoreReply<T, I> => ({ state, result })
 
+/** Start parsing at an offset with no active commit or completion context. */
 export const initialState = <I>(source: I, offset = 0): CoreState<I> => ({
   source,
   offset,
@@ -102,15 +104,18 @@ export interface InputAdapter<I, E extends Error> {
   error(diagnostic: Diagnostic, input: I, sourceName?: string): E
 }
 
+/** Reject negative, fractional, or unsafe counts before constructing a parser. */
 export function ensureCount(n: number): void {
   if (!Number.isSafeInteger(n) || n < 0)
     throw new RangeError("count must be a safe nonnegative integer")
 }
 
+/** Measure diagnostic nesting to break ties between failures at one position. */
 function contextSize(diagnostic: Diagnostic): number {
   return diagnostic.context?.length ?? 0
 }
 
+/** Select the failure with the deepest context from a nonempty list. */
 function mostSpecific(failures: readonly Failure[]): Failure {
   return failures.reduce((best, candidate) =>
     contextSize(candidate.diagnostic) > contextSize(best.diagnostic)
@@ -119,6 +124,7 @@ function mostSpecific(failures: readonly Failure[]): Failure {
   )
 }
 
+/** Report the furthest failures, preferring custom messages and merging expectations. */
 function mergeFailures(
   failures: readonly [Failure, ...Failure[]],
   position: (diagnostic: Diagnostic) => number
@@ -198,18 +204,22 @@ export function createParserEngine<I, E extends Error>(
   const runners = new WeakMap<object, Runner<unknown>>()
   const parserToken = Symbol("Parser")
 
+  /** Remove context inherited from an earlier successful parser. */
   function clearCompletionContext(state: State): State {
     if (!state.completionContext) return state
     const { completionContext: _completionContext, ...rest } = state
     return rest
   }
 
+  /** Return a value and clear the previous completion context. */
   const replySuccess = <T>(value: T, state: State): Reply<T> =>
     makeReply(clearCompletionContext(state), { ok: true, value })
 
+  /** Return a failure while preserving its diagnostic, control state, and cursor. */
   const failRich = (failure: Failure, state: State): Reply<never> =>
     makeReply(state, { ok: false, failure })
 
+  /** Attach a diagnostic to the current state with recoverable or fatal control. */
   const failureAt = (
     state: State,
     diagnostic: Diagnostic,
@@ -225,6 +235,7 @@ export function createParserEngine<I, E extends Error>(
       state
     )
 
+  /** Describe the expected item and the input unit at the cursor. */
   const expectedDiagnostic = (state: State, item: string): Diagnostic => {
     const { value: found, width } = adapter.peek(state)
     return {
@@ -235,6 +246,7 @@ export function createParserEngine<I, E extends Error>(
     }
   }
 
+  /** Fail at the cursor with an expected-item diagnostic. */
   const expected = (state: State, item: string): Reply<never> =>
     failureAt(state, expectedDiagnostic(state, item))
 
@@ -253,21 +265,25 @@ export function createParserEngine<I, E extends Error>(
       state
     )
 
+  /** Create the input adapter's error with the source and optional display name. */
   const errorAt = (diagnostic: Diagnostic, state: State, sourceName?: string) =>
     adapter.error(diagnostic, state.source, sourceName)
 
+  /** Map a diagnostic to the adapter's position used to compare failures. */
   const failureOffset = (diagnostic: Diagnostic) =>
     adapter.failureOffset(diagnostic)
 
   class ParserValue<T> implements Parser<T> {
     declare readonly Type: T
 
+    /** Register a runner, rejecting construction outside this engine. */
     constructor(token: symbol, runner: Runner<T>) {
       if (token !== parserToken)
         throw new TypeError("Parser values must be made by parser combinators")
       runners.set(this, runner as Runner<unknown>)
     }
 
+    /** Transform a successful value while preserving the consumed input. */
     map<B>(f: (value: T) => B): Parser<B> {
       return makeParser(state => {
         const reply = runParser(this, state)
@@ -277,6 +293,7 @@ export function createParserEngine<I, E extends Error>(
       })
     }
 
+    /** Choose the next parser from this value and continue at the resulting cursor. */
     flatMap<B>(f: (value: T) => Parser<B>): Parser<B> {
       return makeParser(state => {
         const reply = runParser(this, state)
@@ -286,6 +303,7 @@ export function createParserEngine<I, E extends Error>(
       })
     }
 
+    /** Run both parsers in order and return their values as a pair. */
     zip<B>(other: Parser<B>): Parser<[T, B]> {
       return makeParser(state => {
         const left = runParser(this, state)
@@ -299,6 +317,7 @@ export function createParserEngine<I, E extends Error>(
       })
     }
 
+    /** Run both parsers in order and retain the second result. */
     zipRight<B>(other: Parser<B>): Parser<B> {
       return makeParser(state => {
         const left = runParser(this, state)
@@ -308,6 +327,7 @@ export function createParserEngine<I, E extends Error>(
       })
     }
 
+    /** Run both parsers in order and retain the first result. */
     zipLeft<B>(other: Parser<B>): Parser<T> {
       return makeParser(state => {
         const left = runParser(this, state)
@@ -319,10 +339,12 @@ export function createParserEngine<I, E extends Error>(
       })
     }
 
+    /** Allow generator grammars to read this parser with yield*. */
     *[Symbol.iterator](): Generator<Parser<T>, T, any> {
       return yield this
     }
 
+    /** Replace a recoverable failure's message with a named expectation. */
     expected(description: string): Parser<T> {
       return makeParser(state => {
         const reply = runParser(this, state)
@@ -341,6 +363,7 @@ export function createParserEngine<I, E extends Error>(
       })
     }
 
+    /** Add context to failures and remember it for unconsumed-input errors. */
     context(description: string): Parser<T> {
       return makeParser(state => {
         const reply = runParser(this, state)
@@ -360,6 +383,7 @@ export function createParserEngine<I, E extends Error>(
       })
     }
 
+    /** Transform the value together with the half-open span it consumed. */
     withSpan<B>(f: (value: T, span: Span) => B): Parser<B> {
       return makeParser(state => {
         const reply = runParser(this, state)
@@ -393,16 +417,20 @@ export function createParserEngine<I, E extends Error>(
       })
     }
 
+    /** Consume the supplied trivia parser before and after this value. */
     trim(trivia: Parser<unknown>): Parser<T> {
       return trivia.zipRight(this).zipLeft(trivia)
     }
+    /** Consume the supplied trivia parser before this value. */
     trimLeft(trivia: Parser<unknown>): Parser<T> {
       return trivia.zipRight(this)
     }
+    /** Consume the supplied trivia parser after this value. */
     trimRight(trivia: Parser<unknown>): Parser<T> {
       return this.zipLeft(trivia)
     }
 
+    /** On success, prevent surrounding alternatives from recovering later failures. */
     commit(): Parser<T> {
       return makeParser(state => {
         const reply = runParser(this, state)
@@ -415,6 +443,7 @@ export function createParserEngine<I, E extends Error>(
       })
     }
 
+    /** Parse the whole input, returning a diagnostic error if any input remains. */
     parse(
       input: I,
       options: { readonly sourceName?: string } = {}
@@ -446,6 +475,7 @@ export function createParserEngine<I, E extends Error>(
       return { success: true, value: reply.result.value }
     }
 
+    /** Parse a prefix and return its value, final offset, and remaining input. */
     parsePrefix(
       input: I,
       options: { readonly sourceName?: string } = {}
@@ -470,6 +500,7 @@ export function createParserEngine<I, E extends Error>(
       }
     }
 
+    /** Parse the whole input and throw the diagnostic error on failure. */
     parseOrThrow(input: I, options: { readonly sourceName?: string } = {}): T {
       const result = this.parse(input, options)
       if (!result.success) throw result.error
@@ -481,16 +512,19 @@ export function createParserEngine<I, E extends Error>(
   const Parser: { readonly prototype: Parser<unknown> } =
     Object.freeze(ParserValue)
 
+  /** Run a parser at a state, rejecting values created by another engine. */
   function runParser<T>(parser: Parser<T>, state: State): Reply<T> {
     const runner = runners.get(parser) as Runner<T> | undefined
     if (!runner) throw new TypeError("Not a Parser")
     return runner(state)
   }
 
+  /** Wrap a primitive runner in this engine's parser implementation. */
   function makeParser<T>(runner: Runner<T>): Parser<T> {
     return new ParserValue(parserToken, runner)
   }
 
+  /** Return a constant value without consuming input. */
   function succeed<T>(value: T): Parser<T> {
     return makeParser(state => replySuccess(value, state))
   }
@@ -506,6 +540,7 @@ export function createParserEngine<I, E extends Error>(
     )
   }
 
+  /** Fail without allowing alternatives, attempts, or optional parsing to recover. */
   function fatal(message: string): Parser<never> {
     return makeParser(state =>
       failureAt(
@@ -520,10 +555,12 @@ export function createParserEngine<I, E extends Error>(
     )
   }
 
+  /** Run yielded parsers sequentially and close the generator on failure. */
   function parser<T>(f: () => Generator<Parser<any>, T, any>): Parser<T> {
     return makeParser(state => {
       const iterator = f()
       let closed = false
+      /** Run generator cleanup at most once after an early exit. */
       const close = (): void => {
         if (closed) return
         closed = true
@@ -550,6 +587,7 @@ export function createParserEngine<I, E extends Error>(
     })
   }
 
+  /** Build a self-referencing grammar lazily on its first execution. */
   function recursive<T>(builder: (self: Parser<T>) => Parser<T>): Parser<T> {
     let built: Parser<T> | undefined
     const self: Parser<T> = makeParser(state =>
@@ -558,6 +596,7 @@ export function createParserEngine<I, E extends Error>(
     return self
   }
 
+  /** Succeed without consuming when the inner parser fails nonfatally. */
   function notFollowedBy<T>(inner: Parser<T>): Parser<true> {
     return makeParser(state => {
       const reply = runParser(inner, state)
@@ -576,6 +615,7 @@ export function createParserEngine<I, E extends Error>(
     })
   }
 
+  /** Inspect a value without consuming input or retaining inner commits. */
   function lookahead<T>(inner: Parser<T>): Parser<T> {
     return makeParser(state => {
       const reply = runParser(inner, state)
@@ -586,6 +626,7 @@ export function createParserEngine<I, E extends Error>(
     })
   }
 
+  /** Inspect a value without consuming, returning undefined on nonfatal failure. */
   function probe<T>(inner: Parser<T>): Parser<T | undefined> {
     return makeParser(state => {
       const reply = runParser(inner, state)
@@ -596,6 +637,7 @@ export function createParserEngine<I, E extends Error>(
     })
   }
 
+  /** Restore the starting state and undo inner commits on nonfatal failure. */
   function attempt<T>(inner: Parser<T>): Parser<T> {
     return makeParser(state => {
       const reply = runParser(inner, state)
@@ -605,6 +647,7 @@ export function createParserEngine<I, E extends Error>(
     })
   }
 
+  /** Parse delimiters around a value and label a missing closing delimiter. */
   function between<T>(
     start: Parser<unknown>,
     end: Parser<unknown>,
@@ -613,6 +656,7 @@ export function createParserEngine<I, E extends Error>(
     return start.zipRight(inner).zipLeft(end.expected("closing delimiter"))
   }
 
+  /** Collect zero or more consuming matches; propagate committed or fatal failures. */
   function many<T>(inner: Parser<T>): Parser<T[]>
   function many(inner: Parser<any>): Parser<any[]>
   function many<T>(inner: Parser<T>): Parser<T[]> {
@@ -634,6 +678,7 @@ export function createParserEngine<I, E extends Error>(
     })
   }
 
+  /** Discard zero or more consuming matches; propagate committed or fatal failures. */
   function skipMany<T>(inner: Parser<T>): Parser<void>
   function skipMany(inner: Parser<any>): Parser<void>
   function skipMany<T>(inner: Parser<T>): Parser<void> {
@@ -653,6 +698,7 @@ export function createParserEngine<I, E extends Error>(
     })
   }
 
+  /** Collect repeated consuming matches and fail when none are found. */
   function many1<T>(inner: Parser<T>): Parser<T[]>
   function many1(inner: Parser<any>): Parser<any[]>
   function many1<T>(inner: Parser<T>): Parser<T[]> {
@@ -668,6 +714,7 @@ export function createParserEngine<I, E extends Error>(
     })
   }
 
+  /** Return undefined without consuming on an uncommitted, nonfatal failure. */
   function optional<T>(inner: Parser<T>): Parser<T | undefined>
   function optional(inner: Parser<any>): Parser<any>
   function optional<T>(inner: Parser<T>): Parser<T | undefined> {
@@ -680,6 +727,7 @@ export function createParserEngine<I, E extends Error>(
     })
   }
 
+  /** Collect repeated matches and require at least the given count. */
   function atLeast<T>(inner: Parser<T>, n: number): Parser<T[]> {
     ensureCount(n)
     return many(inner).flatMap(values =>
@@ -689,6 +737,7 @@ export function createParserEngine<I, E extends Error>(
     )
   }
 
+  /** Run the inner parser exactly n times and collect every value. */
   function count<T>(inner: Parser<T>, n: number): Parser<T[]> {
     ensureCount(n)
     return parser(function* () {
@@ -698,6 +747,7 @@ export function createParserEngine<I, E extends Error>(
     })
   }
 
+  /** Parse a separated list with configurable empty and trailing-separator policies. */
   function list<T, S>(
     inner: Parser<T>,
     separator: Parser<S>,
@@ -739,19 +789,24 @@ export function createParserEngine<I, E extends Error>(
     })
   }
 
+  /** Parse zero or more separated values without allowing a trailing separator. */
   const sepBy = <T, S>(inner: Parser<T>, separator: Parser<S>): Parser<T[]> =>
     list(inner, separator, false, false)
+  /** Parse one or more separated values without allowing a trailing separator. */
   const sepBy1 = <T, S>(inner: Parser<T>, separator: Parser<S>): Parser<T[]> =>
     list(inner, separator, false, true)
+  /** Parse zero or more separated values with an optional trailing separator. */
   const sepEndBy = <T, S>(
     inner: Parser<T>,
     separator: Parser<S>
   ): Parser<T[]> => list(inner, separator, true, false)
+  /** Parse one or more separated values with an optional trailing separator. */
   const sepEndBy1 = <T, S>(
     inner: Parser<T>,
     separator: Parser<S>
   ): Parser<T[]> => list(inner, separator, true, true)
 
+  /** Try alternatives at one cursor until success, a commit, or a fatal failure. */
   function choice<Parsers extends readonly [Parser<any>, ...Parser<any>[]]>(
     ...parsers: Parsers
   ): Parser<Parsers[number] extends Parser<infer T> ? T : never>
@@ -773,6 +828,7 @@ export function createParserEngine<I, E extends Error>(
     })
   }
 
+  /** Run parsers in order and retain their values in a typed tuple. */
   const sequence = <const Parsers extends readonly Parser<unknown>[]>(
     parsers: Parsers
   ): Parser<{
@@ -809,6 +865,7 @@ export function createParserEngine<I, E extends Error>(
     })
   }
 
+  /** Advance the commit generation without consuming input. */
   const commit = (): Parser<void> =>
     makeParser(state =>
       replySuccess(undefined, {
@@ -817,13 +874,17 @@ export function createParserEngine<I, E extends Error>(
       })
     )
 
+  /** Run two parsers in order and return both values. */
   const zip = <A, B>(left: Parser<A>, right: Parser<B>): Parser<[A, B]> =>
     left.zip(right)
+  /** Run two parsers in order and keep the right value. */
   const zipRight = <A, B>(left: Parser<A>, right: Parser<B>): Parser<B> =>
     left.zipRight(right)
+  /** Run two parsers in order and keep the left value. */
   const zipLeft = <A, B>(left: Parser<A>, right: Parser<B>): Parser<A> =>
     left.zipLeft(right)
 
+  /** Succeed only when the input adapter reports no remaining input. */
   const eof = makeParser<void>(state =>
     adapter.isAtEnd(state)
       ? replySuccess(undefined, state)
@@ -879,6 +940,7 @@ export function createParserEngine<I, E extends Error>(
     failRich,
     failureAt,
     expected,
+    /** Combine alternative failures using this adapter's position units. */
     mergeFailures: (failures: readonly [Failure, ...Failure[]]): Failure =>
       mergeFailures(failures, failureOffset)
   }

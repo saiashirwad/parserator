@@ -24,6 +24,7 @@ export type BinaryPrefixParseResult<T> = BinaryParseResult<
 export type BinaryState = CoreState<Uint8Array>
 
 export const binaryEngine = createParserEngine<Uint8Array, BinaryParseError>({
+  /** Reject non-byte inputs and initialize a cursor at the start of the view. */
   fromInput(input) {
     if (!(input instanceof Uint8Array))
       throw new TypeError("Binary parsers expect a Uint8Array")
@@ -68,6 +69,7 @@ export function requireUnits<I>(
   })
 }
 
+/** Fail unless the requested bytes remain within the current input region. */
 export const requireBytes = (
   state: BinaryState,
   n: number,

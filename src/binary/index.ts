@@ -52,6 +52,7 @@ export const {
 
 const { makeParser, runParser, replySuccess, failureAt } = binaryEngine
 
+/** Move the byte cursor forward while retaining state metadata. */
 const advance = (state: BinaryState, n: number): BinaryState =>
   advanceTo(state, state.offset + n)
 
@@ -157,6 +158,7 @@ function readUint(
   return value
 }
 
+/** Combine two 32-bit halves into an unsigned 64-bit integer in the given order. */
 function readBigUint(
   source: Uint8Array,
   offset: number,
@@ -171,9 +173,11 @@ function readBigUint(
   )
 }
 
+/** Create a DataView restricted to the supplied Uint8Array view. */
 const viewOf = (source: Uint8Array): DataView =>
   new DataView(source.buffer, source.byteOffset, source.byteLength)
 
+/** Check the input width before reading and advancing a numeric primitive. */
 function numeric<T>(
   width: number,
   name: string,
@@ -192,8 +196,10 @@ export type ByteOrder = "BE" | "LE"
 /** Every numeric reader for one byte order, for formats that declare it at runtime. */
 export function numbers(order: ByteOrder) {
   const le = order === "LE"
+  /** Build an unsigned reader for a fixed byte width and the selected order. */
   const uint = (width: number) => (s: Uint8Array, o: number) =>
     readUint(s, o, width, le)
+  /** Interpret an unsigned read as a signed two's-complement value. */
   const int = (width: number) => {
     const read = uint(width)
     const limit = 2 ** (width * 8)
@@ -292,6 +298,7 @@ export function bytesUntil(byte: number): BinaryParser<Uint8Array> {
 
 const utf8Decoder = new TextDecoder("utf-8", { fatal: true })
 
+/** Turn invalid UTF-8 into a parser failure instead of a decoder exception. */
 const decodeUtf8 = (raw: Uint8Array): BinaryParser<string> => {
   try {
     return succeed(utf8Decoder.decode(raw))

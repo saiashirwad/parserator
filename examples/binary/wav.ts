@@ -14,6 +14,7 @@ import {
 
 export type WavFormat = typeof wavFormat.Type
 
+/** Match an ASCII container tag and use its text as the expected label. */
 const tag = (text: string) =>
   magic(new TextEncoder().encode(text)).expected(`"${text}"`)
 

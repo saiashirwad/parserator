@@ -31,11 +31,13 @@ export type BitInput = {
 export type BitParser<T> = CoreParser<T, BitInput, BinaryParseError>
 type BitState = CoreState<BitInput>
 
+/** Reject unsupported bit traversal orders at parser construction or entry. */
 function checkOrder(order: BitOrder): void {
   if (order !== "msb-first" && order !== "lsb-first")
     throw new TypeError("bit order must be msb-first or lsb-first")
 }
 
+/** Return the full backing input length in bits, including any consumed prefix. */
 const bitLength = (input: BitInput): number => input.bytes.length * 8
 
 /** Translate a bit-offset diagnostic into byte offsets, keeping the bit span. */
@@ -72,6 +74,7 @@ function readBits(input: BitInput, offset: number, n: number): number {
 }
 
 const bitEngine = createParserEngine<BitInput, BinaryParseError>({
+  /** Validate a bit input and restore its optional unaligned prefix offset. */
   fromInput(input) {
     if (!(input.bytes instanceof Uint8Array))
       throw new TypeError("Bit parsers expect bytes in a Uint8Array")
@@ -98,12 +101,15 @@ const bitEngine = createParserEngine<BitInput, BinaryParseError>({
 
 const { makeParser, runParser, replySuccess } = bitEngine
 
+/** Fail when the requested bit count exceeds the remaining region. */
 const requireBits = (state: BitState, n: number) =>
   requireUnits(state, bitLength(state.source) - state.offset, n, "bits")
 
+/** Move the bit cursor forward while retaining state metadata. */
 const advance = (state: BitState, n: number): BitState =>
   advanceTo(state, state.offset + n)
 
+/** Read up to 53 bits as an exact unsigned number in the input's bit order. */
 function uint(n: number): BitParser<number> {
   ensureCount(n)
   if (n > 53)
@@ -115,6 +121,7 @@ function uint(n: number): BitParser<number> {
   )
 }
 
+/** Read an arbitrary nonnegative bit count as an unsigned bigint. */
 function bigUint(n: number): BitParser<bigint> {
   ensureCount(n)
   return makeParser(state => {
@@ -133,6 +140,7 @@ function bigUint(n: number): BitParser<bigint> {
   })
 }
 
+/** Consume the requested number of bits without returning a value. */
 function skip(n: number): BitParser<void> {
   ensureCount(n)
   return makeParser(
@@ -204,7 +212,7 @@ export function bitFields<T>(
     }
     return makeReply(
       {
-        source: state.source,
+        ...state,
         offset: state.offset + n,
         cutGeneration: bits.state.cutGeneration,
         ...(completionContext ? { completionContext } : {})

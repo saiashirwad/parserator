@@ -1,5 +1,6 @@
 /** Small real files, embedded so the demo and tests need no disk access. */
 
+/** Decode an embedded base64 fixture into its original bytes. */
 const base64 = (text: string) =>
   Uint8Array.from(atob(text), char => char.charCodeAt(0))
 

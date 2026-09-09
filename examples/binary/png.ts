@@ -62,6 +62,7 @@ export const png = parser(function* () {
   return { header, chunks }
 })
 
+/** Read a four-byte ASCII chunk name and optionally require a specific type. */
 const chunkType = (expected?: string) =>
   ascii(4).validate(
     type =>
@@ -70,6 +71,7 @@ const chunkType = (expected?: string) =>
       `expected ${expected} chunk, found ${type}`
   )
 
+/** Validate a stored CRC against the checksum of the chunk type and payload. */
 const checksum = (type: string, expected: number) =>
   uint32BE.validate(
     crc =>
@@ -77,6 +79,7 @@ const checksum = (type: string, expected: number) =>
       `${type} CRC mismatch: expected ${hex8(expected)}, found ${hex8(crc)}`
   )
 
+/** Format an unsigned 32-bit checksum with eight hexadecimal digits. */
 const hex8 = (value: number) => `0x${value.toString(16).padStart(8, "0")}`
 
 const crcTable = Uint32Array.from({ length: 256 }, (_, n) => {
@@ -85,6 +88,7 @@ const crcTable = Uint32Array.from({ length: 256 }, (_, n) => {
   return c >>> 0
 })
 
+/** Compute the PNG CRC-32 of a chunk type and its data. */
 export function crc32(data: Uint8Array): number {
   let crc = 0xffffffff
   for (const byte of data) crc = crcTable[(crc ^ byte) & 0xff]! ^ (crc >>> 8)

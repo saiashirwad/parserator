@@ -185,6 +185,22 @@ describe("bounded bit fields", () => {
     })
   })
 
+  test("successful bit fields preserve outer context unless the inner parser supplies it", () => {
+    const header = uint8.context("header")
+    const plain = header.zipRight(bitFields(1, bit.uint(8)))
+    expect(failure(plain, input(1, 2, 3)).diagnostic).toMatchObject({
+      context: ["header"],
+      span: { start: 2, end: 3 }
+    })
+
+    const contextual = header.zipRight(
+      bitFields(1, bit.uint(8).context("flags"))
+    )
+    expect(failure(contextual, input(1, 2, 3)).diagnostic.context).toEqual([
+      "flags"
+    ])
+  })
+
   test("standalone bit prefix parsing preserves an unaligned remainder", () => {
     const result = bit
       .uint(3)

@@ -48,6 +48,7 @@ const centralEntry = parser(function* () {
   return { name, method, crc, size, compressedSize, localHeader }
 })
 
+/** Read the stored payload after a local header using its directory entry size. */
 const localData = (compressedSize: number) =>
   parser(function* () {
     yield* magic([0x50, 0x4b, 0x03, 0x04]).expected("local file header")

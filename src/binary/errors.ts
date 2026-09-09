@@ -10,6 +10,7 @@ export type BinaryDiagnosticJson = BinaryDiagnostic & {
   readonly sourceName?: string
 }
 
+/** Format a byte as two lowercase hexadecimal digits. */
 export const hexByte = (value: number): string =>
   value.toString(16).padStart(2, "0")
 
@@ -31,6 +32,7 @@ export class SourceBytes {
   readonly bytes: Uint8Array
   readonly name: string | undefined
 
+  /** Retain the input view and its optional diagnostic display name. */
   constructor(bytes: Uint8Array, name?: string) {
     this.bytes = bytes
     this.name = name
@@ -42,11 +44,13 @@ export class BinaryParseError extends DiagnosticError<
   SourceBytes,
   BinaryDiagnostic
 > {
+  /** Associate a binary diagnostic with the bytes that produced it. */
   constructor(diagnostic: BinaryDiagnostic, source: SourceBytes) {
     super(diagnostic, source)
     this.name = "BinaryParseError"
   }
 
+  /** Render the failing hex row, span marker, context, and hints. */
   format(): string {
     const { diagnostic, source } = this
     const offset = diagnostic.span.start
@@ -71,6 +75,7 @@ export class BinaryParseError extends DiagnosticError<
     return `${location}: ${this.message}\n${label}  ${row}\n${marker}${context}${hints}`
   }
 
+  /** Serialize the diagnostic with explicit byte units and any source name. */
   override toJSON(): BinaryDiagnosticJson {
     return { ...super.toJSON(), unit: "byte" }
   }

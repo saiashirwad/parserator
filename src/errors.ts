@@ -88,12 +88,14 @@ export abstract class DiagnosticError<
   readonly diagnostic: D
   readonly source: S
 
+  /** Build an error message while retaining the structured diagnostic and source. */
   constructor(diagnostic: D, source: S) {
     super(diagnosticMessage(diagnostic))
     this.diagnostic = diagnostic
     this.source = source
   }
 
+  /** Serialize the structured diagnostic and optional source display name. */
   toJSON(): D & { readonly sourceName?: string } {
     return {
       ...this.diagnostic,
@@ -104,6 +106,7 @@ export abstract class DiagnosticError<
 
 /** The stable public parse error. */
 export class ParseError extends DiagnosticError<SourceText> {
+  /** Normalize a text source and attach its diagnostic to a parse error. */
   constructor(diagnostic: Diagnostic, source: SourceText | string) {
     super(
       diagnostic,

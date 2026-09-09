@@ -19,6 +19,7 @@ import {
 
 export type Elf = typeof elf.Type
 
+/** Read an ELF identification field restricted to its two supported encodings. */
 const oneOrTwo = (field: string) =>
   uint8.validate(v => v === 1 || v === 2, `${field} must be 1 or 2`)
 
@@ -70,6 +71,7 @@ export const elf = parser(function* () {
   return { ...ident, ...header, sections }
 })
 
+/** Build a section header layout using the file's byte order and word width. */
 const sectionHeader = (
   uint32: BinaryParser<number>,
   word: BinaryParser<number>
