@@ -1,4 +1,4 @@
-/** A half-open span into a JavaScript string (UTF-16 code-unit offsets). */
+/** A half-open span: UTF-16 offsets for text, byte offsets for binary input. */
 export type Span = { readonly start: number; readonly end: number }
 
 export type Diagnostic = {
@@ -80,16 +80,39 @@ export function fatalMessage(message?: string): string {
   return `Fatal: ${detail}`
 }
 
-/** The stable public parse error. */
-export class ParseError extends Error {
-  readonly diagnostic: Diagnostic
-  readonly source: SourceText
+/** Shared by every input kind's parse error; each adds its own renderer. */
+export abstract class DiagnosticError<
+  S extends { readonly name: string | undefined },
+  D extends Diagnostic = Diagnostic
+> extends Error {
+  readonly diagnostic: D
+  readonly source: S
 
-  constructor(diagnostic: Diagnostic, source: SourceText | string) {
+  /** Build an error message while retaining the structured diagnostic and source. */
+  constructor(diagnostic: D, source: S) {
     super(diagnosticMessage(diagnostic))
-    this.name = "ParseError"
     this.diagnostic = diagnostic
-    this.source = typeof source === "string" ? new SourceText(source) : source
+    this.source = source
+  }
+
+  /** Serialize the structured diagnostic and optional source display name. */
+  toJSON(): D & { readonly sourceName?: string } {
+    return {
+      ...this.diagnostic,
+      ...(this.source.name ? { sourceName: this.source.name } : {})
+    }
+  }
+}
+
+/** The stable public parse error. */
+export class ParseError extends DiagnosticError<SourceText> {
+  /** Normalize a text source and attach its diagnostic to a parse error. */
+  constructor(diagnostic: Diagnostic, source: SourceText | string) {
+    super(
+      diagnostic,
+      typeof source === "string" ? new SourceText(source) : source
+    )
+    this.name = "ParseError"
   }
 
   format(
@@ -102,13 +125,6 @@ export class ParseError extends Error {
     // The formatter imports this class for its input type; the import is safe
     // because no formatter code runs while this module is being initialized.
     return new ErrorFormatter(options).format(this)
-  }
-
-  toJSON(): DiagnosticJson {
-    return {
-      ...this.diagnostic,
-      ...(this.source.name ? { sourceName: this.source.name } : {})
-    }
   }
 }
 

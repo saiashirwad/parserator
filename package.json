@@ -42,6 +42,11 @@
       "types": "./dist/diagnostics.d.ts",
       "import": "./dist/diagnostics.js",
       "default": "./dist/diagnostics.js"
+    },
+    "./binary": {
+      "types": "./dist/binary/index.d.ts",
+      "import": "./dist/binary/index.js",
+      "default": "./dist/binary/index.js"
     }
   },
   "publishConfig": {
@@ -80,7 +85,7 @@
     "vitest": "^4.0.0"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18.0"
   },
   "packageManager": "pnpm@11.11.0"
 }

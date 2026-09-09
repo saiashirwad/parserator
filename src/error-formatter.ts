@@ -35,7 +35,10 @@ export class ErrorFormatter {
       )
       if (line === pos.line) {
         const column = Math.max(0, pos.column - 1)
-        lines.push(`  ${" ".repeat(width)} | ${" ".repeat(column)}^`)
+        const text = error.source.lineAt(line)
+        const length = Math.min(d.span.end - d.span.start, text.length - column)
+        const carets = "^".repeat(Math.max(1, length))
+        lines.push(`  ${" ".repeat(width)} | ${" ".repeat(column)}${carets}`)
       }
     }
     lines.push(diagnosticMessage(d))

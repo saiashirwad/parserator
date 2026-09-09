@@ -27,6 +27,7 @@ export {
   sepEndBy1,
   between,
   sequence,
+  struct,
   lookahead,
   probe,
   notFollowedBy,
