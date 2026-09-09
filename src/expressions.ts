@@ -1,9 +1,9 @@
 import { choice, many } from "./combinators.ts"
 import {
-  makeParser,
+  makeResumable,
   parser,
   replySuccess,
-  runParser,
+  runResumable,
   type Parser
 } from "./parser.ts"
 import type { ParserReply } from "./state.ts"
@@ -16,14 +16,14 @@ export function chainLeft1<T>(
   term: Parser<T>,
   operator: BinaryOperator<T>
 ): Parser<T> {
-  return makeParser(state => {
-    const first = runParser(term, state)
+  return makeResumable(function* (state) {
+    const first = yield* runResumable(term, state)
     if (!first.result.ok) return first
 
     let value = first.result.value
     let current = first.state
     while (true) {
-      const operation = runParser(operator, current)
+      const operation = yield* runResumable(operator, current)
       if (!operation.result.ok) {
         const control = operation.result.failure.control
         if (
@@ -35,7 +35,7 @@ export function chainLeft1<T>(
         return replySuccess(value, current)
       }
 
-      const right = runParser(term, operation.state)
+      const right = yield* runResumable(term, operation.state)
       if (!right.result.ok) {
         return right as ParserReply<never> as ParserReply<T>
       }
@@ -53,15 +53,15 @@ export function chainRight1<T>(
   term: Parser<T>,
   operator: BinaryOperator<T>
 ): Parser<T> {
-  return makeParser(state => {
-    const first = runParser(term, state)
+  return makeResumable(function* (state) {
+    const first = yield* runResumable(term, state)
     if (!first.result.ok) return first
 
     const values = [first.result.value]
     const operations: Array<(left: T, right: T) => T> = []
     let current = first.state
     while (true) {
-      const operation = runParser(operator, current)
+      const operation = yield* runResumable(operator, current)
       if (!operation.result.ok) {
         const control = operation.result.failure.control
         if (
@@ -78,7 +78,7 @@ export function chainRight1<T>(
         return replySuccess(value, current)
       }
 
-      const right = runParser(term, operation.state)
+      const right = yield* runResumable(term, operation.state)
       if (!right.result.ok) {
         return right as ParserReply<never> as ParserReply<T>
       }

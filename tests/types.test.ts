@@ -59,6 +59,37 @@ if (parsePrefixResult.success) {
   void rest
 }
 
+const incremental: import("../src/index").IncrementalParser<"ok"> =
+  literal("ok").incremental()
+const incrementalResult: import("../src/index").IncrementalResult<"ok"> =
+  incremental.push("o")
+if (incrementalResult.status === "done") {
+  const value: "ok" = incrementalResult.value
+  const rest: string = incrementalResult.rest
+  void [value, rest]
+}
+incremental.cancel()
+const messages: AsyncGenerator<"ok"> = literal("ok").stream(["ok"])
+void messages
+const promised: AsyncGenerator<number> = literal("ok")
+  .map(async () => 1)
+  .stream(["ok"])
+void promised
+const binaryTypes = async () => {
+  const { uint8 } = await import("../src/binary/index.ts")
+  const session: import("../src/binary/index.ts").BinaryIncrementalParser<number> =
+    uint8.incremental()
+  const result: import("../src/binary/index.ts").BinaryIncrementalResult<number> =
+    session.push(new Uint8Array([1]))
+  if (result.status === "done") {
+    const rest: Uint8Array = result.rest
+    void rest
+  }
+  // @ts-expect-error Binary sessions accept byte arrays, not strings.
+  session.push("x")
+}
+void binaryTypes
+
 // The implementation constructor is intentionally not part of the public API.
 const assertNotConstructible = () => {
   // @ts-expect-error Parser values must come from parser/combinator factories.

@@ -209,13 +209,97 @@ hex dump.
   follows an offset table, and `bitFields(n, inner)` reads packed bits with
   the `bit` namespace.
 
+## Incremental input
+
+The same text and binary grammars can parse input as it arrives. For a stream
+of consecutive messages, call `message.stream(chunks)`, where `chunks` is an
+iterable or async iterable of strings or byte arrays:
+
+```ts
+import * as b from "parserator/binary"
+
+const message = b.parser(function* () {
+  const length = yield* b.uint16BE
+  return yield* b.utf8(length)
+})
+
+// A length-prefixed UTF-8 message split across two network chunks.
+const chunks = [b.hex("00 03 61"), b.hex("62 63 00 01 64")]
+for await (const value of message.stream(chunks)) {
+  console.log(value) // "abc", then "d"
+}
+```
+
+The runner suspends inside an incomplete message and resumes when another
+chunk arrives. Completed reads, generator statements, and callbacks are not
+replayed just because input was split. Normal grammar backtracking still
+runs alternatives as usual. `stream` yields one message at a time, throws a
+parse error on invalid or truncated input, and rejects parsers that succeed
+without consuming input. It accepts an empty stream without invoking the
+message parser. Offsets and diagnostics start at zero for each message.
+
+For manual input delivery, use an incremental prefix session:
+
+```ts
+const session = message.incremental()
+session.push(b.hex("00 03 61")) // { status: "needMore" }
+session.push(b.hex("62 63"))
+// { status: "done", value: "abc", offset: 5, rest: Uint8Array(0) }
+```
+
+A result has `status: "needMore"`, `status: "done"` with `value`, `offset`, and
+`rest`, or `status: "error"` with the usual parse error. Call `finish()` on an
+open session when no more input will arrive; missing required input then
+becomes a parse error. An empty chunk is not end-of-input. Call `cancel()` to
+abandon a session and close suspended generators, including their `finally`
+blocks. A completed, failed, or cancelled session cannot accept more input.
+Use a new session for its `rest`, or let `stream` manage that for you.
+
+Like `parsePrefix`, a session finishes when its grammar has a complete value.
+Use `grammar.zipLeft(eof).incremental()` when the grammar must consume the
+entire input and wait for `finish()` before succeeding. Existing `parse`,
+`parsePrefix`, and `parseOrThrow` still take complete input.
+
+Chunk boundaries have no grammatical meaning. `choice` waits for an
+incomplete earlier alternative; `many`, `optional`, and lookahead do not
+mistake missing input for failure. Greedy text readers wait for a delimiter
+or end-of-input. For example, a digit parser reading `123` must wait because
+the next chunk might extend the number to `1234`. Text chunks are strings;
+decode incoming UTF-8 bytes with a streaming decoder first, or use binary
+`utf8(n)` within your message grammar. Split UTF-16 surrogate pairs are handled
+by character readers.
+
+Some operations need a definite end boundary:
+
+- `regex` waits for `finish()`. Arbitrary JavaScript regular expressions,
+  including lookaround and end anchors, cannot safely finalize against a
+  temporary chunk boundary. Use character readers and delimiters when you
+  need tokens before the stream ends.
+- Binary `rest`, `size`, `ascii()`, and `utf8()` wait for the end of their
+  input. Inside `within(n, inner)`, the region is complete once `n` bytes
+  arrive. `bitFields(n, inner)` similarly buffers its bounded region; standalone
+  bit-input sessions are not supported.
+- One session retains its input until it completes, so backtracking and
+  absolute `at(...)` reads remain valid. `stream` releases completed message
+  input, unless your returned values retain it. Binary chunks are copied on
+  arrival; returned byte values and `rest` are views into session-owned memory.
+
+Advanced synchronous primitives made with `makeParser` conservatively wait
+for end-of-input. To write a primitive that can suspend, `parserator/advanced`
+exports `makeResumable`, `runResumable`, `isFinal`, and `waitForInput`.
+Use `yield* runResumable(inner, state)` to compose low-level runners, and
+`yield* waitForInput(state)` only when more input can change the answer.
+The supplied state's `source` follows the growing input; do not retain a
+snapshot of that source across a wait. Custom runners must resolve when
+`isFinal(state)` is true.
+
 ## Best fit
 
 Parserator works well for search and filter syntax, configuration formats,
 formulas, protocol strings, structured CLI fields, and small internal DSLs.
 
-It is not a streaming parser, does not support left recursion, and does not
-provide multi-error recovery. Input is a string held in memory. For a large
+It does not support left recursion or provide multi-error recovery. Parsers
+accept complete input or incremental strings and byte arrays. For a large
 language, token recovery, grammar analysis, or generated syntax diagrams, use
 a parser toolkit built for compilers.
 

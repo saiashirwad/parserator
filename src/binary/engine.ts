@@ -1,19 +1,35 @@
 import {
   createParserEngine,
   initialState,
+  isFinal,
+  waitForInput,
   makeReply,
   type CoreParser,
   type CoreParseResult,
   type CorePrefixResult,
+  type IncrementalResult,
+  type IncrementalParser,
   type CoreReply,
   type CoreState
 } from "../core.ts"
+import { byteInput } from "../incremental-input.ts"
 import {
   BinaryParseError,
   SourceBytes,
   hexByte,
   type BinaryDiagnostic
 } from "./errors.ts"
+
+export type BinaryIncrementalResult<T> = IncrementalResult<
+  T,
+  Uint8Array,
+  BinaryParseError
+>
+export type BinaryIncrementalParser<T> = IncrementalParser<
+  T,
+  Uint8Array,
+  BinaryParseError
+>
 
 export type BinaryParser<T> = CoreParser<T, Uint8Array, BinaryParseError>
 export type BinaryParseResult<T> = CoreParseResult<T, BinaryParseError>
@@ -24,6 +40,7 @@ export type BinaryPrefixParseResult<T> = BinaryParseResult<
 export type BinaryState = CoreState<Uint8Array>
 
 export const binaryEngine = createParserEngine<Uint8Array, BinaryParseError>({
+  incrementalInput: byteInput,
   /** Reject non-byte inputs and initialize a cursor at the start of the view. */
   fromInput(input) {
     if (!(input instanceof Uint8Array))
@@ -82,3 +99,12 @@ export const requireBytes = (
     "bytes",
     description
   )
+
+/** Wait for a fixed-width read without retrying any preceding parser work. */
+export function* waitForBytes(
+  state: BinaryState,
+  n: number
+): Generator<void, void, void> {
+  while (state.source.length - state.offset < n && !isFinal(state))
+    yield* waitForInput(state)
+}

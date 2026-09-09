@@ -51,10 +51,16 @@ writeFileSync(
     'import { literal } from "parserator"',
     'import { makeParser } from "parserator/advanced"',
     'import { ParseError } from "parserator/diagnostics"',
-    'import { uint8 } from "parserator/binary"',
+    'import { uint8, uint16BE } from "parserator/binary"',
     'if (!literal("ok").parseOrThrow("ok")) process.exit(1)',
     'if (typeof makeParser !== "function" || typeof ParseError !== "function") process.exit(1)',
     "if (uint8.parseOrThrow(new Uint8Array([7])) !== 7) process.exit(1)",
+    'const session = literal("ok").incremental()',
+    'if (session.push("o").status !== "needMore") process.exit(1)',
+    'if (session.push("k").status !== "done") process.exit(1)',
+    "const values = []",
+    "for await (const value of uint16BE.stream([new Uint8Array([0]), new Uint8Array([7, 0, 8])])) values.push(value)",
+    'if (String(values) !== "7,8") process.exit(1)',
     ""
   ].join("\n")
 )
@@ -63,12 +69,15 @@ run(process.execPath, ["index.mjs"], consumer)
 writeFileSync(
   join(consumer, "index.ts"),
   [
-    'import { literal } from "parserator"',
+    'import { literal, type IncrementalResult } from "parserator"',
     'import { makeParser } from "parserator/advanced"',
     'import { ParseError, type Span } from "parserator/diagnostics"',
     'import { uint8, type BinaryParser } from "parserator/binary"',
     'const parser = literal("ok")',
     'parser.parseOrThrow("ok")',
+    'const result: IncrementalResult<"ok"> = parser.incremental().push("ok")',
+    'if (result.status === "done") { const rest: string = result.rest; void rest }',
+    "const stream: AsyncGenerator<number> = uint8.stream([new Uint8Array([1])]); void stream",
     "void [makeParser, ParseError, {} as Span, uint8 as BinaryParser<number>]",
     ""
   ].join("\n")

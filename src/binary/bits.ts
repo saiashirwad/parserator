@@ -11,6 +11,7 @@ import type { Diagnostic } from "../errors.ts"
 import {
   binaryEngine,
   requireBytes,
+  waitForBytes,
   requireUnits,
   type BinaryParser
 } from "./engine.ts"
@@ -163,7 +164,8 @@ export function bitFields<T>(
   const order = options.order ?? "msb-first"
   checkOrder(order)
   const description = `${n} bytes for bit fields`
-  return binaryEngine.makeParser(state => {
+  return binaryEngine.makeResumable(function* (state) {
+    yield* waitForBytes(state, n)
     const failure = requireBytes(state, n, description)
     if (failure) return failure
     const bytes = state.source.subarray(state.offset, state.offset + n)

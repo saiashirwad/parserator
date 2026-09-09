@@ -2,10 +2,13 @@
  * The input-agnostic parser engine. Text, bytes, and bits each instantiate it
  * once with an adapter that knows how to read and report on their input.
  */
+import { createSession, parseStream } from "./incremental.ts"
 import type { Diagnostic, Failure, Span } from "./errors.ts"
 
 export type CoreState<I> = {
   readonly source: I
+  /** Shared growing input; absent for complete input and bounded regions. */
+  readonly input?: IncrementalInput<I> | undefined
   readonly offset: number
   readonly cutGeneration: number
   /** Context from the last parser wrapped in `context`, used by full-input parsing. */
@@ -19,11 +22,41 @@ export type CoreReply<T, I> = {
   readonly result: Success<T> | FailureResult
 }
 
+/** An input owned by one incremental session. Appends must preserve earlier data. */
+export interface IncrementalInput<I> {
+  readonly source: I
+  final: boolean
+  append(chunk: I): void
+}
+
+/** Keep captured cursors and backtracking checkpoints attached to growing input. */
+export function liveState<I>(state: CoreState<I>): CoreState<I> {
+  const input = state.input
+  return input
+    ? {
+        ...state,
+        get source() {
+          return input.source
+        }
+      }
+    : state
+}
+
+export const isFinal = <I>(state: CoreState<I>): boolean =>
+  state.input?.final ?? true
+
+/** Suspend only on open input. A final input must resolve to success or failure. */
+export function* waitForInput<I>(
+  state: CoreState<I>
+): Generator<void, void, void> {
+  if (!isFinal(state)) yield
+}
+
 /** Pair a parser result with its resulting state without altering either. */
 export const makeReply = <T, I>(
   state: CoreState<I>,
   result: Success<T> | FailureResult
-): CoreReply<T, I> => ({ state, result })
+): CoreReply<T, I> => ({ state: liveState(state), result })
 
 /** Start parsing at an offset with no active commit or completion context. */
 export const initialState = <I>(source: I, offset = 0): CoreState<I> => ({
@@ -36,14 +69,16 @@ export const initialState = <I>(source: I, offset = 0): CoreState<I> => ({
 export const advanceTo = <I>(
   state: CoreState<I>,
   offset: number
-): CoreState<I> => ({
-  source: state.source,
-  offset,
-  cutGeneration: state.cutGeneration,
-  ...(state.completionContext
-    ? { completionContext: state.completionContext }
-    : {})
-})
+): CoreState<I> =>
+  liveState({
+    source: state.source,
+    ...(state.input ? { input: state.input } : {}),
+    offset,
+    cutGeneration: state.cutGeneration,
+    ...(state.completionContext
+      ? { completionContext: state.completionContext }
+      : {})
+  })
 
 export type CoreParseResult<T, E extends Error> =
   | { readonly success: true; readonly value: T }
@@ -52,6 +87,24 @@ export type CorePrefixResult<T, I> = {
   readonly value: T
   readonly offset: number
   readonly rest: I
+}
+
+/** A prefix parse either needs input, completes, or reports invalid input. */
+export type IncrementalResult<T, I, E extends Error> =
+  | { readonly status: "needMore" }
+  | {
+      readonly status: "done"
+      readonly value: T
+      readonly offset: number
+      readonly rest: I
+    }
+  | { readonly status: "error"; readonly error: E }
+
+export interface IncrementalParser<T, I, E extends Error> {
+  push(chunk: I): IncrementalResult<T, I, E>
+  finish(): IncrementalResult<T, I, E>
+  /** Close suspended generators and release session-owned input. */
+  cancel(): void
 }
 
 /** The object a `struct` produces: one property per field parser, in order. */
@@ -91,10 +144,20 @@ export interface CoreParser<T, I, E extends Error> {
     options?: { readonly sourceName?: string }
   ): CoreParseResult<CorePrefixResult<T, I>, E>
   parseOrThrow(input: I, options?: { readonly sourceName?: string }): T
+  /** Parse one prefix across chunks; use zipLeft(eof) to require the entire input. */
+  incremental(options?: {
+    readonly sourceName?: string
+  }): IncrementalParser<T, I, E>
+  /** Parse consecutive consuming messages, yielding each as soon as it completes. */
+  stream(
+    chunks: AsyncIterable<I> | Iterable<I>,
+    options?: { readonly sourceName?: string }
+  ): AsyncGenerator<Awaited<T>, void, unknown>
 }
 
 export interface InputAdapter<I, E extends Error> {
   fromInput(input: I): CoreState<I>
+  incrementalInput?(initial?: I): IncrementalInput<I>
   isAtEnd(state: CoreState<I>): boolean
   remaining(state: CoreState<I>): I
   /** The unit at the cursor, for "found" reporting; empty with width 0 at the end. */
@@ -199,7 +262,8 @@ export function createParserEngine<I, E extends Error>(
   type Reply<T> = CoreReply<T, I>
   type ParseResult<T> = CoreParseResult<T, E>
   type PrefixParseResult<T> = CoreParseResult<CorePrefixResult<T, I>, E>
-  type Runner<T> = (state: State) => Reply<T>
+  type Execution<T> = Generator<void, Reply<T>, void>
+  type Runner<T> = (state: State) => Reply<T> | Execution<T>
 
   const runners = new WeakMap<object, Runner<unknown>>()
   const parserToken = Symbol("Parser")
@@ -285,8 +349,9 @@ export function createParserEngine<I, E extends Error>(
 
     /** Transform a successful value while preserving the consumed input. */
     map<B>(f: (value: T) => B): Parser<B> {
-      return makeParser(state => {
-        const reply = runParser(this, state)
+      const run = (state: State) => runResumable(this, state)
+      return makeResumable(function* (state) {
+        const reply = yield* run(state)
         return reply.result.ok
           ? replySuccess(f(reply.result.value), reply.state)
           : (reply as Reply<never> as Reply<B>)
@@ -295,20 +360,22 @@ export function createParserEngine<I, E extends Error>(
 
     /** Choose the next parser from this value and continue at the resulting cursor. */
     flatMap<B>(f: (value: T) => Parser<B>): Parser<B> {
-      return makeParser(state => {
-        const reply = runParser(this, state)
+      const run = (state: State) => runResumable(this, state)
+      return makeResumable(function* (state) {
+        const reply = yield* run(state)
         return reply.result.ok
-          ? runParser(f(reply.result.value), reply.state)
+          ? yield* runResumable(f(reply.result.value), reply.state)
           : (reply as Reply<never> as Reply<B>)
       })
     }
 
     /** Run both parsers in order and return their values as a pair. */
     zip<B>(other: Parser<B>): Parser<[T, B]> {
-      return makeParser(state => {
-        const left = runParser(this, state)
+      const run = (state: State) => runResumable(this, state)
+      return makeResumable(function* (state) {
+        const left = yield* run(state)
         if (!left.result.ok) return left as Reply<never> as Reply<[T, B]>
-        const right = runParser(other, left.state)
+        const right = yield* runResumable(other, left.state)
         if (!right.result.ok) return right as Reply<never> as Reply<[T, B]>
         return replySuccess(
           [left.result.value, right.result.value],
@@ -319,20 +386,22 @@ export function createParserEngine<I, E extends Error>(
 
     /** Run both parsers in order and retain the second result. */
     zipRight<B>(other: Parser<B>): Parser<B> {
-      return makeParser(state => {
-        const left = runParser(this, state)
+      const run = (state: State) => runResumable(this, state)
+      return makeResumable(function* (state) {
+        const left = yield* run(state)
         return left.result.ok
-          ? runParser(other, left.state)
+          ? yield* runResumable(other, left.state)
           : (left as Reply<never> as Reply<B>)
       })
     }
 
     /** Run both parsers in order and retain the first result. */
     zipLeft<B>(other: Parser<B>): Parser<T> {
-      return makeParser(state => {
-        const left = runParser(this, state)
+      const run = (state: State) => runResumable(this, state)
+      return makeResumable(function* (state) {
+        const left = yield* run(state)
         if (!left.result.ok) return left
-        const right = runParser(other, left.state)
+        const right = yield* runResumable(other, left.state)
         return right.result.ok
           ? replySuccess(left.result.value, right.state)
           : (right as Reply<never> as Reply<T>)
@@ -346,8 +415,9 @@ export function createParserEngine<I, E extends Error>(
 
     /** Replace a recoverable failure's message with a named expectation. */
     expected(description: string): Parser<T> {
-      return makeParser(state => {
-        const reply = runParser(this, state)
+      const run = (state: State) => runResumable(this, state)
+      return makeResumable(function* (state) {
+        const reply = yield* run(state)
         if (reply.result.ok) return reply
         if (reply.result.failure.control.kind === "fatal") return reply
         const { message: _message, ...old } = reply.result.failure.diagnostic
@@ -365,8 +435,9 @@ export function createParserEngine<I, E extends Error>(
 
     /** Add context to failures and remember it for unconsumed-input errors. */
     context(description: string): Parser<T> {
-      return makeParser(state => {
-        const reply = runParser(this, state)
+      const run = (state: State) => runResumable(this, state)
+      return makeResumable(function* (state) {
+        const reply = yield* run(state)
         if (reply.result.ok) {
           const previous = reply.state.completionContext ?? []
           return makeReply(
@@ -385,8 +456,9 @@ export function createParserEngine<I, E extends Error>(
 
     /** Transform the value together with the half-open span it consumed. */
     withSpan<B>(f: (value: T, span: Span) => B): Parser<B> {
-      return makeParser(state => {
-        const reply = runParser(this, state)
+      const run = (state: State) => runResumable(this, state)
+      return makeResumable(function* (state) {
+        const reply = yield* run(state)
         return reply.result.ok
           ? replySuccess(
               f(reply.result.value, {
@@ -404,8 +476,9 @@ export function createParserEngine<I, E extends Error>(
       predicate: (value: T) => boolean | string,
       message = "valid value"
     ): Parser<T> {
-      return makeParser(state => {
-        const reply = runParser(this, state)
+      const run = (state: State) => runResumable(this, state)
+      return makeResumable(function* (state) {
+        const reply = yield* run(state)
         if (!reply.result.ok) return reply
         const result = predicate(reply.result.value)
         if (result === true) return reply
@@ -432,8 +505,9 @@ export function createParserEngine<I, E extends Error>(
 
     /** On success, prevent surrounding alternatives from recovering later failures. */
     commit(): Parser<T> {
-      return makeParser(state => {
-        const reply = runParser(this, state)
+      const run = (state: State) => runResumable(this, state)
+      return makeResumable(function* (state) {
+        const reply = yield* run(state)
         return reply.result.ok
           ? makeReply(
               { ...reply.state, cutGeneration: reply.state.cutGeneration + 1 },
@@ -500,6 +574,19 @@ export function createParserEngine<I, E extends Error>(
       }
     }
 
+    incremental(
+      options: { readonly sourceName?: string } = {}
+    ): IncrementalParser<T, I, E> {
+      return createSession(this, adapter, runResumable, options)[0]
+    }
+
+    stream(
+      chunks: AsyncIterable<I> | Iterable<I>,
+      options: { readonly sourceName?: string } = {}
+    ): AsyncGenerator<Awaited<T>, void, unknown> {
+      return parseStream(this, adapter, runResumable, chunks, options)
+    }
+
     /** Parse the whole input and throw the diagnostic error on failure. */
     parseOrThrow(input: I, options: { readonly sourceName?: string } = {}): T {
       const result = this.parse(input, options)
@@ -512,26 +599,74 @@ export function createParserEngine<I, E extends Error>(
   const Parser: { readonly prototype: Parser<unknown> } =
     Object.freeze(ParserValue)
 
-  /** Run a parser at a state, rejecting values created by another engine. */
+  /** Run a complete input, allowing synchronous primitives to return directly. */
   function runParser<T>(parser: Parser<T>, state: State): Reply<T> {
-    const runner = runners.get(parser) as Runner<T> | undefined
-    if (!runner) throw new TypeError("Not a Parser")
-    return runner(state)
+    const execution = execute(parser, state)
+    if ("result" in execution) return execution
+    const step = execution.next()
+    if (!step.done) {
+      execution.return(undefined as never)
+      throw new Error(
+        "runParser requires complete input; use runResumable for open input"
+      )
+    }
+    return step.value
   }
 
-  /** Wrap a primitive runner in this engine's parser implementation. */
-  function makeParser<T>(runner: Runner<T>): Parser<T> {
+  function execute<T>(
+    parser: Parser<T>,
+    state: State
+  ): Reply<T> | Execution<T> {
+    const runner = runners.get(parser) as Runner<T> | undefined
+    if (!runner) throw new TypeError("Not a Parser")
+    return runner(liveState(state))
+  }
+
+  // The delegation protocol requires an iterator even for an immediate reply.
+  // eslint-disable-next-line require-yield
+  function* completed<T>(reply: Reply<T>): Execution<T> {
+    return reply
+  }
+
+  function runResumable<T>(parser: Parser<T>, state: State): Execution<T> {
+    const execution = execute(parser, state)
+    return "result" in execution ? completed(execution) : execution
+  }
+
+  /** Wait until a primitive's answer cannot change when input is appended. */
+  function makeRead<T>(
+    runner: (state: State) => Reply<T>,
+    ready: (state: State) => boolean
+  ): Parser<T> {
+    function* wait(state: State): Execution<T> {
+      do {
+        yield* waitForInput(state)
+      } while (!isFinal(state) && !ready(state))
+      return runner(state)
+    }
+    return makeResumable(state =>
+      isFinal(state) || ready(state) ? runner(state) : wait(state)
+    )
+  }
+
+  /** Custom synchronous primitives conservatively wait for end-of-input. */
+  function makeParser<T>(runner: (state: State) => Reply<T>): Parser<T> {
+    return makeRead(runner, () => false)
+  }
+
+  /** Construct a runner whose local variables survive input suspension. */
+  function makeResumable<T>(runner: Runner<T>): Parser<T> {
     return new ParserValue(parserToken, runner)
   }
 
   /** Return a constant value without consuming input. */
   function succeed<T>(value: T): Parser<T> {
-    return makeParser(state => replySuccess(value, state))
+    return makeResumable(state => replySuccess(value, state))
   }
 
   /** Fails at the current position, or over `span` when the caller knows it. */
   function fail(message: string, span?: Span): Parser<never> {
-    return makeParser(state =>
+    return makeResumable(state =>
       failureAt(state, {
         kind: "custom",
         span: span ?? { start: state.offset, end: state.offset },
@@ -542,7 +677,7 @@ export function createParserEngine<I, E extends Error>(
 
   /** Fail without allowing alternatives, attempts, or optional parsing to recover. */
   function fatal(message: string): Parser<never> {
-    return makeParser(state =>
+    return makeResumable(state =>
       failureAt(
         state,
         {
@@ -557,7 +692,7 @@ export function createParserEngine<I, E extends Error>(
 
   /** Run yielded parsers sequentially and close the generator on failure. */
   function parser<T>(f: () => Generator<Parser<any>, T, any>): Parser<T> {
-    return makeParser(state => {
+    return makeResumable(function* (state) {
       const iterator = f()
       let closed = false
       /** Run generator cleanup at most once after an early exit. */
@@ -570,7 +705,8 @@ export function createParserEngine<I, E extends Error>(
         let current = iterator.next()
         let currentState = state
         while (!current.done) {
-          const reply = runParser(current.value, currentState)
+          const work = execute(current.value, currentState)
+          const reply = "result" in work ? work : yield* work
           if (!reply.result.ok) {
             close()
             return reply as Reply<never> as Reply<T>
@@ -580,9 +716,8 @@ export function createParserEngine<I, E extends Error>(
         }
         closed = true
         return replySuccess(current.value, currentState)
-      } catch (error) {
+      } finally {
         close()
-        throw error
       }
     })
   }
@@ -590,16 +725,16 @@ export function createParserEngine<I, E extends Error>(
   /** Build a self-referencing grammar lazily on its first execution. */
   function recursive<T>(builder: (self: Parser<T>) => Parser<T>): Parser<T> {
     let built: Parser<T> | undefined
-    const self: Parser<T> = makeParser(state =>
-      runParser((built ??= builder(self)), state)
-    )
+    const self: Parser<T> = makeResumable(function* (state) {
+      return yield* runResumable((built ??= builder(self)), state)
+    })
     return self
   }
 
   /** Succeed without consuming when the inner parser fails nonfatally. */
   function notFollowedBy<T>(inner: Parser<T>): Parser<true> {
-    return makeParser(state => {
-      const reply = runParser(inner, state)
+    return makeResumable(function* (state) {
+      const reply = yield* runResumable(inner, state)
       if (!reply.result.ok) {
         if (reply.result.failure.control.kind === "fatal")
           return reply as Reply<never> as Reply<true>
@@ -617,8 +752,8 @@ export function createParserEngine<I, E extends Error>(
 
   /** Inspect a value without consuming input or retaining inner commits. */
   function lookahead<T>(inner: Parser<T>): Parser<T> {
-    return makeParser(state => {
-      const reply = runParser(inner, state)
+    return makeResumable(function* (state) {
+      const reply = yield* runResumable(inner, state)
       if (reply.result.ok) return replySuccess(reply.result.value, state)
       if (reply.result.failure.control.kind === "fatal")
         return reply as Reply<never> as Reply<T>
@@ -628,8 +763,8 @@ export function createParserEngine<I, E extends Error>(
 
   /** Inspect a value without consuming, returning undefined on nonfatal failure. */
   function probe<T>(inner: Parser<T>): Parser<T | undefined> {
-    return makeParser(state => {
-      const reply = runParser(inner, state)
+    return makeResumable(function* (state) {
+      const reply = yield* runResumable(inner, state)
       if (reply.result.ok) return replySuccess(reply.result.value, state)
       if (reply.result.failure.control.kind === "fatal")
         return reply as Reply<never> as Reply<T | undefined>
@@ -639,8 +774,8 @@ export function createParserEngine<I, E extends Error>(
 
   /** Restore the starting state and undo inner commits on nonfatal failure. */
   function attempt<T>(inner: Parser<T>): Parser<T> {
-    return makeParser(state => {
-      const reply = runParser(inner, state)
+    return makeResumable(function* (state) {
+      const reply = yield* runResumable(inner, state)
       if (reply.result.ok || reply.result.failure.control.kind === "fatal")
         return reply
       return recoverAt(reply.result.failure, state) as Reply<T>
@@ -660,11 +795,12 @@ export function createParserEngine<I, E extends Error>(
   function many<T>(inner: Parser<T>): Parser<T[]>
   function many(inner: Parser<any>): Parser<any[]>
   function many<T>(inner: Parser<T>): Parser<T[]> {
-    return makeParser(state => {
+    return makeResumable(function* (state) {
       const values: T[] = []
       let current = state
       while (true) {
-        const reply = runParser(inner, current)
+        const work = execute(inner, current)
+        const reply = "result" in work ? work : yield* work
         if (!reply.result.ok) {
           if (escapes(reply.result.failure, current.cutGeneration))
             return reply as Reply<never> as Reply<T[]>
@@ -682,10 +818,11 @@ export function createParserEngine<I, E extends Error>(
   function skipMany<T>(inner: Parser<T>): Parser<void>
   function skipMany(inner: Parser<any>): Parser<void>
   function skipMany<T>(inner: Parser<T>): Parser<void> {
-    return makeParser(state => {
+    return makeResumable(function* (state) {
       let current = state
       while (true) {
-        const reply = runParser(inner, current)
+        const work = execute(inner, current)
+        const reply = "result" in work ? work : yield* work
         if (!reply.result.ok) {
           if (escapes(reply.result.failure, current.cutGeneration))
             return reply as Reply<never> as Reply<void>
@@ -703,8 +840,8 @@ export function createParserEngine<I, E extends Error>(
   function many1(inner: Parser<any>): Parser<any[]>
   function many1<T>(inner: Parser<T>): Parser<T[]> {
     const repeated = many(inner)
-    return makeParser(state => {
-      const reply = runParser(repeated, state)
+    return makeResumable(function* (state) {
+      const reply = yield* runResumable(repeated, state)
       if (!reply.result.ok || reply.result.value.length) return reply
       return failureAt(state, {
         kind: "expected",
@@ -718,8 +855,8 @@ export function createParserEngine<I, E extends Error>(
   function optional<T>(inner: Parser<T>): Parser<T | undefined>
   function optional(inner: Parser<any>): Parser<any>
   function optional<T>(inner: Parser<T>): Parser<T | undefined> {
-    return makeParser(state => {
-      const reply = runParser(inner, state)
+    return makeResumable(function* (state) {
+      const reply = yield* runResumable(inner, state)
       if (reply.result.ok) return replySuccess(reply.result.value, reply.state)
       if (escapes(reply.result.failure, state.cutGeneration))
         return reply as Reply<never> as Reply<T | undefined>
@@ -754,8 +891,8 @@ export function createParserEngine<I, E extends Error>(
     allowTrailing: boolean,
     requireOne: boolean
   ): Parser<T[]> {
-    return makeParser(state => {
-      const first = runParser(inner, state)
+    return makeResumable(function* (state) {
+      const first = yield* runResumable(inner, state)
       if (!first.result.ok) {
         if (!requireOne && !escapes(first.result.failure, state.cutGeneration))
           return replySuccess([], state)
@@ -764,13 +901,13 @@ export function createParserEngine<I, E extends Error>(
       const values = [first.result.value]
       let current = first.state
       while (true) {
-        const sep = runParser(separator, current)
+        const sep = yield* runResumable(separator, current)
         if (!sep.result.ok) {
           if (escapes(sep.result.failure, current.cutGeneration))
             return sep as Reply<never> as Reply<T[]>
           return replySuccess(values, current)
         }
-        const item = runParser(inner, sep.state)
+        const item = yield* runResumable(inner, sep.state)
         if (!item.result.ok) {
           if (
             allowTrailing &&
@@ -813,10 +950,11 @@ export function createParserEngine<I, E extends Error>(
   function choice(...parsers: Parser<any>[]): Parser<any> {
     if (parsers.length === 0)
       throw new TypeError("choice requires at least one parser")
-    return makeParser(state => {
+    return makeResumable(function* (state) {
       const failures: Failure[] = []
       for (const alternative of parsers) {
-        const reply = runParser(alternative, state)
+        const work = execute(alternative, state)
+        const reply = "result" in work ? work : yield* work
         if (reply.result.ok) return reply
         if (escapes(reply.result.failure, state.cutGeneration)) return reply
         failures.push(reply.result.failure)
@@ -851,11 +989,12 @@ export function createParserEngine<I, E extends Error>(
     fields: Fields
   ): Parser<StructValue<Fields>> {
     const entries = Object.entries(fields)
-    return makeParser(state => {
+    return makeResumable(function* (state) {
       const value: Record<string, unknown> = {}
       let current = state
       for (const [key, field] of entries) {
-        const reply = runParser(field, current)
+        const work = execute(field, current)
+        const reply = "result" in work ? work : yield* work
         if (!reply.result.ok)
           return reply as Reply<never> as Reply<StructValue<Fields>>
         Object.defineProperty(value, key, {
@@ -872,7 +1011,7 @@ export function createParserEngine<I, E extends Error>(
 
   /** Advance the commit generation without consuming input. */
   const commit = (): Parser<void> =>
-    makeParser(state =>
+    makeResumable(state =>
       replySuccess(undefined, {
         ...state,
         cutGeneration: state.cutGeneration + 1
@@ -890,14 +1029,15 @@ export function createParserEngine<I, E extends Error>(
     left.zipLeft(right)
 
   /** Succeed only when the input adapter reports no remaining input. */
-  const eof = makeParser<void>(state =>
-    adapter.isAtEnd(state)
+  const eof = makeResumable<void>(function* (state) {
+    while (adapter.isAtEnd(state) && !isFinal(state)) yield* waitForInput(state)
+    return adapter.isAtEnd(state)
       ? replySuccess(undefined, state)
-      : (expected(state, "end of input") as Reply<void>)
-  )
+      : expected(state, "end of input")
+  })
 
-  /** The current offset in the adapter's units. Text overrides this with line and column. */
-  const position = makeParser<{ readonly offset: number }>(state =>
+  /** The current offset in the adapter's units. Text overrides line and column. */
+  const position = makeResumable<{ readonly offset: number }>(state =>
     replySuccess({ offset: state.offset }, state)
   )
 
@@ -940,7 +1080,10 @@ export function createParserEngine<I, E extends Error>(
     // Construction and replies, for writing primitives.
     Parser,
     makeParser,
+    makeRead,
+    makeResumable,
     runParser,
+    runResumable,
     replySuccess,
     failRich,
     failureAt,
