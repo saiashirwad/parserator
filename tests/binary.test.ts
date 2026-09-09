@@ -22,6 +22,19 @@ const packet = b.parser(function* () {
   return { version, payload }
 })
 
+describe("hex", () => {
+  test("decodes pairs, ignoring whitespace and case", () => {
+    expect(b.hex("ca fe\n01")).toEqual(input(0xca, 0xfe, 0x01))
+    expect(b.hex("CAFE")).toEqual(input(0xca, 0xfe))
+    expect(b.hex("")).toEqual(input())
+  })
+
+  test("rejects odd digit counts and non-hex characters", () => {
+    expect(() => b.hex("abc")).toThrow("pairs of hex digits")
+    expect(() => b.hex("zz")).toThrow('"zz"')
+  })
+})
+
 describe("binary input and byte primitives", () => {
   test("parses a length-prefixed packet and rejects every truncation", () => {
     const source = input(0xca, 0xfe, 1, 0, 3, 0x10, 0x20, 0x30)

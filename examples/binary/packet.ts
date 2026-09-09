@@ -1,5 +1,6 @@
 import {
   ascii,
+  hex,
   magic,
   parser,
   uint8,
@@ -19,11 +20,8 @@ const packet = parser(function* () {
   return { version, body }
 })
 
-const bytes = (text: string) =>
-  Uint8Array.from(text.match(/[0-9a-f]{2}/g) ?? [], b => parseInt(b, 16))
-
-const good = bytes("ca fe 01 00 05 68 65 6c 6c 6f 62")
-const bad = bytes("ca fe 01 00 05 68 65 6c 6c 6f 00")
+const good = hex("ca fe 01 00 05 68 65 6c 6c 6f 62")
+const bad = hex("ca fe 01 00 05 68 65 6c 6c 6f 00")
 
 console.log(packet.parseOrThrow(good))
 console.log()

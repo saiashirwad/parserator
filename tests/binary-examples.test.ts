@@ -1,11 +1,12 @@
 import { describe, expect, test } from "vitest"
-import type {
-  BinaryParseError,
-  BinaryParseResult,
-  BinaryParser
+import {
+  hex,
+  type BinaryParseError,
+  type BinaryParseResult,
+  type BinaryParser
 } from "../src/binary/index.ts"
 import { elf } from "../examples/binary/elf.ts"
-import { hex, tinyElf, tinyPng, tinyZip } from "../examples/binary/fixtures.ts"
+import { tinyElf, tinyPng, tinyZip } from "../examples/binary/fixtures.ts"
 import { encode, frame, frames, varint } from "../examples/binary/frames.ts"
 import { ipv4Header } from "../examples/binary/ipv4.ts"
 import { crc32, png } from "../examples/binary/png.ts"
@@ -70,6 +71,25 @@ describe("binary examples", () => {
     )
     expect(error.format()).toContain("corrupt.png: byte 54")
 
+    const iend = new TextEncoder().encode("IEND")
+    const payload = Uint8Array.from([...iend, 0x00])
+    const crc = crc32(payload)
+    const nonEmptyEnd = Uint8Array.from([
+      ...tinyPng.subarray(0, tinyPng.length - 12),
+      0,
+      0,
+      0,
+      1,
+      ...payload,
+      crc >>> 24,
+      (crc >>> 16) & 0xff,
+      (crc >>> 8) & 0xff,
+      crc & 0xff
+    ])
+    expect(failure(png.parse(nonEmptyEnd)).message).toBe(
+      "IEND chunk must be empty"
+    )
+
     expect(failure(png.parse(hex("89 50 4e 47 00"))).message).toBe(
       "Expected PNG signature, found 0x00"
     )
@@ -106,6 +126,12 @@ describe("binary examples", () => {
 
   test("varint reads LEB128 and frames round-trip through encode", () => {
     expect(varint.parseOrThrow(hex("e5 8e 26"))).toBe(624485)
+    expect(varint.parseOrThrow(hex("ff ff ff ff ff ff ff 0f"))).toBe(
+      Number.MAX_SAFE_INTEGER
+    )
+    expect(failure(varint.parse(hex("80 80 80 80 80 80 80 10"))).message).toBe(
+      "varint does not fit in a number"
+    )
     const items = [
       { kind: "ping" as const },
       { kind: "text" as const, text: "héllo" },
@@ -119,6 +145,16 @@ describe("binary examples", () => {
 
     const short = failure(frame.parse(hex("03 04 02 80")))
     expect(short.message).toBe("Expected 4 bytes; only 2 bytes remain")
+  })
+
+  test("encode rejects point coordinates that do not fit in a uint16", () => {
+    const point = (x: number, y: number) => [{ kind: "point" as const, x, y }]
+    expect(frames.parseOrThrow(encode(point(0, 0xffff)))).toEqual(
+      point(0, 0xffff)
+    )
+    expect(() => encode(point(-1, 0))).toThrow("-1 is not a uint16")
+    expect(() => encode(point(0, 0x10000))).toThrow("65536 is not a uint16")
+    expect(() => encode(point(1.5, 0))).toThrow("1.5 is not a uint16")
   })
 
   test("elf follows the section table and the name table through at", () => {

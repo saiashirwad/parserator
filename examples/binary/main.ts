@@ -1,6 +1,6 @@
-import type { BinaryParser } from "../../src/binary/index.ts"
+import { hex, type BinaryParser } from "../../src/binary/index.ts"
 import { elf, machineNames } from "./elf.ts"
-import { hex, tinyElf, tinyPng, tinyZip } from "./fixtures.ts"
+import { tinyElf, tinyPng, tinyZip } from "./fixtures.ts"
 import { encode, frames } from "./frames.ts"
 import { ipv4Header, protocolNames } from "./ipv4.ts"
 import { png } from "./png.ts"

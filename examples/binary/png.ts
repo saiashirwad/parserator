@@ -6,6 +6,7 @@ import {
   ascii,
   bytes,
   eof,
+  fail,
   lookahead,
   magic,
   parser,
@@ -51,7 +52,10 @@ export const png = parser(function* () {
   const chunks = []
   while (true) {
     const { type, data } = yield* chunk(rest)
-    if (type === "IEND") break
+    if (type === "IEND") {
+      if (data.length !== 0) yield* fail("IEND chunk must be empty")
+      break
+    }
     chunks.push({ type, data })
   }
   yield* eof

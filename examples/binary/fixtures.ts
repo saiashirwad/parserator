@@ -1,8 +1,5 @@
 /** Small real files, embedded so the demo and tests need no disk access. */
 
-export const hex = (text: string) =>
-  Uint8Array.from(text.match(/[0-9a-f]{2}/gi) ?? [], byte => parseInt(byte, 16))
-
 const base64 = (text: string) =>
   Uint8Array.from(atob(text), char => char.charCodeAt(0))
 

@@ -14,7 +14,7 @@ export type {
   BinaryPrefixResult,
   BinaryPrefixParseResult
 } from "./engine.ts"
-export { BinaryParseError, SourceBytes } from "./errors.ts"
+export { BinaryParseError, SourceBytes, hex } from "./errors.ts"
 export type { BinaryDiagnostic, BinaryDiagnosticJson } from "./errors.ts"
 export { bit, bitFields } from "./bits.ts"
 export type { BitParser, BitInput, BitOrder } from "./bits.ts"
@@ -305,7 +305,7 @@ export function ascii(n?: number): BinaryParser<string> {
   const what = n === undefined ? "ASCII text" : `${n} ASCII bytes`
   return (n === undefined ? rest : bytes(n))
     .validate(raw => raw.every(byte => byte < 0x80), `Expected ${what}`)
-    .map(raw => String.fromCharCode(...raw))
+    .map(raw => utf8Decoder.decode(raw))
 }
 
 /** `n` bytes, or the rest of the region, decoded as UTF-8. Invalid input fails. */

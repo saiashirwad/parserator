@@ -201,7 +201,8 @@ hex dump.
   `int64BE/LE`, `float32BE/LE`, `float64BE/LE`. `numbers("LE")` returns the
   whole set for one byte order, for formats that declare it in a header.
 - Bytes: `bytes(n)`, `magic(signature)`, `skip(n)`, `rest`, `size`,
-  `takeWhile(predicate)`, `bytesUntil(byte)`.
+  `takeWhile(predicate)`, `bytesUntil(byte)`. `hex("ca fe 01")` builds test
+  input from hex text.
 - Strings: `ascii(n)`, `utf8(n)`, `cstring`. Without `n` the string parsers
   take the rest of the region.
 - Layout: `within(n, inner)` parses a length-prefixed region, `at(offset, inner)`

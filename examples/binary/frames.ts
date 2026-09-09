@@ -25,7 +25,10 @@ export const varint = parser(function* () {
   for (let shift = 0; ; shift += 7) {
     if (shift > 49) yield* fail("varint does not fit in a number")
     const byte = yield* uint8
-    value += (byte & 0x7f) * 2 ** shift
+    const group = byte & 0x7f
+    if (shift === 49 && group > 0x0f)
+      yield* fail("varint does not fit in a number")
+    value += group * 2 ** shift
     if ((byte & 0x80) === 0) return value
   }
 })
@@ -76,8 +79,13 @@ export function encode(items: readonly Frame[]): Uint8Array {
       out.push(0x02)
       pushVarint(encoded.length)
       out.push(...encoded)
-    } else
+    } else {
+      for (const value of [item.x, item.y]) {
+        if (!Number.isInteger(value) || value < 0 || value > 0xffff)
+          throw new RangeError(`point coordinate ${value} is not a uint16`)
+      }
       out.push(0x03, 4, item.x >> 8, item.x & 0xff, item.y >> 8, item.y & 0xff)
+    }
   }
   return Uint8Array.from(out)
 }

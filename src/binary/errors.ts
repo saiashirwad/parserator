@@ -13,6 +13,20 @@ export type BinaryDiagnosticJson = BinaryDiagnostic & {
 export const hexByte = (value: number): string =>
   value.toString(16).padStart(2, "0")
 
+/**
+ * Decodes hex text such as "ca fe 01" into bytes. Whitespace is ignored;
+ * anything else, including an odd trailing digit, throws.
+ */
+export function hex(text: string): Uint8Array {
+  const clean = text.replace(/\s+/g, "")
+  if (!/^(?:[0-9a-f]{2})*$/i.test(clean)) {
+    throw new Error(
+      `hex: expected pairs of hex digits, got ${JSON.stringify(text)}`
+    )
+  }
+  return Uint8Array.from(clean.matchAll(/../g), ([pair]) => parseInt(pair, 16))
+}
+
 export class SourceBytes {
   readonly bytes: Uint8Array
   readonly name: string | undefined
