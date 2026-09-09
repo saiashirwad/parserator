@@ -1,28 +1,19 @@
-import { SourceText, type Failure, type Span } from "./errors.ts"
+import {
+  advanceTo,
+  initialState,
+  type CoreReply,
+  type CoreState
+} from "./core.ts"
+import { SourceText, type Span } from "./errors.ts"
 
 export type Spanned<T> = { readonly value: T; readonly span: Span }
 
-export type ParserState = {
-  readonly source: string
-  readonly offset: number
-  readonly cutGeneration: number
-  /** Context from the last parser wrapped in `context`, used by full-input parsing. */
-  readonly completionContext?: readonly string[]
-}
-
-export type Success<T> = { readonly ok: true; readonly value: T }
-export type FailureResult = { readonly ok: false; readonly failure: Failure }
-export type ParserReply<T> = {
-  readonly state: ParserState
-  readonly result: Success<T> | FailureResult
-}
+export type ParserState = CoreState<string>
+export type ParserReply<T> = CoreReply<T, string>
 export type Reply<T> = ParserReply<T>
 export type ParserOutput<T> = ParserReply<T>
-
-export const ParserOutput = <T>(
-  state: ParserState,
-  result: Success<T> | FailureResult
-): ParserReply<T> => ({ state, result })
+export { makeReply as ParserOutput } from "./core.ts"
+export type { Success, FailureResult } from "./core.ts"
 
 export type SourcePosition = {
   readonly line: number
@@ -39,22 +30,11 @@ function sourceForPosition(text: string): SourceText {
   return positionSource
 }
 
-const advanced = (state: ParserState, offset: number): ParserState => ({
-  source: state.source,
-  offset,
-  cutGeneration: state.cutGeneration,
-  ...(state.completionContext
-    ? { completionContext: state.completionContext }
-    : {})
-})
-
-function codePointAt(
+/** Returns one Unicode code point and its UTF-16 width; empty at the end. */
+export function codePointAt(
   source: string,
   offset: number
-): {
-  readonly value: string
-  readonly width: number
-} {
+): { readonly value: string; readonly width: number } {
   const first = source.charCodeAt(offset)
   if (Number.isNaN(first)) return { value: "", width: 0 }
 
@@ -63,11 +43,11 @@ function codePointAt(
     if (second >= 0xdc00 && second <= 0xdfff) {
       return { value: source.slice(offset, offset + 2), width: 2 }
     }
-    return { value: "\ufffd", width: 1 }
+    return { value: "�", width: 1 }
   }
 
   if (first >= 0xdc00 && first <= 0xdfff) {
-    return { value: "\ufffd", width: 1 }
+    return { value: "�", width: 1 }
   }
 
   return { value: source[offset]!, width: 1 }
@@ -75,7 +55,7 @@ function codePointAt(
 
 export const State = {
   fromInput(input: string): ParserState {
-    return { source: input, offset: 0, cutGeneration: 0 }
+    return initialState(input)
   },
   remaining(state: ParserState): string {
     return state.source.slice(state.offset)
@@ -95,7 +75,7 @@ export const State = {
       throw new RangeError("consume expects a safe nonnegative integer")
     if (n > state.source.length - state.offset)
       throw new RangeError("Cannot consume more input than remains")
-    return n === 0 ? state : advanced(state, state.offset + n)
+    return n === 0 ? state : advanceTo(state, state.offset + n)
   },
   consumeWhile(
     state: ParserState,
@@ -107,7 +87,7 @@ export const State = {
       if (!point.value || !predicate(point.value)) break
       offset += point.width
     }
-    return offset === state.offset ? state : advanced(state, offset)
+    return offset === state.offset ? state : advanceTo(state, offset)
   },
   peek(state: ParserState, n = 1): string {
     if (!Number.isSafeInteger(n) || n < 0)

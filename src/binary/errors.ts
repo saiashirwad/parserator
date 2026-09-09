@@ -1,0 +1,61 @@
+import { DiagnosticError, type Diagnostic, type Span } from "../errors.ts"
+
+/** Byte spans, plus a precise bit span when the failure came from a bit grammar. */
+export type BinaryDiagnostic = Diagnostic & {
+  /** Half-open span in absolute bit offsets, set by failures inside `bitFields`. */
+  readonly bitSpan?: Span
+}
+export type BinaryDiagnosticJson = BinaryDiagnostic & {
+  readonly unit: "byte"
+  readonly sourceName?: string
+}
+
+export const hexByte = (value: number): string =>
+  value.toString(16).padStart(2, "0")
+
+export class SourceBytes {
+  readonly bytes: Uint8Array
+  readonly name: string | undefined
+
+  constructor(bytes: Uint8Array, name?: string) {
+    this.bytes = bytes
+    this.name = name
+  }
+}
+
+/** Renders byte and bit positions over a hex row of the failing bytes. */
+export class BinaryParseError extends DiagnosticError<
+  SourceBytes,
+  BinaryDiagnostic
+> {
+  constructor(diagnostic: BinaryDiagnostic, source: SourceBytes) {
+    super(diagnostic, source)
+    this.name = "BinaryParseError"
+  }
+
+  format(): string {
+    const { diagnostic, source } = this
+    const offset = diagnostic.span.start
+    const bit = diagnostic.bitSpan
+      ? `, bit ${diagnostic.bitSpan.start % 8}`
+      : ""
+    const location = `${source.name ? `${source.name}: ` : ""}byte ${offset}${bit}`
+    const start = Math.max(0, Math.floor(offset / 16) * 16)
+    const row = Array.from(
+      source.bytes.subarray(start, start + 16),
+      hexByte
+    ).join(" ")
+    const label = start.toString(16).padStart(8, "0")
+    const marker = " ".repeat(label.length + 2 + (offset - start) * 3) + "^"
+    const context = diagnostic.context?.length
+      ? `\nwhile parsing ${[...diagnostic.context].reverse().join(" > ")}`
+      : ""
+    const hints =
+      diagnostic.hints?.map(hint => `\nhint: ${hint}`).join("") ?? ""
+    return `${location}: ${this.message}\n${label}  ${row}\n${marker}${context}${hints}`
+  }
+
+  override toJSON(): BinaryDiagnosticJson {
+    return { ...super.toJSON(), unit: "byte" }
+  }
+}

@@ -145,7 +145,9 @@ The root API is deliberately small:
 - Primitives: `literal`, `char`, `regex`, `satisfy`, `anyChar`, `eof`.
 - Construction: `succeed`, `fail`, and `fatal` create simple parser results.
 - Composition: `choice`, `optional`, `many`, `many1`, `count`, `sepBy`,
-  `sepBy1`, `sepEndBy`, `between`, `recursive`.
+  `sepBy1`, `sepEndBy`, `between`, `sequence`, `struct`, `recursive`.
+- Types come from the parser: `typeof p.Type` is the value a parser `p`
+  produces, so grammars need no hand-written result types.
 - Control: `commit`, `attempt`, `lookahead`, `notFollowedBy`.
 - Expression helpers: `chainLeft1`, `chainRight1`, `prefix`, `postfix`,
   `precedence`.
@@ -189,6 +191,23 @@ const expression = precedence(atom, [
 Use `withSpan` when AST nodes need source locations, and `validate` for local
 semantic checks that belong in the grammar.
 
+## Binary input
+
+`parserator/binary` runs the same engine over a `Uint8Array`, with the same
+generator style, methods, and combinators. Errors report byte offsets over a
+hex dump.
+
+- Integers and floats: `uint8` through `uint64BE/LE`, `int8` through
+  `int64BE/LE`, `float32BE/LE`, `float64BE/LE`. `numbers("LE")` returns the
+  whole set for one byte order, for formats that declare it in a header.
+- Bytes: `bytes(n)`, `magic(signature)`, `skip(n)`, `rest`, `size`,
+  `takeWhile(predicate)`, `bytesUntil(byte)`.
+- Strings: `ascii(n)`, `utf8(n)`, `cstring`. Without `n` the string parsers
+  take the rest of the region.
+- Layout: `within(n, inner)` parses a length-prefixed region, `at(offset, inner)`
+  follows an offset table, and `bitFields(n, inner)` reads packed bits with
+  the `bit` namespace.
+
 ## Best fit
 
 Parserator works well for search and filter syntax, configuration formats,
@@ -210,6 +229,10 @@ a parser toolkit built for compilers.
 - [`examples/ini-parser.ts`](examples/ini-parser.ts) and
   [`examples/scheme-parser.ts`](examples/scheme-parser.ts) — smaller complete
   grammars.
+- [`examples/binary/`](examples/binary) — `parserator/binary` on real formats:
+  a WAV header, PNG chunks with CRC checks, an IPv4 header with bit fields,
+  a framed message protocol with LEB128 lengths, and ELF and ZIP indexes that
+  follow offset tables with `at`. Run `node examples/binary/main.ts`.
 - [`bench/`](bench) — reproducible performance and profiling harnesses.
 
 Benchmarks report environment-specific measurements when run. They validate

@@ -51,8 +51,10 @@ writeFileSync(
     'import { literal } from "parserator"',
     'import { makeParser } from "parserator/advanced"',
     'import { ParseError } from "parserator/diagnostics"',
+    'import { uint8 } from "parserator/binary"',
     'if (!literal("ok").parseOrThrow("ok")) process.exit(1)',
     'if (typeof makeParser !== "function" || typeof ParseError !== "function") process.exit(1)',
+    "if (uint8.parseOrThrow(new Uint8Array([7])) !== 7) process.exit(1)",
     ""
   ].join("\n")
 )
@@ -64,9 +66,10 @@ writeFileSync(
     'import { literal } from "parserator"',
     'import { makeParser } from "parserator/advanced"',
     'import { ParseError, type Span } from "parserator/diagnostics"',
+    'import { uint8, type BinaryParser } from "parserator/binary"',
     'const parser = literal("ok")',
     'parser.parseOrThrow("ok")',
-    "void [makeParser, ParseError, {} as Span]",
+    "void [makeParser, ParseError, {} as Span, uint8 as BinaryParser<number>]",
     ""
   ].join("\n")
 )
