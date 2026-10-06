@@ -285,31 +285,25 @@ export function parser<T>(
 ): Parser<T> {
   return makeParser((source, offset) => {
     const iterator = f()
-    let closed = false
-    const close = () => {
-      if (!closed) {
-        closed = true
-        iterator.return?.(undefined as never)
-      }
-    }
+    let completed = false
     try {
       let current = iterator.next()
       let cut = false
       while (!current.done) {
         const reply = runParser(current.value, source, offset)
         cut ||= reply.cut
-        if (!reply.ok) {
-          close()
-          return combineCut(reply, cut)
-        }
+        if (!reply.ok) return combineCut(reply, cut)
         offset = reply.offset
         current = iterator.next(reply.value)
       }
-      closed = true
+      completed = true
       return replySuccess(current.value, offset, cut)
-    } catch (error) {
-      close()
-      throw error
+    } finally {
+      if (!completed) {
+        while (!iterator.return(undefined as never).done) {
+          // Continue cancellation without running parsers yielded by finalizers.
+        }
+      }
     }
   })
 }
