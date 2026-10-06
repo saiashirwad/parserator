@@ -58,7 +58,7 @@ export type {
   PrecedenceLevel
 } from "./expressions.ts"
 
-export { ParseError, SourceText } from "./errors.ts"
+export { ParseError } from "./errors.ts"
 
 export type { Diagnostic, DiagnosticJson, Span } from "./errors.ts"
 

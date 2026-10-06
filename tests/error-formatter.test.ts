@@ -1,10 +1,6 @@
 import { expect, test } from "vitest"
-import { formatError } from "../src/diagnostics.ts"
-import {
-  ParseError,
-  SourceText,
-  type ErrorFormatterOptions
-} from "../src/index.ts"
+import { formatError, SourceText } from "../src/diagnostics.ts"
+import { ParseError, type ErrorFormatterOptions } from "../src/index.ts"
 
 test("the pure formatter and ParseError.format share rendering options", () => {
   const error = new ParseError(

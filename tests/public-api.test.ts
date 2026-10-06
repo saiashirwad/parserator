@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest"
 
 describe("root public API", () => {
-  test("exports the 0.2 surface without internal result machinery", async () => {
+  test("exports the root surface without low-level machinery", async () => {
     const api = await import("../src/index")
 
     for (const name of [
@@ -24,6 +24,7 @@ describe("root public API", () => {
 
     for (const internal of [
       "Parser",
+      "SourceText",
       "generateHints",
       "levenshteinDistance",
       "Either",
@@ -64,6 +65,7 @@ describe("root public API", () => {
 
   test("keeps low-level and diagnostic APIs in their subpaths", async () => {
     const advanced = await import("../src/advanced")
+    expect(advanced).toHaveProperty("SourceText")
     expect(advanced).toHaveProperty("makeParser")
     expect(advanced).toHaveProperty("replyFailure")
     expect(advanced).toHaveProperty("replySuccess")

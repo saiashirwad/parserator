@@ -33,12 +33,8 @@ import {
   takeUpto,
   attempt
 } from "../src/index"
-import {
-  anyKeywordWithHints,
-  keywordWithHints,
-  position,
-  SourceText
-} from "../src/index"
+import { anyKeywordWithHints, keywordWithHints, position } from "../src/index"
+import { SourceText } from "../src/diagnostics.ts"
 import { ParseError } from "../src/index"
 import type { ParseResult, Parser as ParserType } from "../src/index"
 
