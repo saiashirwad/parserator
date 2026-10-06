@@ -2,7 +2,6 @@ import type { Diagnostic, Failure } from "./errors.ts"
 import {
   Parser,
   parser,
-  recursive,
   makeParser,
   runParser,
   replySuccess,
@@ -226,14 +225,6 @@ export const asciiAlphanumeric = satisfy(
 )
 export const whitespace = satisfy(whitespaceTest, "whitespace")
 
-export function oneOfChars(chars: string): Parser<string> {
-  if (!chars) throw new TypeError("oneOfChars requires at least one character")
-  return satisfy(
-    value => chars.includes(value),
-    `one of ${JSON.stringify(chars)}`
-  )
-}
-
 export function notFollowedBy<T>(inner: Parser<T>): Parser<true> {
   return makeParser(state => {
     const reply = runParser(inner, state)
@@ -299,27 +290,6 @@ export function takeWhileChar1(
     value ? succeed(value) : fail(`Expected at least one ${description}`)
   )
 }
-export const takeUntilChar = (
-  predicate: (char: string) => boolean
-): Parser<string> => takeWhileChar(c => !predicate(c))
-export const skipWhitespace = takeWhileChar(whitespaceTest).map(() => undefined)
-export const skipSpaces = takeWhileChar(c => c === " ").map(() => undefined)
-export const manyDigit = () => takeWhileChar(digitTest).map(value => [...value])
-export const many1Digit = () =>
-  takeWhileChar1(digitTest, "digit").map(value => [...value])
-export const manyAlphabet = () =>
-  takeWhileChar(letterTest).map(value => [...value])
-export const many1Alphabet = () =>
-  takeWhileChar1(letterTest, "letter").map(value => [...value])
-export const manyAlphanumeric = () =>
-  takeWhileChar(alphanumericTest).map(value => [...value])
-export const many1Alphanumeric = () =>
-  takeWhileChar1(alphanumericTest, "alphanumeric character").map(value => [
-    ...value
-  ])
-export const manyWhitespace = () =>
-  takeWhileChar(whitespaceTest).map(value => [...value])
-
 export function between<T>(
   start: Parser<unknown>,
   end: Parser<unknown>,
@@ -612,7 +582,6 @@ export const commit = (): Parser<void> =>
       cutGeneration: state.cutGeneration + 1
     })
   )
-export const lookaheadParser = lookahead
 
 export function attempt<T>(inner: Parser<T>): Parser<T> {
   return makeParser(state => {
@@ -628,23 +597,3 @@ export function attempt<T>(inner: Parser<T>): Parser<T> {
     ) as ParserReply<T>
   })
 }
-
-export const zip = <A, B>(left: Parser<A>, right: Parser<B>): Parser<[A, B]> =>
-  left.zip(right)
-export const zipRight = <A, B>(left: Parser<A>, right: Parser<B>): Parser<B> =>
-  left.zipRight(right)
-export const zipLeft = <A, B>(left: Parser<A>, right: Parser<B>): Parser<A> =>
-  left.zipLeft(right)
-
-export function takeN(n: number): Parser<string> {
-  ensureCount(n)
-  return makeParser(state => {
-    const value = State.peek(state, n)
-    if ([...value].length < n) {
-      return expected(state, `${n} characters`) as ParserReply<string>
-    }
-    return replySuccess(value, State.consume(state, value.length))
-  })
-}
-
-export const recursiveParser = recursive

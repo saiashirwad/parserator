@@ -282,51 +282,43 @@ const nonAssignmentOperator = <const T extends string>(
 const binaryExpression: Parser<Expression> = precedence(unaryExpression, [
   {
     associativity: "left",
-    operators: [
-      binaryOperator(
-        token(
-          choice(
-            nonAssignmentOperator("*"),
-            nonAssignmentOperator("/"),
-            literal("%")
-          )
+    operator: binaryOperator(
+      token(
+        choice(
+          nonAssignmentOperator("*"),
+          nonAssignmentOperator("/"),
+          literal("%")
         )
       )
-    ]
+    )
   },
   {
     associativity: "left",
-    operators: [
-      binaryOperator(
-        token(choice(nonAssignmentOperator("+"), nonAssignmentOperator("-")))
+    operator: binaryOperator(
+      token(choice(nonAssignmentOperator("+"), nonAssignmentOperator("-")))
+    )
+  },
+  {
+    associativity: "left",
+    operator: binaryOperator(
+      token(choice(literal("<="), literal(">="), literal("<"), literal(">")))
+    )
+  },
+  {
+    associativity: "left",
+    operator: binaryOperator(
+      token(
+        choice(literal("==="), literal("!=="), literal("=="), literal("!="))
       )
-    ]
+    )
   },
   {
     associativity: "left",
-    operators: [
-      binaryOperator(
-        token(choice(literal("<="), literal(">="), literal("<"), literal(">")))
-      )
-    ]
+    operator: binaryOperator(token(literal("&&")))
   },
   {
     associativity: "left",
-    operators: [
-      binaryOperator(
-        token(
-          choice(literal("==="), literal("!=="), literal("=="), literal("!="))
-        )
-      )
-    ]
-  },
-  {
-    associativity: "left",
-    operators: [binaryOperator(token(literal("&&")))]
-  },
-  {
-    associativity: "left",
-    operators: [binaryOperator(token(literal("||")))]
+    operator: binaryOperator(token(literal("||")))
   }
 ])
 

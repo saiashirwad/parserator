@@ -40,7 +40,6 @@ import {
   SourceText
 } from "../src/index"
 import { State } from "../src/state"
-import { peekUntil } from "../src/utils"
 import { ParseError } from "../src/index"
 import type { ParseResult, Parser as ParserType } from "../src/index"
 
@@ -593,8 +592,8 @@ describe("recovery helpers and utilities", () => {
     expect(skipUntil(fatalParser).parse("abc").success).toBe(false)
   })
 
-  test("peekUntil returns all remaining input when the delimiter is absent", () => {
-    expect(peekUntil("!").parsePrefix("abc")).toEqual({
+  test("lookahead scanning returns all remaining input when the delimiter is absent", () => {
+    expect(lookahead(takeUpto(literal("!"))).parsePrefix("abc")).toEqual({
       success: true,
       value: { value: "abc", offset: 0, rest: "abc" }
     })

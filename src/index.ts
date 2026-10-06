@@ -51,8 +51,7 @@ export {
 export type {
   BinaryOperator,
   UnaryOperator,
-  PrecedenceLevel,
-  PrecedenceOperator
+  PrecedenceLevel
 } from "./expressions.ts"
 
 export { ParseError, SourceText } from "./errors.ts"

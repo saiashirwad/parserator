@@ -77,8 +77,8 @@ const expression: Parser<QueryNode> = recursive(self => {
         Query.logical("OR", left, right)
     )
   return precedence(atom, [
-    { associativity: "left", operators: [andOperator] },
-    { associativity: "left", operators: [orOperator] }
+    { associativity: "left", operator: andOperator },
+    { associativity: "left", operator: orOperator }
   ])
 })
 

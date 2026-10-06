@@ -1,4 +1,4 @@
-import { choice, many } from "./combinators.ts"
+import { many } from "./combinators.ts"
 import {
   makeParser,
   parser,
@@ -120,46 +120,21 @@ export function postfix<T>(
   })
 }
 
-export type PrecedenceOperator<T> =
-  | BinaryOperator<T>
-  | readonly [Parser<unknown>, (left: T, right: T) => T]
-
 export type PrecedenceLevel<T> = {
   readonly associativity: "left" | "right"
-  readonly operators: readonly PrecedenceOperator<T>[]
+  readonly operator: BinaryOperator<T>
 }
 
-function operatorParser<T>(
-  operators: readonly PrecedenceOperator<T>[]
-): BinaryOperator<T> {
-  if (operators.length === 0) {
-    throw new TypeError("precedence levels need at least one operator")
-  }
-  const parsers = operators.map(operator => {
-    if (Array.isArray(operator)) {
-      return operator[0].map(() => operator[1])
-    }
-    return operator
-  })
-  return choice(...(parsers as [BinaryOperator<T>, ...BinaryOperator<T>[]]))
-}
-
-/**
- * Builds an expression parser from high-to-low precedence levels.
- * Operators may already return a binary function, or be supplied as
- * `[parser, combine]` pairs.
- */
 export function precedence<T>(
   atom: Parser<T>,
   levels: readonly PrecedenceLevel<T>[]
 ): Parser<T> {
   let current = atom
   for (const level of levels) {
-    const operator = operatorParser(level.operators)
     current =
       level.associativity === "left"
-        ? chainLeft1(current, operator)
-        : chainRight1(current, operator)
+        ? chainLeft1(current, level.operator)
+        : chainRight1(current, level.operator)
   }
   return current
 }

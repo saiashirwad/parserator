@@ -14,10 +14,10 @@ import {
   regex,
   skipMany,
   literal,
+  lookahead,
   takeUpto
 } from "../src/index.ts"
 import type { Parser } from "../src/index.ts"
-import { peekAhead } from "../src/utils.ts"
 
 export namespace LispExpr {
   export type LispExpr =
@@ -306,7 +306,7 @@ const listParser = list.flatMap(items =>
 expr = parser(function* () {
   yield* spaces
 
-  const isList = yield* peekAhead(1).map(x => x === "(")
+  const isList = yield* optional(lookahead(char("("))).map(x => x === "(")
   const result = yield* isList ? listParser : atom
 
   yield* spaces

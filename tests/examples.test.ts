@@ -2,12 +2,19 @@ import { describe, expect, test } from "vitest"
 import { eof } from "../src/index.ts"
 import { program as jsProgram } from "../examples/js-parser"
 import { json } from "../examples/json-parser"
+import { lispParser } from "../examples/scheme-parser.ts"
 import {
   expr as toymlExpression,
   programParser as toymlProgram
 } from "../examples/toyml/parser.ts"
 
 describe("shipped examples", () => {
+  test("Scheme dispatch peeks without consuming lists or atoms", () => {
+    expect(lispParser.parse("(a 1)").success).toBe(true)
+    expect(lispParser.parse("symbol").success).toBe(true)
+    expect(lispParser.parse("").success).toBe(false)
+    expect(lispParser.parse("(").success).toBe(false)
+  })
   test.each([
     "\n",
     " \n ",

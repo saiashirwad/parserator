@@ -92,16 +92,8 @@ export class ParseError extends Error {
     this.source = typeof source === "string" ? new SourceText(source) : source
   }
 
-  format(
-    options: {
-      style?: "plain" | "ansi"
-      contextLines?: number
-      showHints?: boolean
-    } = {}
-  ): string {
-    // The formatter imports this class for its input type; the import is safe
-    // because no formatter code runs while this module is being initialized.
-    return new ErrorFormatter(options).format(this)
+  format(options: ErrorFormatterOptions = {}): string {
+    return formatError(this, options)
   }
 
   toJSON(): DiagnosticJson {
@@ -112,7 +104,7 @@ export class ParseError extends Error {
   }
 }
 
-import { ErrorFormatter } from "./error-formatter.ts"
+import { formatError, type ErrorFormatterOptions } from "./error-formatter.ts"
 
 export type FailureControl =
   | { readonly kind: "recoverable"; readonly cutGeneration: number }
