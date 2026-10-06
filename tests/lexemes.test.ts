@@ -1,11 +1,11 @@
 import { describe, expect, test } from "vitest"
-import { createLexemes, fatal, literal, regex } from "../src/index.ts"
+import { createLexemes, literal, regex } from "../src/index.ts"
 
 describe("createLexemes", () => {
   test("reserved-word errors cover the identifier before trailing trivia", () => {
     const lex = createLexemes({
       trivia: regex(/\s*/),
-      identifier: regex(/[A-Za-z]+/),
+      identifier: /[A-Za-z]+/,
       keywords: ["AND"] as const
     })
     const result = lex.complete(lex.identifier).parse("  AND \n next")
@@ -25,7 +25,7 @@ describe("createLexemes", () => {
     (identifier, input) => {
       const lex = createLexemes({
         trivia: regex(/\s*/),
-        identifier: regex(identifier),
+        identifier,
         keywords: ["AND"] as const
       })
 
@@ -40,29 +40,29 @@ describe("createLexemes", () => {
   test("accepts a keyword before a character excluded from identifiers", () => {
     const lex = createLexemes({
       trivia: regex(/\s*/),
-      identifier: regex(/[A-Z]+/),
+      identifier: /[A-Z]+/,
       keywords: ["AND"] as const
     })
 
     expect(lex.keyword("AND").parsePrefix("AND1")).toEqual({
       success: true,
-      value: { value: "AND", offset: 3, rest: "1" }
+      value: "AND",
+      offset: 3,
+      rest: "1"
     })
   })
 
   test("uses configured keyword boundaries when checking complete input", () => {
     const lex = createLexemes({
       trivia: regex(/\s*/),
-      identifier: regex(/[A-Za-z_][A-Za-z0-9_.]*/),
+      identifier: /[A-Za-z_][A-Za-z0-9_.]*/,
       keywords: ["AND"] as const
     })
 
     const keyword = lex.complete(literal("x")).parse("x AND")
     expect(keyword.success).toBe(false)
     if (!keyword.success) {
-      expect(keyword.error.diagnostic.message).toContain(
-        "Unexpected trailing keyword"
-      )
+      expect(keyword.error.diagnostic.expected).toEqual(["end of input"])
     }
 
     const identifier = lex.complete(literal("x")).parse("x AND.owner")
@@ -74,25 +74,23 @@ describe("createLexemes", () => {
     }
   })
 
-  test("does not hide fatal identifier failures during a boundary check", () => {
-    const lex = createLexemes({
-      trivia: regex(/\s*/),
-      identifier: fatal("identifier boundary failed"),
-      keywords: ["AND"] as const
-    })
-    const result = lex.keyword("AND").parse("AND")
-
-    expect(result.success).toBe(false)
-    if (!result.success) {
-      expect(result.error.diagnostic.kind).toBe("fatal")
-      expect(result.error.diagnostic.message).toBe("identifier boundary failed")
-    }
+  test("rejects empty identifiers and invalid keyword configurations", () => {
+    expect(() =>
+      createLexemes({ trivia: regex(/\s*/), identifier: /a*/, keywords: [] })
+    ).toThrow(/consume input/)
+    expect(() =>
+      createLexemes({
+        trivia: regex(/\s*/),
+        identifier: /[A-Z]+/,
+        keywords: ["AND-OR"]
+      })
+    ).toThrow(/complete identifier/)
   })
 
   test("keeps typo hints when no keyword prefix matches", () => {
     const lex = createLexemes({
       trivia: regex(/\s*/),
-      identifier: regex(/[A-Za-z_][A-Za-z0-9_.]*/),
+      identifier: /[A-Za-z_][A-Za-z0-9_.]*/,
       keywords: ["AND"] as const
     })
     const result = lex.keyword("AND").parse("AN")
@@ -105,7 +103,7 @@ describe("createLexemes", () => {
   test("keeps typo hints when an identifier extends a keyword", () => {
     const lex = createLexemes({
       trivia: regex(/\s*/),
-      identifier: regex(/[A-Za-z]+/),
+      identifier: /[A-Za-z]+/,
       keywords: ["AND"] as const
     })
     const result = lex.keyword("AND").parse("ANDS")

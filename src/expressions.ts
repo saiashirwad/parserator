@@ -1,12 +1,12 @@
 import { many } from "./combinators.ts"
 import {
   makeParser,
+  combineCut,
   parser,
   replySuccess,
   runParser,
   type Parser
 } from "./parser.ts"
-import type { ParserReply } from "./state.ts"
 
 export type BinaryOperator<T> = Parser<(left: T, right: T) => T>
 export type UnaryOperator<T> = Parser<(value: T) => T>
@@ -16,34 +16,32 @@ export function chainLeft1<T>(
   term: Parser<T>,
   operator: BinaryOperator<T>
 ): Parser<T> {
-  return makeParser(state => {
-    const first = runParser(term, state)
-    if (!first.result.ok) return first
+  return makeParser((source, offset) => {
+    const first = runParser(term, source, offset)
+    if (!first.ok) return first
 
-    let value = first.result.value
-    let current = first.state
+    let value = first.value
+    let current = first.offset
+    let cut = first.cut
     while (true) {
-      const operation = runParser(operator, current)
-      if (!operation.result.ok) {
-        const control = operation.result.failure.control
-        if (
-          control.kind === "fatal" ||
-          control.cutGeneration > current.cutGeneration
-        ) {
-          return operation as ParserReply<never> as ParserReply<T>
+      const operation = runParser(operator, source, current)
+      if (!operation.ok) {
+        if (operation.fatal || operation.cut) {
+          return combineCut(operation, cut)
         }
-        return replySuccess(value, current)
+        return replySuccess(value, current, cut)
       }
 
-      const right = runParser(term, operation.state)
-      if (!right.result.ok) {
-        return right as ParserReply<never> as ParserReply<T>
+      const right = runParser(term, source, operation.offset)
+      if (!right.ok) {
+        return combineCut(right, cut || operation.cut)
       }
-      if (right.state.offset <= current.offset) {
+      if (right.offset <= current) {
         throw new Error("expression operator and term must consume input")
       }
-      value = operation.result.value(value, right.result.value)
-      current = right.state
+      value = operation.value(value, right.value)
+      current = right.offset
+      cut ||= operation.cut || right.cut
     }
   })
 }
@@ -53,41 +51,39 @@ export function chainRight1<T>(
   term: Parser<T>,
   operator: BinaryOperator<T>
 ): Parser<T> {
-  return makeParser(state => {
-    const first = runParser(term, state)
-    if (!first.result.ok) return first
+  return makeParser((source, offset) => {
+    const first = runParser(term, source, offset)
+    if (!first.ok) return first
 
-    const values = [first.result.value]
+    const values = [first.value]
     const operations: Array<(left: T, right: T) => T> = []
-    let current = first.state
+    let current = first.offset
+    let cut = first.cut
     while (true) {
-      const operation = runParser(operator, current)
-      if (!operation.result.ok) {
-        const control = operation.result.failure.control
-        if (
-          control.kind === "fatal" ||
-          control.cutGeneration > current.cutGeneration
-        ) {
-          return operation as ParserReply<never> as ParserReply<T>
+      const operation = runParser(operator, source, current)
+      if (!operation.ok) {
+        if (operation.fatal || operation.cut) {
+          return combineCut(operation, cut)
         }
 
         let value: T = values[values.length - 1] as T
         for (let index = operations.length - 1; index >= 0; index--) {
           value = operations[index]!(values[index] as T, value)
         }
-        return replySuccess(value, current)
+        return replySuccess(value, current, cut)
       }
 
-      const right = runParser(term, operation.state)
-      if (!right.result.ok) {
-        return right as ParserReply<never> as ParserReply<T>
+      const right = runParser(term, source, operation.offset)
+      if (!right.ok) {
+        return combineCut(right, cut || operation.cut)
       }
-      if (right.state.offset <= current.offset) {
+      if (right.offset <= current) {
         throw new Error("expression operator and term must consume input")
       }
-      operations.push(operation.result.value)
-      values.push(right.result.value)
-      current = right.state
+      operations.push(operation.value)
+      values.push(right.value)
+      current = right.offset
+      cut ||= operation.cut || right.cut
     }
   })
 }

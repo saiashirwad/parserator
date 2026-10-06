@@ -1,4 +1,4 @@
-import { diagnosticMessage, type ParseError } from "./errors.ts"
+import { type ParseError } from "./errors.ts"
 
 export type ErrorFormatterOptions = {
   style?: "plain" | "ansi"
@@ -29,7 +29,7 @@ export function formatError(
       lines.push(`  ${" ".repeat(width)} | ${" ".repeat(column)}^`)
     }
   }
-  lines.push(diagnosticMessage(d))
+  lines.push(error.message)
   if ((options.showHints ?? true) && d.hints?.length) {
     lines.push(`Did you mean: ${d.hints.join(", ")}?`)
   }

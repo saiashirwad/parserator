@@ -93,7 +93,7 @@ describe("query language", () => {
     expect(result.error.diagnostic).toMatchObject({
       kind: "expected",
       expected: ["query value"],
-      context: ["comparison"]
+      context: ["comparison", "query"]
     })
     expect(result.error.diagnostic.span.start).toBe(
       "status:open AND owner:".length
@@ -107,7 +107,7 @@ describe("query language", () => {
     expect(result.error.toJSON()).toMatchObject({
       kind: "expected",
       expected: ["query value"],
-      context: ["comparison"]
+      context: ["comparison", "query"]
     })
   })
 
@@ -120,7 +120,7 @@ describe("query language", () => {
     expect(result.error.diagnostic).toMatchObject({
       kind: "expected",
       expected: ["closing delimiter"],
-      context: ["parenthesized expression"]
+      context: ["parenthesized expression", "query"]
     })
     expect(result.error.diagnostic.span.start).toBe(
       "status:open AND (owner:me".length
@@ -140,10 +140,10 @@ describe("query language", () => {
   test("keeps inner context for trailing-input failures", () => {
     const lex = createLexemes({
       trivia: regex(/[ ]*/),
-      identifier: regex(/[A-Za-z]+/),
+      identifier: /[A-Za-z]+/,
       keywords: [] as const
     })
-    const result = lex.complete(literal("a").context("inner")).parse("a b")
+    const result = lex.complete(literal("a")).context("inner").parse("a b")
     expect(result.success).toBe(false)
     if (result.success) return
 

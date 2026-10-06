@@ -1,5 +1,5 @@
-export { Parser, fail, fatal, parser, recursive, succeed } from "./parser.ts"
-export type { ParseResult, PrefixResult, PrefixParseResult } from "./parser.ts"
+export { fail, fatal, parser, recursive, succeed } from "./parser.ts"
+export type { Parser, ParseResult, PrefixParseResult } from "./parser.ts"
 export type { SourcePosition } from "./state.ts"
 
 export {
@@ -59,8 +59,6 @@ export type { Diagnostic, DiagnosticJson, Span } from "./errors.ts"
 export type { ErrorFormatterOptions } from "./error-formatter.ts"
 
 export {
-  generateHints,
-  levenshteinDistance,
   anyKeywordWithHints,
   keywordWithHints,
   stringWithHints

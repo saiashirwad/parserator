@@ -7,7 +7,7 @@ import {
   parser,
   position,
   sequence,
-  Parser
+  type Parser
 } from "../src/index"
 import type { ParseResult, SourcePosition } from "../src/index"
 
@@ -53,11 +53,20 @@ if (generatorResult.success) {
 
 const parsePrefixResult = literal("ok").parsePrefix("ok!")
 if (parsePrefixResult.success) {
-  const offset: number = parsePrefixResult.value.offset
-  const rest: string = parsePrefixResult.value.rest
+  const offset: number = parsePrefixResult.offset
+  const rest: string = parsePrefixResult.rest
   void offset
   void rest
 }
+
+const opaqueCheck = () => {
+  // @ts-expect-error A structural method bag cannot manufacture a nominal parser.
+  const forged: Parser<string> = { map: () => literal("x") }
+  // @ts-expect-error Parsers must never be Promise thenables.
+  literal("x").then(() => 1)
+  void forged
+}
+void opaqueCheck
 
 // The implementation constructor is intentionally not part of the public API.
 const assertNotConstructible = () => {

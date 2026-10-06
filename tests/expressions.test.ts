@@ -64,7 +64,8 @@ describe("expression chains", () => {
       }
       expect(chain(number, subtract).parsePrefix("1!")).toMatchObject({
         success: true,
-        value: { value: 1, rest: "!" }
+        value: 1,
+        rest: "!"
       })
     })
 

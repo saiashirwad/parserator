@@ -1,25 +1,35 @@
-import type { Diagnostic, Failure, ParseError, Span } from "./errors.ts"
-import { ParseError as ParseErrorClass, SourceText } from "./errors.ts"
-import {
-  ParserOutput,
-  type ParserReply,
-  type ParserState,
-  State
-} from "./state.ts"
+import { ParseError, SourceText, type Diagnostic, type Span } from "./errors.ts"
 
+export type Reply<T> =
+  | {
+      readonly ok: true
+      readonly value: T
+      readonly offset: number
+      readonly cut: boolean
+    }
+  | {
+      readonly ok: false
+      readonly offset: number
+      readonly diagnostic: Diagnostic
+      readonly cut: boolean
+      readonly fatal: boolean
+    }
+export type Run<T> = (source: SourceText, offset: number) => Reply<T>
 export type ParseResult<T> =
   | { readonly success: true; readonly value: T }
   | { readonly success: false; readonly error: ParseError }
+export type PrefixParseResult<T> =
+  | {
+      readonly success: true
+      readonly value: T
+      readonly offset: number
+      readonly rest: string
+    }
+  | { readonly success: false; readonly error: ParseError }
+const runner = Symbol("parser runner")
 
-export type PrefixResult<T> = {
-  readonly value: T
-  readonly offset: number
-  readonly rest: string
-}
-export type PrefixParseResult<T> = ParseResult<PrefixResult<T>>
-
-/** A parser value. Construction lives in the advanced entry point. */
 export interface Parser<T> {
+  readonly [runner]: Run<T>
   map<B>(f: (value: T) => B): Parser<B>
   flatMap<B>(f: (value: T) => Parser<B>): Parser<B>
   zip<B>(other: Parser<B>): Parser<[T, B]>
@@ -47,136 +57,90 @@ export interface Parser<T> {
   ): PrefixParseResult<T>
   parseOrThrow(input: string, options?: { readonly sourceName?: string }): T
 }
-
-type Runner<T> = (state: ParserState) => ParserReply<T>
-const runners = new WeakMap<object, Runner<unknown>>()
-const parserToken = Symbol("Parser")
-
-function clearCompletionContext(state: ParserState): ParserState {
-  if (!state.completionContext) return state
-  const { completionContext: _completionContext, ...rest } = state
-  return rest
-}
-
-const successReply = <T>(value: T, state: ParserState): ParserReply<T> =>
-  ParserOutput(clearCompletionContext(state), { ok: true, value })
-export const replySuccess = successReply
+export const replySuccess = <T>(
+  value: T,
+  offset: number,
+  cut = false
+): Reply<T> => ({ ok: true, value, offset, cut })
+export const replyFailure = (
+  diagnostic: Diagnostic,
+  offset: number,
+  cut = false,
+  fatal = false
+): Reply<never> => ({ ok: false, diagnostic, offset, cut, fatal })
+export const combineCut = <T>(reply: Reply<T>, cut: boolean): Reply<T> =>
+  cut && !reply.cut ? { ...reply, cut: true } : reply
 
 class ParserValue<T> implements Parser<T> {
-  constructor(token: symbol, runner: Runner<T>) {
-    if (token !== parserToken)
-      throw new TypeError("Parser values must be made by parser combinators")
-    runners.set(this, runner as Runner<unknown>)
+  readonly [runner]: Run<T>
+  constructor(run: Run<T>) {
+    this[runner] = run
   }
-
   map<B>(f: (value: T) => B): Parser<B> {
-    return makeParser(state => {
-      const reply = runParser(this, state)
-      return reply.result.ok
-        ? successReply(f(reply.result.value), reply.state)
-        : (reply as ParserReply<never> as ParserReply<B>)
+    return makeParser((source, offset) => {
+      const reply = runParser(this, source, offset)
+      return reply.ok
+        ? replySuccess(f(reply.value), reply.offset, reply.cut)
+        : reply
     })
   }
-
   flatMap<B>(f: (value: T) => Parser<B>): Parser<B> {
-    return makeParser(state => {
-      const reply = runParser(this, state)
-      return reply.result.ok
-        ? runParser(f(reply.result.value), reply.state)
-        : (reply as ParserReply<never> as ParserReply<B>)
+    return makeParser((source, offset) => {
+      const reply = runParser(this, source, offset)
+      return reply.ok
+        ? combineCut(runParser(f(reply.value), source, reply.offset), reply.cut)
+        : reply
     })
   }
-
   zip<B>(other: Parser<B>): Parser<[T, B]> {
-    return makeParser(state => {
-      const left = runParser(this, state)
-      if (!left.result.ok)
-        return left as ParserReply<never> as ParserReply<[T, B]>
-      const right = runParser(other, left.state)
-      if (!right.result.ok)
-        return right as ParserReply<never> as ParserReply<[T, B]>
-      return successReply([left.result.value, right.result.value], right.state)
-    })
+    return this.flatMap(a => other.map(b => [a, b]))
   }
-
   zipRight<B>(other: Parser<B>): Parser<B> {
-    return makeParser(state => {
-      const left = runParser(this, state)
-      return left.result.ok
-        ? runParser(other, left.state)
-        : (left as ParserReply<never> as ParserReply<B>)
-    })
+    return this.flatMap(() => other)
   }
-
   zipLeft<B>(other: Parser<B>): Parser<T> {
-    return makeParser(state => {
-      const left = runParser(this, state)
-      if (!left.result.ok) return left
-      const right = runParser(other, left.state)
-      return right.result.ok
-        ? successReply(left.result.value, right.state)
-        : (right as ParserReply<never> as ParserReply<T>)
-    })
+    return this.flatMap(a => other.map(() => a))
   }
-
   *[Symbol.iterator](): Generator<Parser<T>, T, any> {
     return yield this
   }
-
   expected(description: string): Parser<T> {
-    return makeParser(state => {
-      const reply = runParser(this, state)
-      if (reply.result.ok) return reply
-      if (reply.result.failure.control.kind === "fatal") return reply
-      const old = reply.result.failure.diagnostic
-      const { message: _message, ...withoutMessage } = old
-      const diagnostic: Diagnostic = {
-        ...withoutMessage,
-        kind: "expected",
-        expected: [description],
-        span: old.span
+    return makeParser((source, offset) => {
+      const reply = runParser(this, source, offset)
+      if (reply.ok || reply.fatal) return reply
+      const { message: _message, ...old } = reply.diagnostic
+      return {
+        ...reply,
+        diagnostic: { ...old, kind: "expected", expected: [description] }
       }
-      return failRich(
-        { ...reply.result.failure, diagnostic },
-        reply.state
-      ) as ParserReply<T>
     })
   }
-
   context(description: string): Parser<T> {
-    return makeParser(state => {
-      const reply = runParser(this, state)
-      if (reply.result.ok) {
-        const previous = reply.state.completionContext ?? []
-        return ParserOutput(
-          { ...reply.state, completionContext: [...previous, description] },
-          reply.result
-        )
-      }
-      const old = reply.result.failure.diagnostic
-      const context = [...(old.context ?? []), description]
-      return failRich(
-        { ...reply.result.failure, diagnostic: { ...old, context } },
-        reply.state
-      ) as ParserReply<T>
+    return makeParser((source, offset) => {
+      const reply = runParser(this, source, offset)
+      return reply.ok
+        ? reply
+        : {
+            ...reply,
+            diagnostic: {
+              ...reply.diagnostic,
+              context: [...(reply.diagnostic.context ?? []), description]
+            }
+          }
     })
   }
-
   withSpan<B>(f: (value: T, span: Span) => B): Parser<B> {
-    return makeParser(state => {
-      const reply = runParser(this, state)
-      return reply.result.ok
-        ? successReply(
-            f(reply.result.value, {
-              start: state.offset,
-              end: reply.state.offset
-            }),
-            reply.state
+    return makeParser((source, offset) => {
+      const reply = runParser(this, source, offset)
+      return reply.ok
+        ? replySuccess(
+            f(reply.value, { start: offset, end: reply.offset }),
+            reply.offset,
+            reply.cut
           )
-        : (reply as ParserReply<never> as ParserReply<B>)
+        : reply
     })
   }
-
   validate(
     predicate: (value: T) => boolean | string,
     message = "valid value"
@@ -188,7 +152,6 @@ class ParserValue<T> implements Parser<T> {
         : fail(typeof result === "string" ? result : message)
     })
   }
-
   trim(trivia: Parser<unknown>): Parser<T> {
     return trivia.zipRight(this).zipLeft(trivia)
   }
@@ -198,73 +161,59 @@ class ParserValue<T> implements Parser<T> {
   trimRight(trivia: Parser<unknown>): Parser<T> {
     return this.zipLeft(trivia)
   }
-
   commit(): Parser<T> {
-    return makeParser(state => {
-      const reply = runParser(this, state)
-      return reply.result.ok
-        ? ParserOutput(
-            {
-              ...reply.state,
-              cutGeneration: reply.state.cutGeneration + 1
-            },
-            reply.result
-          )
-        : reply
+    return makeParser((source, offset) => {
+      const reply = runParser(this, source, offset)
+      return reply.ok ? combineCut(reply, true) : reply
     })
   }
-
   parse(
     input: string,
     options: { readonly sourceName?: string } = {}
   ): ParseResult<T> {
-    const reply = runParser(this, State.fromInput(input))
-    if (!reply.result.ok)
+    const source = new SourceText(input, options.sourceName)
+    const reply = runParser(this, source, 0)
+    if (!reply.ok)
       return {
         success: false,
-        error: errorFromReply(reply, options.sourceName)
+        error: new ParseError(reply.diagnostic, source, reply.fatal)
       }
-    if (!State.isAtEnd(reply.state)) {
-      const found = State.charAt(reply.state)
+    if (reply.offset < input.length)
       return {
         success: false,
-        error: new ParseErrorClass(
+        error: new ParseError(
           {
             kind: "expected",
             span: {
-              start: reply.state.offset,
-              end: reply.state.offset + State.charWidthAt(reply.state)
+              start: reply.offset,
+              end: reply.offset + source.charWidthAt(reply.offset)
             },
             expected: ["end of input"],
-            found,
-            ...(reply.state.completionContext
-              ? { context: reply.state.completionContext }
-              : {})
+            found: source.charAt(reply.offset)
           },
-          new SourceText(input, options.sourceName)
+          source
         )
       }
-    }
-    return { success: true, value: reply.result.value }
+    return { success: true, value: reply.value }
   }
-
   parsePrefix(
     input: string,
     options: { readonly sourceName?: string } = {}
   ): PrefixParseResult<T> {
-    const reply = runParser(this, State.fromInput(input))
-    if (!reply.result.ok)
-      return {
-        success: false,
-        error: errorFromReply(reply, options.sourceName)
-      }
-    const rest = input.slice(reply.state.offset)
-    return {
-      success: true,
-      value: { value: reply.result.value, offset: reply.state.offset, rest }
-    }
+    const source = new SourceText(input, options.sourceName)
+    const reply = runParser(this, source, 0)
+    return reply.ok
+      ? {
+          success: true,
+          value: reply.value,
+          offset: reply.offset,
+          rest: input.slice(reply.offset)
+        }
+      : {
+          success: false,
+          error: new ParseError(reply.diagnostic, source, reply.fatal)
+        }
   }
-
   parseOrThrow(
     input: string,
     options: { readonly sourceName?: string } = {}
@@ -274,120 +223,74 @@ class ParserValue<T> implements Parser<T> {
     return result.value
   }
 }
-
-/** Runtime identity for parser values, without a public construct signature. */
-export const Parser: { readonly prototype: Parser<unknown> } =
-  Object.freeze(ParserValue)
-
-function errorFromReply(
-  reply: ParserReply<unknown>,
-  sourceName?: string
-): ParseError {
-  const diagnostic = reply.result.ok
-    ? {
-        kind: "custom" as const,
-        span: { start: reply.state.offset, end: reply.state.offset },
-        message: "Parser failed"
-      }
-    : reply.result.failure.diagnostic
-  return new ParseErrorClass(
-    diagnostic,
-    new SourceText(reply.state.source, sourceName)
-  )
-}
-
 export function runParser<T>(
   parser: Parser<T>,
-  state: ParserState
-): ParserReply<T> {
-  const runner = runners.get(parser) as Runner<T> | undefined
-  if (!runner) throw new TypeError("Not a Parser")
-  return runner(state)
+  source: SourceText,
+  offset: number
+): Reply<T> {
+  return parser[runner](source, offset)
 }
-
-export function makeParser<T>(runner: Runner<T>): Parser<T> {
-  return new ParserValue(parserToken, runner)
+export function makeParser<T>(run: Run<T>): Parser<T> {
+  return new ParserValue(run)
 }
-
 export function succeed<T>(value: T): Parser<T> {
-  return makeParser(current => successReply(value, current))
+  return makeParser((_source, offset) => replySuccess(value, offset))
 }
-
 export function fail(message: string): Parser<never> {
-  return makeParser(state =>
-    ParserOutput(state, {
-      ok: false,
-      failure: {
-        diagnostic: {
-          kind: "custom",
-          span: { start: state.offset, end: state.offset },
-          message
-        },
-        control: { kind: "recoverable", cutGeneration: state.cutGeneration }
-      }
-    })
+  return makeParser((_source, offset) =>
+    replyFailure(
+      { kind: "custom", span: { start: offset, end: offset }, message },
+      offset
+    )
   )
 }
-
 export function fatal(message: string): Parser<never> {
-  return makeParser(state =>
-    ParserOutput(state, {
-      ok: false,
-      failure: {
-        diagnostic: {
-          kind: "fatal",
-          span: { start: state.offset, end: state.offset },
-          message
-        },
-        control: { kind: "fatal" }
-      }
-    })
+  return makeParser((_source, offset) =>
+    replyFailure(
+      { kind: "custom", span: { start: offset, end: offset }, message },
+      offset,
+      false,
+      true
+    )
   )
 }
-
-export function failRich(
-  failure: Failure,
-  state: ParserState
-): ParserReply<never> {
-  return ParserOutput(state, { ok: false, failure })
-}
-
 export function parser<T>(f: () => Generator<Parser<any>, T, any>): Parser<T> {
-  return makeParser(state => {
+  return makeParser((source, offset) => {
     const iterator = f()
     let closed = false
-    const close = (): void => {
-      if (closed) return
-      closed = true
-      iterator.return?.(undefined as never)
+    const close = () => {
+      if (!closed) {
+        closed = true
+        iterator.return?.(undefined as never)
+      }
     }
     try {
       let current = iterator.next()
-      let currentState = state
+      let cut = false
       while (!current.done) {
-        const reply = runParser(current.value, currentState)
-        if (!reply.result.ok) {
+        const reply = runParser(current.value, source, offset)
+        cut ||= reply.cut
+        if (!reply.ok) {
           close()
-          return reply as ParserReply<never> as ParserReply<T>
+          return combineCut(reply, cut)
         }
-        currentState = reply.state
-        current = iterator.next(reply.result.value)
+        offset = reply.offset
+        current = iterator.next(reply.value)
       }
       closed = true
-      return successReply(current.value, currentState)
+      return replySuccess(current.value, offset, cut)
     } catch (error) {
       close()
       throw error
     }
   })
 }
-
 export function recursive<T>(
   builder: (self: Parser<T>) => Parser<T>
 ): Parser<T> {
   let built: Parser<T> | undefined
-  const self: Parser<T> = makeParser(state =>
-    runParser((built ??= builder(self)), state)
+  const self: Parser<T> = makeParser((source, offset) =>
+    runParser((built ??= builder(self)), source, offset)
   )
   return self
 }

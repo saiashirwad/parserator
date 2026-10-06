@@ -2,6 +2,8 @@ import {
   between,
   choice,
   createLexemes,
+  eof,
+  fail,
   literal,
   notFollowedBy,
   parser,
@@ -19,7 +21,7 @@ import {
 
 const lex = createLexemes({
   trivia: regex(/[ \t\r\n]*/),
-  identifier: regex(/[A-Za-z_][A-Za-z0-9_.]*/),
+  identifier: /[A-Za-z_][A-Za-z0-9_.]*/,
   keywords: ["AND", "OR"] as const
 })
 
@@ -83,6 +85,12 @@ const expression: Parser<QueryNode> = recursive(self => {
 })
 
 /** A complete, whitespace-tolerant query parser. */
-export const query: Parser<QueryNode> = lex.complete(expression)
+const expectedOperator = choice(lex.keyword("AND"), lex.keyword("OR")).flatMap(
+  word => fail(`Unexpected trailing keyword ${JSON.stringify(word)}`)
+)
+
+export const query: Parser<QueryNode> = lex
+  .complete(expression.zipLeft(choice(expectedOperator, eof)))
+  .context("query")
 
 export { expression }

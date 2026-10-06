@@ -1,8 +1,7 @@
 /** A half-open span into a JavaScript string (UTF-16 code-unit offsets). */
 export type Span = { readonly start: number; readonly end: number }
 
-export type Diagnostic = {
-  readonly kind: "expected" | "unexpected" | "custom" | "fatal"
+type DiagnosticDetails = {
   readonly span: Span
   readonly expected?: readonly string[]
   readonly found?: string
@@ -10,7 +9,16 @@ export type Diagnostic = {
   readonly context?: readonly string[]
   readonly hints?: readonly string[]
 }
-export type DiagnosticJson = Diagnostic & { readonly sourceName?: string }
+export type Diagnostic = DiagnosticDetails &
+  (
+    | { readonly kind: "expected"; readonly expected: readonly string[] }
+    | { readonly kind: "unexpected"; readonly found: string }
+    | { readonly kind: "custom"; readonly message: string }
+  )
+export type DiagnosticJson = Diagnostic & {
+  readonly sourceName?: string
+  readonly fatal: boolean
+}
 
 /** Source text shared by diagnostics and their renderers. */
 export class SourceText {
@@ -21,6 +29,20 @@ export class SourceText {
   constructor(text: string, name?: string) {
     this.text = text
     this.name = name
+  }
+
+  charWidthAt(offset: number): number {
+    const point = this.text.codePointAt(offset)
+    return point === undefined ? 0 : point > 0xffff ? 2 : 1
+  }
+
+  charAt(offset: number): string {
+    const point = this.text.codePointAt(offset)
+    return point === undefined
+      ? ""
+      : point >= 0xd800 && point <= 0xdfff
+        ? "\ufffd"
+        : String.fromCodePoint(point)
   }
 
   private lineStarts(): number[] {
@@ -64,7 +86,6 @@ export class SourceText {
 }
 
 export function diagnosticMessage(diagnostic: Diagnostic): string {
-  if (diagnostic.kind === "fatal") return fatalMessage(diagnostic.message)
   if (diagnostic.message) return diagnostic.message
   if (diagnostic.kind === "expected") {
     const expected = diagnostic.expected?.join(" or ") || "valid input"
@@ -85,8 +106,19 @@ export class ParseError extends Error {
   readonly diagnostic: Diagnostic
   readonly source: SourceText
 
-  constructor(diagnostic: Diagnostic, source: SourceText | string) {
-    super(diagnosticMessage(diagnostic))
+  readonly fatal: boolean
+
+  constructor(
+    diagnostic: Diagnostic,
+    source: SourceText | string,
+    fatal = false
+  ) {
+    super(
+      fatal
+        ? fatalMessage(diagnosticMessage(diagnostic))
+        : diagnosticMessage(diagnostic)
+    )
+    this.fatal = fatal
     this.name = "ParseError"
     this.diagnostic = diagnostic
     this.source = typeof source === "string" ? new SourceText(source) : source
@@ -99,21 +131,13 @@ export class ParseError extends Error {
   toJSON(): DiagnosticJson {
     return {
       ...this.diagnostic,
+      fatal: this.fatal,
       ...(this.source.name ? { sourceName: this.source.name } : {})
     }
   }
 }
 
 import { formatError, type ErrorFormatterOptions } from "./error-formatter.ts"
-
-export type FailureControl =
-  | { readonly kind: "recoverable"; readonly cutGeneration: number }
-  | { readonly kind: "fatal" }
-
-export type Failure = {
-  readonly diagnostic: Diagnostic
-  readonly control: FailureControl
-}
 
 export function positionAt(
   source: string,

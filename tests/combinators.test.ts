@@ -39,7 +39,6 @@ import {
   position,
   SourceText
 } from "../src/index"
-import { State } from "../src/state"
 import { ParseError } from "../src/index"
 import type { ParseResult, Parser as ParserType } from "../src/index"
 
@@ -67,12 +66,16 @@ describe("parse boundary and results", () => {
   test("parsePrefix exposes the unconsumed suffix", () => {
     expect(literal("abc").parsePrefix("abc!")).toEqual({
       success: true,
-      value: { value: "abc", offset: 3, rest: "!" }
+      value: "abc",
+      offset: 3,
+      rest: "!"
     })
   })
 
   test("complete trailing-input errors point at the trailing input", () => {
-    const error = fails(literal("a").context("top-level value").parse("ab"))
+    const error = fails(
+      literal("a").zipLeft(eof).context("top-level value").parse("ab")
+    )
     expect(error.diagnostic.span).toEqual({ start: 1, end: 2 })
     expect(error.diagnostic.expected).toContain("end of input")
     expect(error.diagnostic.context).toEqual(["top-level value"])
@@ -110,9 +113,10 @@ describe("errors", () => {
       { line: 1, column: 2, offset: 1 },
       { line: 1, column: 3, offset: 2 }
     ])
-    expect(
-      State.printPosition(State.consume(State.fromInput("a\r\nb"), 3))
-    ).toBe("line 2, column 1, offset 3")
+    expect(new SourceText("a\r\nb").positionAt(3)).toEqual({
+      line: 2,
+      column: 1
+    })
   })
 
   test.each(["", "a\n", "a\rb\r\n", "a\nb\rc\r\nd"])(
@@ -224,7 +228,7 @@ describe("commit, attempt, and fatal control", () => {
     if (name === "failure after cut" || name === "fatal failure") {
       expect(result.success).toBe(false)
     } else {
-      expect(succeeds(result).value).toBe("a")
+      expect(succeeds(result)).toBe("a")
     }
   })
 
@@ -233,7 +237,7 @@ describe("commit, attempt, and fatal control", () => {
     if (name === "failure after cut" || name === "fatal failure") {
       expect(result.success).toBe(false)
     } else {
-      expect(succeeds(result).value).toBeUndefined()
+      expect(succeeds(result)).toBeUndefined()
     }
   })
 
@@ -242,7 +246,7 @@ describe("commit, attempt, and fatal control", () => {
     if (name === "failure after cut" || name === "fatal failure") {
       expect(result.success).toBe(false)
     } else {
-      expect(succeeds(result).value).toEqual([])
+      expect(succeeds(result)).toEqual([])
     }
   })
 
@@ -265,7 +269,7 @@ describe("commit, attempt, and fatal control", () => {
 
   test("attempt isolates a cut made by a failed branch", () => {
     expect(
-      succeeds(choice(attempt(cutFailure), literal("a")).parsePrefix("a")).value
+      succeeds(choice(attempt(cutFailure), literal("a")).parsePrefix("a"))
     ).toBe("a")
   })
 
@@ -297,7 +301,7 @@ describe("commit, attempt, and fatal control", () => {
       literal("a")
     ).parse("b")
     const error = fails(result)
-    expect(error.diagnostic.kind).toBe("fatal")
+    expect(error.fatal).toBe(true)
     expect(error.format({ style: "plain" })).toContain("fatal diagnostic")
   })
 
@@ -314,7 +318,7 @@ describe("commit, attempt, and fatal control", () => {
     ]
     for (const boundary of boundaries) {
       const error = fails(boundary.parse("x"))
-      expect(error.diagnostic.kind).toBe("fatal")
+      expect(error.fatal).toBe(true)
       expect(error.format({ style: "plain" })).toContain("wrapped fatal")
     }
   })
@@ -349,8 +353,6 @@ describe("commit, attempt, and fatal control", () => {
       expect(outer(inner).parsePrefix("a").success).toBe(true)
     }
 
-    // A choice boundary created after the outer cut still starts at the
-    // current generation and can try its next ordinary alternative.
     const nestedChoice = choice(literal("b"), literal("a"))
     expect(outer(optional(nestedChoice)).parse("a").success).toBe(true)
     expect(outer(many(nestedChoice)).parse("a").success).toBe(true)
@@ -442,9 +444,7 @@ describe("diagnostic wrappers and zero-width parsers", () => {
     expect(
       succeeds(choice(lookahead(cutMismatch), literal("a")).parse("a"))
     ).toBe("a")
-    expect(succeeds(notFollowedBy(cutMismatch).parsePrefix("a")).value).toBe(
-      true
-    )
+    expect(succeeds(notFollowedBy(cutMismatch).parsePrefix("a"))).toBe(true)
 
     expect(succeeds(takeUntil(cutMismatch).parse("a"))).toBe("a")
     expect(succeeds(takeUpto(cutMismatch).parse("a"))).toBe("a")
@@ -574,12 +574,14 @@ describe("primitive correctness", () => {
     const prefix = anyChar().parsePrefix("👋!")
     expect(prefix).toEqual({
       success: true,
-      value: { value: "👋", offset: 2, rest: "!" }
+      value: "👋",
+      offset: 2,
+      rest: "!"
     })
   })
 
   test("scan-until advances by Unicode code point", () => {
-    expect(succeeds(takeUpto(literal("x")).parsePrefix("👋x")).value).toBe("👋")
+    expect(succeeds(takeUpto(literal("x")).parsePrefix("👋x"))).toBe("👋")
     expect(succeeds(takeUntil(literal("x")).parse("👋x"))).toBe("👋")
   })
 })
@@ -595,7 +597,9 @@ describe("recovery helpers and utilities", () => {
   test("lookahead scanning returns all remaining input when the delimiter is absent", () => {
     expect(lookahead(takeUpto(literal("!"))).parsePrefix("abc")).toEqual({
       success: true,
-      value: { value: "abc", offset: 0, rest: "abc" }
+      value: "abc",
+      offset: 0,
+      rest: "abc"
     })
   })
 
