@@ -1,360 +1,225 @@
 # Parserator
 
-Readable, type-safe parsers for small TypeScript application languages.
+Parserator is a TypeScript parser-combinator library for application-defined syntax: search queries, configuration, formulas, and command languages. Grammars are composed from reusable parser values and produce the data structures you choose, from a single parsed value to a typed syntax tree. There is no separate grammar language or code-generation step.
 
-Parserator is for the point where a regular expression has become brittle,
-but a parser generator would be too much. Grammars are ordinary generator
-functions, so local variables, conditions, and loops stay visible.
+The generator API makes sequential grammars read like sequential code. Delegating to a parser with `yield*` binds its result with its inferred TypeScript type. The generator's return value defines the composed parser's output. This makes data-dependent grammars straightforward to express, while retaining standard combinators for alternatives, repetition, recursion, and precedence. Parserator manages input positions, backtracking, and structured diagnostics. Your application decides what to do with a successful result.
+
+## A command grammar
 
 ```sh
 npm install parserator
 ```
 
-Parserator is ESM-only, has no runtime dependencies, targets ES2022, and
-supports Node 22 and newer.
+The package is ESM-only, has no runtime dependencies, and requires Node.js 22 or newer. Its build target is ES2022.
 
-## A small parser
+This grammar accepts `resize 640 x 480` and `rotate 90`, producing a discriminated union rather than executing either command:
 
 ```ts
-import { char, parser, regex } from "parserator"
+import { choice, createLexemes, parser, regex } from "parserator"
 
-const number = regex(/-?\d+/).map(Number)
-const point = parser(function* () {
-  yield* char("(")
-  const x = yield* number
-  yield* char(",")
-  const y = yield* number
-  yield* char(")")
-  return { x, y }
+const lex = createLexemes({
+  trivia: regex(/\s*/),
+  identifier: /[a-z]+/,
+  keywords: ["resize", "rotate"]
 })
 
-point.parseOrThrow("(10,20)")
-// { x: 10, y: 20 }
-```
+const integer = lex.token(regex(/\d+/)).map(Number).expected("integer")
 
-## A useful application grammar
+const commandBody = parser(function* () {
+  const type = yield* choice(lex.keyword("resize"), lex.keyword("rotate"))
 
-The query example parses a filter that an application could put in a search
-box:
+  if (type === "rotate") {
+    const degrees = yield* integer
+    return { type, degrees }
+  }
 
-```ts
-import { query, queryLexemes } from "./examples/query-language/parser.ts"
-import { evaluate } from "./examples/query-language/evaluate.ts"
-
-const filter = query.parseOrThrow("status:open AND (owner:me OR priority >= 3)")
-
-evaluate(filter, { status: "open", owner: "other", priority: 3 })
-// true
-
-console.dir(filter, { depth: null })
-// {
-//   type: "logical", operator: "AND",
-//   left: { type: "comparison", field: "status", operator: ":", value: "open" },
-//   right: {
-//     type: "logical", operator: "OR",
-//     left: { type: "comparison", field: "owner", operator: ":", value: "me" },
-//     right: { type: "comparison", field: "priority", operator: ">=", value: 3 }
-//   }
-// }
-```
-
-The example has a typed AST, keyword boundaries, parentheses, comparisons,
-operator precedence, dotted fields, evaluation, and malformed-input tests.
-It is in [`examples/query-language/`](examples/query-language).
-
-Malformed input stays structured and points to the operand that is missing:
-
-```ts
-const result = query.parse("status:open AND owner:")
-if (!result.success) {
-  result.error.diagnostic
-  // {
-  //   kind: "expected", span: { start: 22, end: 22 },
-  //   expected: ["query value"], context: ["comparison", "query"]
-  // }
-  console.error(result.error.format({ style: "plain" }))
-}
-```
-
-The lexical layer also suggests a known keyword for a close typo:
-
-```ts
-const keyword = queryLexemes.keyword("AND").parse("AN")
-if (!keyword.success) keyword.error.diagnostic.hints // ["AND", "OR"]
-```
-
-## The core idea
-
-`parser(function* () {})` sequences parsers with `yield*`. The delegated
-expression has the parser's result type, and the generator's `return` type
-becomes the new parser's type. Use `yield*`, not plain `yield`: a plain yield
-resumes with `unknown` and must not supply unchecked typed values.
-
-On cancellation, the runner forces the iterator to unwind until it is done,
-skipping parser effects yielded from cleanup. Put resource-release code in
-non-yielding `finally` blocks, including nested `finally` blocks. During normal
-completion, parsers yielded from `finally` may execute.
-
-`choice(a, b, c)` tries alternatives in order and backtracks input by default,
-even when an alternative consumed text. Use `commit()` after the input has
-identified a branch:
-
-```ts
-import { commit, literal, parser, regex } from "parserator"
-
-const identifier = regex(/[A-Za-z_][A-Za-z0-9_]*/)
-const letExpression = parser(function* () {
-  yield* literal("let")
-  yield* commit()
-  const name = yield* identifier.expected("variable name")
-  yield* literal("=").expected("'=' after variable name")
-  return name
+  const width = yield* integer
+  yield* lex.symbol("x")
+  const height = yield* integer
+  return { type, width, height }
 })
+
+const command = lex.complete(commandBody).context("image command")
+
+command.parseOrThrow("resize 640 x 480")
+// { type: "resize", width: 640, height: 480 }
+
+command.parseOrThrow("  rotate 90  ")
+// { type: "rotate", degrees: 90 }
 ```
 
-Each parser invocation reports only its own cuts. A cut affects the choice,
-optional parser, or repetition boundary that surrounds it; a nested boundary
-can still recover independently. `attempt(parser)` clears ordinary cuts on
-failure, but keeps them on success. `lookahead` isolates ordinary cuts and
-consumes no input. A fatal failure always stops recovery.
+`commandBody` sequences parsers against a shared input position. Each `yield*` either supplies the parser's result or propagates its failure, while `return` constructs the output. The keyword choice infers `"resize" | "rotate"`. Narrowing that value determines which fields each branch returns.
 
-Keep parser callbacks pure. A speculative branch may run more than once after
-backtracking; perform side effects only after parsing succeeds.
+The resulting parser can be reused across inputs, or embedded in a larger grammar before `lex.complete` supplies the whole-input boundary. Use `yield*`, not plain `yield`, for typed delegation. Explicit output contracts can use the type-only `Parser<T>` export. Parsers are created through factories, not a public constructor.
 
-## Results and diagnostics
+### Tokens and whitespace
 
-`parse()` consumes the complete input and returns a discriminated result:
+`createLexemes` establishes a lexical policy shared by the grammar. The `trivia` parser consumes ignored text—whitespace here, or comments in a more elaborate grammar. `token(p)`, `symbol`, and `keyword` consume trailing trivia. `complete(p)` consumes leading and trailing trivia and requires the end of the input. `/\s*/` accepts empty trivia, so whitespace is permitted rather than required.
+
+The identifier RegExp defines whole-word recognition for both `lex.identifier` and keywords. Under `/[a-z]+/`, `resizeable` remains one identifier instead of matching the keyword `resize` as a prefix. Configured keywords are case-sensitive and reserved from identifiers. Close misspellings can produce diagnostic suggestions.
+
+Raw `literal`, `char`, and `regex` parsers do not skip trivia. A regex matches at the current position, not the next matching position, and returns the complete matched text. A literal does not enforce word boundaries. Use these primitives directly when the grammar needs exact control over spacing and token boundaries.
+
+## Decide how to handle invalid input
+
+Use `parse` for user input. Failure becomes a value you can handle:
 
 ```ts
-const result = point.parse("(10,20)")
+const result = command.parse("rotate nope", { sourceName: "command" })
+
 if (result.success) {
-  result.value
+  console.log(result.value)
 } else {
   console.error(result.error.format({ style: "plain" }))
 }
 ```
 
-Use `parsePrefix()` when a caller deliberately wants a prefix and the rest:
-
-```ts
-const prefix = number.parsePrefix("42 remaining")
-if (prefix.success) {
-  prefix.value // 42 (number)
-  prefix.offset // 2 (UTF-16 code units)
-  prefix.rest // " remaining"
-}
+```text
+command:line 1, column 8:
+> 1 | rotate nope
+    |        ^
+Expected integer, found n
+While parsing: image command
 ```
 
-`parseOrThrow()` returns the value or throws a `ParseError`. A parse error is a
-real `Error` with a source span, structured expectations, context, and a stable
-`toJSON()` representation. `error.fatal` and `error.toJSON().fatal` report
-fatality independently of `diagnostic.kind`. Diagnostic kinds are `expected`
-(with nonempty expectation labels), `unexpected` (with `found`), and `custom`
-(with `message`). The `message` field belongs only to custom diagnostics;
-expected diagnostics cannot have one.
+The error is a `ParseError`, not just a string. `error.diagnostic` contains the source `span`, a diagnostic `kind`, and expectations or a custom message, with optional context and suggestions. `error.toJSON()` makes the diagnostic available to an editor or other UI. Spans are half-open UTF-16 string indexes: `{ start, end }` selects `input.slice(start, end)`. `format` can produce plain or ANSI text.
 
-When merging alternative failures, the furthest `span.start` wins. At that
-position, kind priority is **custom → unexpected → expected**. Within the
-winning kind, the diagnostic with the deepest context wins (first encountered
-on a tie). If expected diagnostics win, their labels merge in encounter order
-with duplicates removed, and their span extends to the largest expected
-`span.end`. Hints merge from all diagnostics tied at that position, also in
-encounter order with duplicates removed.
+Use `.expected("integer")` to give a low-level parser a useful expectation and `.context("image command")` to name the surrounding grammar. Context only decorates failures in the wrapped parser. Wrapping `lex.complete(...)` also includes failures caused by trailing input.
 
-`format()` supports plain and ANSI output; `formatError(error, options)` from
-`parserator/diagnostics` is the pure function form, not a formatter class.
+| Entry point             | On success                               | Input rule                                               |
+| ----------------------- | ---------------------------------------- | -------------------------------------------------------- |
+| `p.parse(input)`        | `{ success: true, value }`               | All input must be consumed.                              |
+| `p.parseOrThrow(input)` | The parsed value                         | All input must be consumed; failure throws `ParseError`. |
+| `p.parsePrefix(input)`  | `{ success: true, value, offset, rest }` | A prefix is enough.                                      |
 
-`context()` adds context only when its wrapped parser fails. To include a
-trailing-input error, wrap explicit completion: `lex.complete(expression).context("query")`
-or `expression.zipLeft(eof).context("query")`. A successful inner context does
-not carry forward to the implicit EOF check in `parse()`.
-
-## Building grammars
-
-The root API is deliberately small:
-
-- Primitives: `literal`, `char`, `regex`, `satisfy`, `anyChar`, `eof`.
-- Construction: `succeed`, `fail`, and `fatal` create simple parser results.
-- Composition: `choice`, `sequence`, `optional`, `many`, `many1`, `skipMany`,
-  `count`, `atLeast`, `sepBy`, `sepBy1`, `sepEndBy`, `sepEndBy1`, `between`, `recursive`.
-- Control: `commit`, `attempt`, `lookahead`, `probe`, `notFollowedBy`.
-- Scanning: `takeUntil`, `takeUpto`, `skipUntil`, `takeWhileChar1`.
-- Character helpers: `oneOfLiterals`, `digit`, `asciiLetter`,
-  `asciiAlphanumeric`, `whitespace`, `position`.
-- Standalone hints: `keywordWithHints`, `anyKeywordWithHints`, `stringWithHints`.
-- Expression helpers: `chainLeft1`, `chainRight1`, `prefix`, `postfix`,
-  `precedence`.
-- Lexical helpers: `createLexemes` with `token`, `symbol`, `keyword`,
-  `identifier`, `trivia`, and `complete`.
-
-`Parser<T>` is an opaque, type-only export, not a public constructor. Create
-parsers with the functions above and compose them with `yield*` or methods:
-`map`, `flatMap`, `zip`, `zipLeft`, `zipRight`, `expected`, `context`, `validate`,
-`withSpan`, `trim`, `trimLeft`, `trimRight`, and `commit`. Parser values have no
-`.then` method and are safe to pass to `Promise.resolve`.
-
-### Cookbook
-
-Whitespace and tokens:
+`parse` and `parsePrefix` both return `{ success: false, error }` on a parsing failure. They do not catch exceptions thrown by your callbacks. Whole-input parsing does not automatically trim whitespace. Our example accepts it because it explicitly uses `lex.complete`.
 
 ```ts
-import { createLexemes, regex } from "parserator"
+const number = regex(/\d+/).map(Number)
+number.parsePrefix("42 more")
+// { success: true, value: 42, offset: 2, rest: " more" }
 
-const lex = createLexemes({
-  trivia: regex(/[ \t\r\n]*/),
-  identifier: /[\p{L}_][\p{L}\p{N}_.]*/u,
-  keywords: ["AND", "OR"] as const
-})
-
-const open = lex.symbol("(")
-const and = lex.keyword("AND")
+number.parse("42 more").success // false
 ```
 
-`identifier` is a `RegExp`, not a parser. One sticky scanner defines both
-identifiers and whole-word keywords. With the expression above, `ANDé` and
-`AND.field` are single identifiers, not keyword `AND` followed by a suffix.
-Other expressions define other boundaries. Keywords must be nonempty complete
-matches of that expression; duplicates are removed, and requesting an
-unconfigured keyword throws. Empty identifier matches throw (at construction
-when detectable on empty input, otherwise when scanning). Reserved keywords
-are rejected by `lex.identifier`. The same vocabulary supplies typo hints.
+Use a grammar without `complete` for prefix parsing or embedding inside another grammar. `commandBody` can be nested. `command` deliberately requires EOF and is a whole-input entry point.
 
-`token`, `symbol`, `keyword`, and `identifier` consume trailing trivia.
-`complete(p)` consumes leading and trailing trivia and requires EOF; it does
-not do a separate trailing-keyword recognition pass.
+## Grow a grammar from the pieces you already have
 
-Lists use explicit names for their trailing-separator rules: `sepBy` rejects a
-trailing separator, while `sepEndBy` accepts one. Their `1` variants require at
-least one item. Every successful list item, including the first, must advance.
-`many`, `many1`, `atLeast`, and discard-only `skipMany` also require progress
-on every success. `count(p, n)` is finite and permits zero-width successes;
-`count` and `atLeast` require a safe nonnegative integer. Failures below a
-required minimum preserve the failing item's diagnostic.
-
-`takeUntil(delimiter)` returns text before the delimiter but consumes the
-matched delimiter. `takeUpto(delimiter)` returns the same text and leaves the
-delimiter unconsumed. `skipUntil` consumes it and returns `undefined`. All
-three succeed at EOF if no delimiter matches, ignoring ordinary delimiter
-failures/cuts but propagating fatal failures. Scanning advances by Unicode
-code point; all offsets and spans use UTF-16 code units.
-
-Standalone `keywordWithHints(vocabulary)(word)` and
-`anyKeywordWithHints(vocabulary)` use the word expression
-`/[\p{L}_][\p{L}\p{N}_'.-]*/u`, including dotted words.
-`stringWithHints(values)` accepts a double-quoted member of `values` and
-suggests close matches. Its grammar is deliberately limited: it reads until
-the next double quote, permits raw newlines, and does not decode escapes or
-support escaped quotes. It is not a JSON string parser.
-
-For expressions, make each operator return a function and list precedence
-levels from tightest to loosest:
+`map` changes the returned value, not the text consumed. `validate` adds a local semantic check:
 
 ```ts
-import { choice, literal, precedence, regex } from "parserator"
+const positiveInteger = integer.validate(n => n > 0, "must be positive")
+```
+
+For several commands separated by semicolons, reuse the inner grammar:
+
+```ts
+import { sepBy1 } from "parserator"
+
+const commands = lex.complete(sepBy1(commandBody, lex.symbol(";")))
+commands.parseOrThrow("rotate 90; resize 640 x 480")
+// [
+//   { type: "rotate", degrees: 90 },
+//   { type: "resize", width: 640, height: 480 }
+// ]
+```
+
+`sepBy1` requires at least one item and rejects a trailing separator. Choose `sepBy` to allow an empty list, or `sepEndBy`/`sepEndBy1` to allow a trailing separator. `many(p)` repeats without a separator. `many1(p)` requires at least one match. A repeated parser must consume text whenever it succeeds, so do not put a possibly-empty match like `regex(/\s*/)` inside `many`.
+
+For a recursive grammar, `recursive(self => ...)` supplies a reference to the parser you're constructing. For example, nested brackets can use `between(open, close, self)`. Recursive paths must consume input before calling themselves. Left-recursive grammars are not supported.
+
+### Expressions with precedence
+
+An operator parser returns a function describing how to combine its operands. `precedence` applies those functions, with levels listed from tightest to loosest:
+
+```ts
+import { literal, precedence } from "parserator"
 
 const atom = regex(/\d+/).map(Number)
-const multiply = literal("*").map(() => (a: number, b: number) => a * b)
-const divide = literal("/").map(() => (a: number, b: number) => a / b)
-const add = literal("+").map(() => (a: number, b: number) => a + b)
-const subtract = literal("-").map(() => (a: number, b: number) => a - b)
 const expression = precedence(atom, [
-  { associativity: "left", operator: choice(multiply, divide) },
-  { associativity: "left", operator: choice(add, subtract) }
+  {
+    associativity: "left",
+    operator: literal("*").map(() => (a: number, b: number) => a * b)
+  },
+  {
+    associativity: "left",
+    operator: literal("+").map(() => (a: number, b: number) => a + b)
+  }
 ])
+
 expression.parseOrThrow("2+3*4") // 14
 ```
 
-Use `withSpan` when AST nodes need source locations, and `validate` for local
-semantic checks that belong in the grammar.
+These functions can build syntax-tree nodes instead of evaluating immediately. Use `chainLeft1` or `chainRight1` for a single binary operator level, and `prefix`/`postfix` for unary operators. Parentheses require an explicit recursive grammar. This example only accepts numbers, `+`, and `*`, with no whitespace.
 
-## Best fit
+## Understand when alternatives are retried
 
-Parserator works well for search and filter syntax, configuration formats,
-formulas, protocol strings, structured CLI fields, and small internal DSLs.
+`choice(a, b)` tries `a`, then tries `b` from the same starting position if `a` fails ordinarily—even if `a` read some input first. The first successful alternative wins. A later EOF failure does not cause `choice` to revisit an already-successful alternative.
 
-It is not a streaming parser, does not support left recursion, and does not
-provide multi-error recovery. Input is a string held in memory. For a large
-language, token recovery, grammar analysis, or generated syntax diagrams, use
-a parser toolkit built for compilers.
+That matters for overlapping tokens: `choice(literal(">"), literal(">="))` accepts `>` first. Use `oneOfLiterals(">", ">=")` to try the longest literal first, or order `choice` alternatives explicitly.
 
-## Examples and benchmarks
-
-- [`examples/query-language/`](examples/query-language) — typed query AST and
-  evaluator; the main application example.
-- [`examples/json-parser.ts`](examples/json-parser.ts) — recursive grammar and
-  escaping example; not a replacement for `JSON.parse`.
-- [`examples/toyml/`](examples/toyml) — an ML-like grammar with recursion,
-  patterns, records, and variants.
-- [`examples/ini-parser.ts`](examples/ini-parser.ts) and
-  [`examples/scheme-parser.ts`](examples/scheme-parser.ts) — smaller complete
-  grammars.
-- [`bench/`](bench) — reproducible performance and profiling harnesses.
-
-Benchmarks report environment-specific measurements when run. They validate
-the successful fixtures before timing and do not make a general speed claim.
-
-## Advanced entry points
-
-The root exports application combinators, the `Parser<T>` type, `ParseError`,
-and diagnostic types. Import `SourceText` from `parserator/advanced` or
-`parserator/diagnostics`, not the root. Diagnostic helpers `positionAt`,
-`spanAt`, `formatError`, `generateHints`, and `levenshteinDistance` live in
-`parserator/diagnostics`.
-
-`parserator/advanced` exports `makeParser`, `runParser`, `replySuccess`,
-`replyFailure`, and types `Run<T>` and `Reply<T>`. A runner receives
-`(source: SourceText, offset: number)` and returns one flat reply:
-
-- Success: `{ ok: true, value, offset, cut }`.
-- Failure: `{ ok: false, offset, diagnostic, cut, fatal }`.
-
-The failure offset is execution position, independent of the diagnostic span.
-Custom runners are trusted low-level code: input and returned offsets must be
-safe integers between zero and `source.text.length`, inclusive. The runner
-API does not validate these bounds. Report only cuts made by this invocation;
-child runners receive no inherited cut state. When composing child runners,
-combine their returned cut effects explicitly. Reuse the same `SourceText`
-when composing runners. One public parse call creates one source session with
-a lazy line index.
-
-Here is a custom scanner for a single Unicode code point:
+Once a prefix identifies a branch, you can stop a misleading fallback with `commit()`:
 
 ```ts
-import { makeParser, runParser, SourceText } from "parserator/advanced"
+import { commit, literal } from "parserator"
 
-const codePoint = makeParser<string>((source, offset) => {
-  const value = source.charAt(offset)
-  return value
-    ? {
-        ok: true,
-        value,
-        offset: offset + source.charWidthAt(offset),
-        cut: false
-      }
-    : {
-        ok: false,
-        offset,
-        cut: false,
-        fatal: false,
-        diagnostic: {
-          kind: "expected",
-          span: { start: offset, end: offset },
-          expected: ["code point"]
-        }
-      }
+const assignment = parser(function* () {
+  const name = yield* regex(/[a-z]+/)
+  yield* literal("=")
+  yield* commit()
+  const value = yield* regex(/\d+/).map(Number).expected("assignment value")
+  return { name, value }
 })
-const reply = runParser(codePoint, new SourceText("😀!", "input.txt"), 0)
-if (reply.ok) console.log(reply.value, reply.offset) // 😀 2
+
+const nameOrAssignment = choice(assignment, regex(/[a-z]+/))
+nameOrAssignment.parseOrThrow("size=12") // { name: "size", value: 12 }
+// "size=" fails with "assignment value", rather than falling back to a bare name.
 ```
 
-`replySuccess(value, offset, cut = false)` and
-`replyFailure(diagnostic, offset, cut = false, fatal = false)` construct the
-same flat shapes. Every diagnostic has a span, with optional `context` and
-`hints`. Expected diagnostics require nonempty `expected` labels and may have
-`found`; unexpected diagnostics require `found`; custom diagnostics require
-`message`. Use a custom diagnostic for prose, not a `message` override on an
-expected diagnostic.
+The cut applies at the surrounding recovery boundary, not globally to every nested parser. `attempt(p)` permits recovery from an ordinary committed failure. `fatal(message)` prevents recovery even through `attempt`. `lookahead(p)` checks a parser without consuming input and isolates ordinary cuts. `optional(p)` returns `undefined` on an ordinary uncommitted failure.
 
-## License
+Keep parsing callbacks free of application side effects. Retrying a branch rewinds the input position, not external mutations. Run the returned command after parsing succeeds.
 
-MIT
+## Find the tool you need
+
+You can compose parsers with `yield*` or with methods. `.zip(p)` keeps both results, `.zipLeft(p)` keeps the first, `.zipRight(p)` keeps the second, and `.flatMap(f)` chooses the next parser using a previous result.
+
+| Task                              | API                                                                                                  |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Read text or a character          | `literal(text)`, `char(codePoint)`, `regex(pattern)`, `satisfy(predicate, description)`, `anyChar()` |
+| Read common characters            | `digit`, `asciiLetter`, `asciiAlphanumeric`, `whitespace` (each consumes one character)              |
+| Combine alternatives or sequences | `choice(...parsers)`, `oneOfLiterals(...texts)`, `sequence([parsers])`                               |
+| Match delimiters                  | `between(open, close, inner)`                                                                        |
+| Repeat or discard                 | `many(p)`, `many1(p)`, `skipMany(p)`, `count(p, n)`, `atLeast(p, n)`                                 |
+| Read separated lists              | `sepBy`, `sepBy1`, `sepEndBy`, `sepEndBy1` (item parser, separator parser)                           |
+| Check without consuming           | `lookahead(p)`, `probe(p)`, `notFollowedBy(p)`                                                       |
+| Return or reject explicitly       | `succeed(value)`, `fail(message)`, `fatal(message)`                                                  |
+| Track source locations            | `position`, `p.withSpan((value, span) => ...)`                                                       |
+| Require completion                | `eof`, `createLexemes(...).complete(p)`                                                              |
+| Skip or collect until a delimiter | `takeUntil(p)`, `takeUpto(p)`, `skipUntil(p)`                                                        |
+| Read a nonempty character run     | `takeWhileChar1(predicate, description)`                                                             |
+
+`takeUntil` consumes its matched delimiter. `takeUpto` leaves it for the next parser. Both succeed at EOF if no delimiter is found, so they alone do not enforce a required closing delimiter. `skipUntil` consumes the delimiter and discards the text.
+
+For suggestions without a lexical layer, use `keywordWithHints(vocabulary)(word)`, `anyKeywordWithHints(vocabulary)`, and `stringWithHints(values)`. The last accepts only double-quoted known values. It does not decode escapes or recognize escaped quotes, and is not a general-purpose JSON string parser.
+
+Most applications only need `parserator`. For custom scanners, `parserator/advanced` exposes `makeParser`, `runParser`, `replySuccess`, `replyFailure`, and `SourceText`. A runner receives `(source, offset)` and returns a success or failure reply. This is trusted low-level code: keep offsets within the source string, reuse the source session, and propagate each child runner's local cut effects explicitly. `Parser` remains a type, not a public constructor.
+
+`parserator/diagnostics` provides `SourceText`, `positionAt`, `spanAt`, `formatError`, `generateHints`, and `levenshteinDistance` for working with locations, formatting, and suggestions outside a grammar.
+
+## Is it a good fit?
+
+Use Parserator when an application has a small language of its own: filter queries, command fields, formulas, configuration, or an internal DSL. A regular expression is still useful for reading individual tokens. Parserator gives those tokens structure, typed results, and parse errors.
+
+It parses an in-memory string synchronously. It does not offer streaming input, left recursion, or multi-error recovery. For an existing standard format, start with its dedicated parser. For a full compiler or editor language service needing recovery and grammar analysis, choose a toolkit designed for that job.
+
+## See complete grammars
+
+The [query-language example](examples/query-language/) is a good next step. It builds a typed syntax tree for comparisons and `AND`/`OR`, handles parentheses and keyword boundaries, and includes an evaluator and malformed-input tests.
+
+Other repository examples cover [JSON](examples/json-parser.ts), [INI](examples/ini-parser.ts), [Scheme](examples/scheme-parser.ts), and an [ML-like language](examples/toyml/). These are source examples to study, not exports from the npm package. Use `JSON.parse` for production JSON parsing.
+
+For repository development, run `pnpm install` and `pnpm run ci`. The [benchmark harness](bench/) is available with `pnpm run bench`. Its measurements depend on the environment and are not a blanket speed claim.
+
+[Changelog](CHANGELOG.md) · [MIT license](LICENSE)
