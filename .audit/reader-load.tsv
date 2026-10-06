@@ -1,0 +1,4 @@
+ts	phase	decision	why	evidence	result
+2026-10-06T10:57:59Z	frame	Use isolated local branches and commit verified units	The user authorized breaking changes and local commits but not external actions	.audit/reader-load.md	Original main checkout remains unchanged
+2026-10-06T10:57:59Z	design	Choose explicit replies with call-local cut effects	The prior candidates converged and the local probe matched existing nested control behavior	/private/var/folders/_f/yb2trsh50c1gv2dpybhtbw7r0000gn/T/opencode/parserator-local-cut-probe.mjs	631718 comparisons with zero divergences; extended checks pending
+2026-10-06T10:57:59Z	workflow	Separate cleanup and verification workers before the coupled runtime migration	Independent artifacts can proceed without sharing writable source	.audit/reader-load.md	Three worktrees; one runtime owner planned
