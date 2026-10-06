@@ -2,12 +2,12 @@ import {
   between,
   char,
   choice,
-  parser,
-  regex,
-  recursive,
-  sepBy,
-  literal,
   eof,
+  literal,
+  parser,
+  recursive,
+  regex,
+  sepBy,
   takeWhileChar1
 } from "../src/index.ts"
 import type { Parser } from "../src/index.ts"
@@ -22,8 +22,11 @@ type JsonValue =
 
 const whitespace = regex(/[ \t\r\n]*/)
 
-const token = <T>(p: Parser<T>): Parser<T> =>
-  whitespace.zipRight(p).zipLeft(whitespace)
+const token = <T>(inner: Parser<T>): Parser<T> =>
+  whitespace.zipRight(inner).zipLeft(whitespace)
+
+const punctuation = <const T extends string>(value: T): Parser<T> =>
+  token(char(value))
 
 const jsonNull = literal("null").map(() => null)
 
@@ -78,27 +81,24 @@ const jsonString = parser(function* () {
   return chars.join("")
 })
 
-const jsonValue: Parser<JsonValue> = recursive(() =>
-  choice(jsonNull, jsonBool, jsonNumber, jsonString, jsonArray, jsonObject)
+const jsonValue: Parser<JsonValue> = token(
+  recursive(() =>
+    choice(jsonNull, jsonBool, jsonNumber, jsonString, jsonArray, jsonObject)
+  )
 )
 
 const jsonArray: Parser<JsonValue[]> = between(
-  token(char("[")),
-  token(char("]")),
-  sepBy(token(jsonValue), token(char(",")))
+  punctuation("["),
+  punctuation("]"),
+  sepBy(jsonValue, punctuation(","))
 )
 
-const jsonMember = parser(function* () {
-  const key = yield* token(jsonString)
-  yield* token(char(":"))
-  const value = yield* token(jsonValue)
-  return [key, value] as const
-})
+const jsonMember = token(jsonString).zipLeft(punctuation(":")).zip(jsonValue)
 
 const jsonObject: Parser<{ [key: string]: JsonValue }> = between(
-  token(char("{")),
-  token(char("}")),
-  sepBy(jsonMember, token(char(",")))
+  punctuation("{"),
+  punctuation("}"),
+  sepBy(jsonMember, punctuation(","))
 ).map(pairs => Object.fromEntries(pairs))
 
-export const json = token(jsonValue).zipLeft(eof)
+export const json = jsonValue.zipLeft(eof)

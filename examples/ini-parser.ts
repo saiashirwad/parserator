@@ -1,37 +1,17 @@
 import {
   attempt,
   char,
+  choice,
   commit,
   eof,
+  literal,
   many,
   optional,
-  choice,
   parser,
   regex,
-  skipMany,
-  literal
+  skipMany
 } from "../src/index.ts"
 import type { Parser } from "../src/index.ts"
-
-const whitespace = regex(/[ \t]+/).context("whitespace")
-
-const lineBreak = choice(literal("\r\n"), literal("\n"), literal("\r")).context(
-  "line break"
-)
-
-const blankLine = regex(/[ \t]*[\r\n]/).context("blank line")
-
-const comment = regex(/[;#][^\n\r]*/).context("comment")
-
-const space = choice(whitespace, comment)
-
-const spaces = skipMany(space)
-
-const spacesNewlines = skipMany(choice(space, lineBreak, blankLine))
-
-function token<T>(parser: Parser<T>): Parser<T> {
-  return spaces.zipRight(parser)
-}
 
 export type IniSection = {
   name: string
@@ -40,41 +20,53 @@ export type IniSection = {
 
 export type IniFile = IniSection[]
 
-const key = token(regex(/[a-zA-Z0-9_.-]+/).context("property key"))
+const whitespace = regex(/[ \t]+/).context("whitespace")
 
-const value = regex(/[^\r\n]*/)
-  .map(s => s.trim())
+const lineBreak = choice(literal("\r\n"), literal("\n"), literal("\r")).context(
+  "line break"
+)
+
+const comment = regex(/[;#][^\n\r]*/).context("comment")
+
+const space = choice(whitespace, comment)
+
+const spaces = skipMany(space)
+
+const trivia = skipMany(choice(space, lineBreak))
+
+function token<T>(inner: Parser<T>): Parser<T> {
+  return spaces.zipRight(inner)
+}
+
+const propertyKey = token(regex(/[a-zA-Z0-9_.-]+/).context("property key"))
+
+const propertyValue = regex(/[^\r\n]*/)
+  .map(value => value.trim())
   .context("property value")
 
 const property = attempt(
   parser(function* () {
-    const k = yield* key
+    const key = yield* propertyKey
     yield* token(char("="))
     yield* commit()
-    const v = yield* value.expected("property value after '='")
-    return { key: k, value: v }
+    const value = yield* propertyValue.expected("property value after '='")
+    return { key, value }
   })
 )
 
 const section = attempt(
   parser(function* () {
-    yield* spacesNewlines
+    yield* trivia
     yield* token(char("["))
     yield* commit()
     const name = yield* regex(/[^\]]+/)
-      .map(s => s.trim())
+      .map(name => name.trim())
       .expected("section name")
     yield* char("]").expected("closing bracket ']'")
     yield* optional(lineBreak)
 
     const properties = yield* many(
-      parser(function* () {
-        yield* spaces
-        const prop = yield* property
-        yield* optional(lineBreak)
-        yield* spacesNewlines
-        return prop
-      })
+      property.zipLeft(optional(lineBreak)).zipLeft(trivia)
     )
 
     return { name, properties }
@@ -82,9 +74,9 @@ const section = attempt(
 )
 
 export const iniFile: Parser<IniFile> = parser(function* () {
-  yield* spacesNewlines
+  yield* trivia
   const sections = yield* many(section)
-  yield* spacesNewlines
+  yield* trivia
   yield* eof.expected("end of input")
   return sections
 })

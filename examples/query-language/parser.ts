@@ -19,13 +19,15 @@ import {
   type Value
 } from "./ast.ts"
 
+const logicalOperators = ["AND", "OR"] as const
+
 const lex = createLexemes({
   trivia: regex(/[ \t\r\n]*/),
   identifier: /[A-Za-z_][A-Za-z0-9_.]*/,
-  keywords: ["AND", "OR"] as const
+  keywords: logicalOperators
 })
 
-export const queryLexemes = lex
+export { lex as queryLexemes }
 
 const quotedValue: Parser<string> = lex.token(
   between(literal('"'), literal('"'), regex(/[^"\\]*/))
@@ -46,13 +48,13 @@ const value: Parser<Value> = choice(numberValue, quotedValue, bareValue)
   .context("comparison")
 
 const comparisonOperator: Parser<ComparisonOperator> = choice(
-  lex.symbol(">=").map(() => ">=" as const),
-  lex.symbol("<=").map(() => "<=" as const),
-  lex.symbol("!=").map(() => "!=" as const),
-  lex.symbol(":").map(() => ":" as const),
-  lex.symbol("=").map(() => "=" as const),
-  lex.symbol(">").map(() => ">" as const),
-  lex.symbol("<").map(() => "<" as const)
+  lex.symbol(">="),
+  lex.symbol("<="),
+  lex.symbol("!="),
+  lex.symbol(":"),
+  lex.symbol("="),
+  lex.symbol(">"),
+  lex.symbol("<")
 )
 
 const comparison: Parser<QueryNode> = parser(function* () {
@@ -67,22 +69,18 @@ const expressionBody: Parser<QueryNode> = recursive(self => {
     "parenthesized expression"
   )
   const atom = choice(comparison, grouped)
-  const andOperator = lex
-    .keyword("AND")
-    .map(
-      () => (left: QueryNode, right: QueryNode) =>
-        Query.logical("AND", left, right)
-    )
-  const orOperator = lex
-    .keyword("OR")
-    .map(
-      () => (left: QueryNode, right: QueryNode) =>
-        Query.logical("OR", left, right)
-    )
-  return precedence(atom, [
-    { associativity: "left", operator: andOperator },
-    { associativity: "left", operator: orOperator }
-  ])
+  return precedence(
+    atom,
+    logicalOperators.map(operator => ({
+      associativity: "left",
+      operator: lex
+        .keyword(operator)
+        .map(
+          () => (left: QueryNode, right: QueryNode) =>
+            Query.logical(operator, left, right)
+        )
+    }))
+  )
 })
 
 const expectedOperator = choice(lex.keyword("AND"), lex.keyword("OR")).flatMap(

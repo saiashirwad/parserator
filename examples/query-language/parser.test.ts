@@ -4,6 +4,18 @@ import { evaluate } from "./evaluate.ts"
 import { query, queryLexemes } from "./parser.ts"
 
 describe("query language", () => {
+  test.each([":", "=", "!=", ">", ">=", "<", "<="])(
+    "preserves the comparison operator %s",
+    operator => {
+      expect(query.parseOrThrow(`priority ${operator} 3`)).toEqual({
+        type: "comparison",
+        field: "priority",
+        operator,
+        value: 3
+      })
+    }
+  )
+
   test("parses AND and OR with AND precedence", () => {
     const ast = query.parseOrThrow(
       "status:open AND (owner:me OR priority >= 3)"
