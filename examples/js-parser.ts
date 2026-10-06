@@ -2,105 +2,29 @@ import {
   attempt,
   between,
   char,
+  choice,
   commit,
   eof,
   fail,
   fatal,
+  literal,
   many,
   notFollowedBy,
   optional,
-  precedence,
-  choice,
   parser,
+  postfix,
+  precedence,
   recursive,
   regex,
   sepBy,
-  succeed,
   skipMany,
-  literal
+  succeed
 } from "../src/index.ts"
 import type { Parser } from "../src/index.ts"
 
-const whitespace = regex(/\s+/).context("whitespace")
-
-const lineComment = regex(/\/\/[^\r\n\u2028\u2029]*/).context("line comment")
-
-const blockComment = regex(/\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\//).context(
-  "block comment"
-)
-
-const space = choice(whitespace, lineComment, blockComment)
-
-const spaces = skipMany(space)
-
-function token<T>(parser: Parser<T>): Parser<T> {
-  return spaces.zipRight(parser)
-}
-
-const keywords = [
-  "let",
-  "const",
-  "function",
-  "if",
-  "else",
-  "return",
-  "true",
-  "false",
-  "null"
-]
-
-const keyword = (k: string) =>
-  token(literal(k).zipLeft(regex(/(?![a-zA-Z0-9_])/)))
-
-const identifier: Parser<string> = token(
-  regex(/[a-zA-Z_][a-zA-Z0-9_]*/)
-    .context("identifier")
-    .flatMap(name =>
-      keywords.includes(name)
-        ? fail(
-            `'${name}' is a reserved keyword and cannot be used as an identifier`
-          )
-        : succeed(name)
-    )
-)
-
-const numberLiteral = token(
-  regex(/-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/)
-    .map(Number)
-    .context("number")
-)
-
-const stringLiteral = token(
-  choice(
-    between(char('"'), char('"'), regex(/[^"]*/)),
-    between(char("'"), char("'"), regex(/[^']*/))
-  ).context("string")
-)
-
-const booleanLiteral = token(
-  choice(
-    keyword("true").map(() => true),
-    keyword("false").map(() => false)
-  )
-).context("boolean")
-
-const nullLiteral = token(keyword("null").map(() => null)).context("null")
-
-const assignmentOp = token(
-  choice(
-    literal("="),
-    literal("+="),
-    literal("-="),
-    literal("*="),
-    literal("/=")
-  )
-)
-
-const unaryOp = token(choice(literal("!"), literal("-"), literal("+")))
-
 type Expression =
   | { type: "identifier"; name: string }
-  | { type: "literal"; value: any }
+  | { type: "literal"; value: number | string | boolean | null }
   | { type: "binary"; left: Expression; op: string; right: Expression }
   | { type: "unary"; op: string; arg: Expression }
   | { type: "call"; callee: Expression; args: Expression[] }
@@ -127,181 +51,87 @@ type Statement =
   | { type: "return"; value?: Expression | undefined }
   | { type: "block"; body: Statement[] }
 
-let expression: Parser<Expression>
+const whitespace = regex(/\s+/).context("whitespace")
 
-const primaryExpression: Parser<Expression> = choice(
-  numberLiteral.map(value => ({ type: "literal" as const, value })),
-  stringLiteral.map(value => ({ type: "literal" as const, value })),
-  booleanLiteral.map(value => ({ type: "literal" as const, value })),
-  nullLiteral.map(value => ({ type: "literal" as const, value })),
+const lineComment = regex(/\/\/[^\r\n\u2028\u2029]*/).context("line comment")
 
-  attempt(
-    parser(function* () {
-      yield* keyword("function")
-      yield* token(char("(")).expected("opening parenthesis after 'function'")
-      const params = yield* sepBy(identifier, token(char(",")))
-      yield* token(char(")")).expected("closing parenthesis")
-      const body = yield* speculativeBlockStatement.expected("function body")
-      return { type: "function" as const, params, body: body.body }
-    })
-  ),
+const blockComment = regex(/\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\//).context(
+  "block comment"
+)
 
-  identifier.map(name => ({ type: "identifier" as const, name })),
+const space = choice(whitespace, lineComment, blockComment)
 
-  attempt(
-    parser(function* () {
-      yield* token(char("{"))
-      yield* commit()
-      const properties = yield* sepBy(
-        parser(function* () {
-          const key = yield* choice(identifier, stringLiteral).expected(
-            "property key"
+const spaces = skipMany(space)
+
+function token<T>(inner: Parser<T>): Parser<T> {
+  return spaces.zipRight(inner)
+}
+
+const punctuation = <const T extends string>(value: T): Parser<T> =>
+  token(char(value))
+
+const reservedKeywords = [
+  "let",
+  "const",
+  "function",
+  "if",
+  "else",
+  "return",
+  "true",
+  "false",
+  "null"
+]
+
+const keyword = <const T extends string>(value: T): Parser<T> =>
+  token(literal(value).zipLeft(regex(/(?![a-zA-Z0-9_])/)))
+
+const identifier: Parser<string> = token(
+  regex(/[a-zA-Z_][a-zA-Z0-9_]*/)
+    .context("identifier")
+    .flatMap(name =>
+      reservedKeywords.includes(name)
+        ? fail(
+            `'${name}' is a reserved keyword and cannot be used as an identifier`
           )
-          const hasColon = yield* optional(token(char(":")))
-          const value = hasColon
-            ? yield* recursive<Expression>(() => expression).expected(
-                "property value"
-              )
-            : { type: "identifier" as const, name: key }
-          return { key, value }
-        }),
-        token(char(","))
-      )
-      yield* token(char("}")).expected("closing brace for object")
-      return { type: "object" as const, properties }
-    })
-  ),
+        : succeed(name)
+    )
+)
 
-  attempt(
-    parser(function* () {
-      yield* token(char("["))
-      yield* commit()
-      const elements = yield* sepBy(
-        recursive<Expression>(() => expression),
-        token(char(","))
-      )
-      yield* token(char("]")).expected("closing bracket for array")
-      return { type: "array" as const, elements }
-    })
-  ),
+const numberLiteral = token(
+  regex(/-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/)
+    .map(Number)
+    .context("number")
+)
 
-  between(
-    token(char("(")),
-    token(char(")")),
-    recursive<Expression>(() => expression)
+const stringLiteral = token(
+  choice(
+    between(char('"'), char('"'), regex(/[^"]*/)),
+    between(char("'"), char("'"), regex(/[^']*/))
+  ).context("string")
+)
+
+const booleanLiteral = choice(
+  keyword("true").map(() => true),
+  keyword("false").map(() => false)
+).context("boolean")
+
+const nullLiteral = keyword("null")
+  .map(() => null)
+  .context("null")
+
+const assignmentOp = token(
+  choice(
+    literal("="),
+    literal("+="),
+    literal("-="),
+    literal("*="),
+    literal("/=")
   )
 )
 
-const postfixExpression: Parser<Expression> = parser(function* () {
-  let expr = yield* primaryExpression
+const unaryOp = token(choice(literal("!"), literal("-"), literal("+")))
 
-  while (true) {
-    const next = yield* optional(
-      choice(
-        attempt(
-          parser(function* () {
-            yield* token(char("("))
-            const args = yield* sepBy(
-              recursive<Expression>(() => expression),
-              token(char(","))
-            )
-            yield* token(char(")")).expected(
-              "closing parenthesis for function call"
-            )
-            return { type: "call" as const, args }
-          })
-        ),
-        attempt(
-          parser(function* () {
-            yield* token(char("."))
-            const property = yield* identifier.expected(
-              "property name after '.'"
-            )
-            return { type: "member" as const, property }
-          })
-        )
-      )
-    )
-
-    if (!next) break
-
-    if (next.type === "call") {
-      expr = { type: "call", callee: expr, args: next.args }
-    } else {
-      expr = { type: "member", object: expr, property: next.property }
-    }
-  }
-
-  return expr
-})
-
-const unaryExpression: Parser<Expression> = choice(
-  parser(function* () {
-    const op = yield* unaryOp
-    const arg = yield* unaryExpression
-    return { type: "unary" as const, op, arg }
-  }),
-  postfixExpression
-)
-
-const binaryOperator = <T extends string>(
-  operator: Parser<T>
-): Parser<(left: Expression, right: Expression) => Expression> =>
-  operator.map(op => (left, right) => ({
-    type: "binary" as const,
-    left,
-    op,
-    right
-  }))
-
-const nonAssignmentOperator = <const T extends string>(
-  operator: T
-): Parser<T> => literal(operator).zipLeft(notFollowedBy(char("=")))
-
-const binaryExpression: Parser<Expression> = precedence(unaryExpression, [
-  {
-    associativity: "left",
-    operator: binaryOperator(
-      token(
-        choice(
-          nonAssignmentOperator("*"),
-          nonAssignmentOperator("/"),
-          literal("%")
-        )
-      )
-    )
-  },
-  {
-    associativity: "left",
-    operator: binaryOperator(
-      token(choice(nonAssignmentOperator("+"), nonAssignmentOperator("-")))
-    )
-  },
-  {
-    associativity: "left",
-    operator: binaryOperator(
-      token(choice(literal("<="), literal(">="), literal("<"), literal(">")))
-    )
-  },
-  {
-    associativity: "left",
-    operator: binaryOperator(
-      token(
-        choice(literal("==="), literal("!=="), literal("=="), literal("!="))
-      )
-    )
-  },
-  {
-    associativity: "left",
-    operator: binaryOperator(token(literal("&&")))
-  },
-  {
-    associativity: "left",
-    operator: binaryOperator(token(literal("||")))
-  }
-])
-
-expression = parser(function* () {
+const expression: Parser<Expression> = parser(function* () {
   const left = yield* binaryExpression
   const assignment = yield* optional(
     parser(function* () {
@@ -314,85 +144,203 @@ expression = parser(function* () {
     })
   )
 
-  if (assignment) {
-    if (left.type !== "identifier" && left.type !== "member") {
-      return yield* fatal("Invalid assignment target")
-    }
-    return {
-      type: "binary" as const,
-      left,
-      op: assignment.op,
-      right: assignment.right
-    }
+  if (!assignment) return left
+
+  if (left.type !== "identifier" && left.type !== "member") {
+    return yield* fatal("Invalid assignment target")
   }
 
-  return left
+  return { type: "binary", left, op: assignment.op, right: assignment.right }
 })
 
-let statement: Parser<Statement>
+const primaryExpression: Parser<Expression> = choice(
+  choice(numberLiteral, stringLiteral, booleanLiteral, nullLiteral).map(
+    value => ({ type: "literal" as const, value })
+  ),
+
+  attempt(
+    parser(function* () {
+      yield* keyword("function")
+      yield* punctuation("(").expected("opening parenthesis after 'function'")
+      const params = yield* sepBy(identifier, punctuation(","))
+      yield* punctuation(")").expected("closing parenthesis")
+      const body = yield* speculativeBlockStatement.expected("function body")
+      return { type: "function" as const, params, body: body.body }
+    })
+  ),
+
+  identifier.map(name => ({ type: "identifier" as const, name })),
+
+  attempt(
+    parser(function* () {
+      yield* punctuation("{")
+      yield* commit()
+      const properties = yield* sepBy(
+        parser(function* () {
+          const key = yield* choice(identifier, stringLiteral).expected(
+            "property key"
+          )
+          const hasColon = yield* optional(punctuation(":"))
+          const value = hasColon
+            ? yield* expression.expected("property value")
+            : { type: "identifier" as const, name: key }
+          return { key, value }
+        }),
+        punctuation(",")
+      )
+      yield* punctuation("}").expected("closing brace for object")
+      return { type: "object" as const, properties }
+    })
+  ),
+
+  attempt(
+    parser(function* () {
+      yield* punctuation("[")
+      yield* commit()
+      const elements = yield* sepBy(expression, punctuation(","))
+      yield* punctuation("]").expected("closing bracket for array")
+      return { type: "array" as const, elements }
+    })
+  ),
+
+  between(punctuation("("), punctuation(")"), expression)
+)
+
+const postfixExpression: Parser<Expression> = postfix(
+  primaryExpression,
+  choice(
+    attempt(
+      parser(function* () {
+        yield* punctuation("(")
+        const args = yield* sepBy(expression, punctuation(","))
+        yield* punctuation(")").expected(
+          "closing parenthesis for function call"
+        )
+        return (callee: Expression): Expression => ({
+          type: "call",
+          callee,
+          args
+        })
+      })
+    ),
+    attempt(
+      punctuation(".")
+        .zipRight(identifier.expected("property name after '.'"))
+        .map(
+          property =>
+            (object: Expression): Expression => ({
+              type: "member",
+              object,
+              property
+            })
+        )
+    )
+  )
+)
+
+const unaryExpression: Parser<Expression> = choice(
+  parser(function* () {
+    const op = yield* unaryOp
+    const arg = yield* unaryExpression
+    return { type: "unary" as const, op, arg }
+  }),
+  postfixExpression
+)
+
+const nonAssignmentOperator = <const T extends string>(
+  operator: T
+): Parser<T> => literal(operator).zipLeft(notFollowedBy(char("=")))
+
+const binaryOperators: [Parser<string>, ...Parser<string>[]][] = [
+  [nonAssignmentOperator("*"), nonAssignmentOperator("/"), literal("%")],
+  [nonAssignmentOperator("+"), nonAssignmentOperator("-")],
+  [literal("<="), literal(">="), literal("<"), literal(">")],
+  [literal("==="), literal("!=="), literal("=="), literal("!=")],
+  [literal("&&")],
+  [literal("||")]
+]
+
+const binaryExpression: Parser<Expression> = precedence(
+  unaryExpression,
+  binaryOperators.map(operators => ({
+    associativity: "left",
+    operator: token(choice(...operators)).map(
+      op =>
+        (left: Expression, right: Expression): Expression => ({
+          type: "binary",
+          left,
+          op,
+          right
+        })
+    )
+  }))
+)
+
+const statement: Parser<Statement> = recursive(() =>
+  choice(
+    speculativeBlockStatement,
+    variableStatement,
+    functionStatement,
+    ifStatement,
+    returnStatement,
+    expressionStatement
+  )
+)
 
 const speculativeBlockStatement: Parser<Extract<Statement, { type: "block" }>> =
   attempt(
     parser(function* () {
-      yield* token(char("{"))
-      const body = yield* many(recursive<Statement>(() => statement))
-      yield* token(char("}")).expected("closing brace for block")
+      yield* punctuation("{")
+      const body = yield* many(statement)
+      yield* punctuation("}").expected("closing brace for block")
       return { type: "block" as const, body }
     })
   )
 
 const variableStatement: Parser<Statement> = parser(function* () {
-  const kind = (yield* choice(keyword("let"), keyword("const"))) as
-    | "let"
-    | "const"
+  const kind = yield* choice(keyword("let"), keyword("const"))
 
   const name = yield* identifier.expected("variable name")
 
   const init = yield* optional(
-    parser(function* () {
-      yield* token(char("="))
-      return yield* expression.expected("initializer expression")
-    })
+    punctuation("=").zipRight(expression.expected("initializer expression"))
   )
 
   if (kind === "const" && !init) {
     return yield* fatal("Missing initializer in const declaration")
   }
 
-  yield* token(char(";")).expected("semicolon after variable declaration")
+  yield* punctuation(";").expected("semicolon after variable declaration")
 
-  return { type: "variable" as const, kind, name, init }
+  return { type: "variable", kind, name, init }
 })
 
 const functionStatement: Parser<Statement> = parser(function* () {
   yield* keyword("function")
 
   const name = yield* identifier.expected("function name")
-  yield* token(char("(")).expected("opening parenthesis")
-  const params = yield* sepBy(identifier, token(char(",")))
-  yield* token(char(")")).expected("closing parenthesis")
+  yield* punctuation("(").expected("opening parenthesis")
+  const params = yield* sepBy(identifier, punctuation(","))
+  yield* punctuation(")").expected("closing parenthesis")
   const body = yield* speculativeBlockStatement.expected("function body")
 
-  return { type: "function" as const, name, params, body: body.body }
+  return { type: "function", name, params, body: body.body }
 })
 
 const ifStatement: Parser<Statement> = parser(function* () {
   yield* keyword("if")
 
-  yield* token(char("(")).expected("opening parenthesis after 'if'")
+  yield* punctuation("(").expected("opening parenthesis after 'if'")
   const test = yield* expression.expected("condition expression")
-  yield* token(char(")")).expected("closing parenthesis")
+  yield* punctuation(")").expected("closing parenthesis")
 
   const consequent = yield* statement.expected("if body")
 
   const alternate = yield* optional(
-    parser(function* () {
-      yield* keyword("else")
-      return yield* statement.expected("else body")
-    })
+    keyword("else").zipRight(statement.expected("else body"))
   )
 
-  return { type: "if" as const, test, consequent, alternate }
+  return { type: "if", test, consequent, alternate }
 })
 
 const returnStatement: Parser<Statement> = parser(function* () {
@@ -401,30 +349,19 @@ const returnStatement: Parser<Statement> = parser(function* () {
   const trivia = yield* many(space)
   if (trivia.some(text => /[\r\n\u2028\u2029]/u.test(text))) {
     yield* optional(char(";"))
-    return { type: "return" as const, value: undefined }
+    return { type: "return", value: undefined }
   }
 
   const value = yield* optional(expression)
 
-  yield* token(char(";")).expected("semicolon after return statement")
+  yield* punctuation(";").expected("semicolon after return statement")
 
-  return { type: "return" as const, value }
+  return { type: "return", value }
 })
 
-const expressionStatement: Parser<Statement> = parser(function* () {
-  const expr = yield* expression
-  yield* token(char(";")).expected("semicolon after expression")
-  return { type: "expression" as const, expression: expr }
-})
-
-statement = choice(
-  speculativeBlockStatement,
-  variableStatement,
-  functionStatement,
-  ifStatement,
-  returnStatement,
-  expressionStatement
-)
+const expressionStatement: Parser<Statement> = expression
+  .zipLeft(punctuation(";").expected("semicolon after expression"))
+  .map(expression => ({ type: "expression", expression }))
 
 export const program = parser(function* () {
   yield* spaces
