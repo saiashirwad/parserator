@@ -44,8 +44,15 @@ export function wordScanner(expression: RegExp, vocabulary: readonly string[]) {
         )
       : replySuccess(word, offset + word.length)
   })
-  const keyword = (candidates: readonly string[]): Parser<string> =>
-    makeParser((source, offset) => {
+  const keyword = (candidates: readonly string[]): Parser<string> => {
+    const [first, ...rest] = candidates
+    if (first === undefined)
+      throw new TypeError("keyword requires at least one candidate")
+    const expected: readonly [string, ...string[]] = [
+      JSON.stringify(first),
+      ...rest.map(word => JSON.stringify(word))
+    ]
+    return makeParser((source, offset) => {
       const word = scan(source, offset)
       if (word !== undefined && candidates.includes(word))
         return replySuccess(word, offset + word.length)
@@ -55,12 +62,13 @@ export function wordScanner(expression: RegExp, vocabulary: readonly string[]) {
         {
           kind: "expected",
           span: { start: offset, end: offset + found.length },
-          expected: candidates.map(word => JSON.stringify(word)),
+          expected,
           ...(found ? { found } : {}),
           ...(hints.length ? { hints } : {})
         },
         offset
       )
     })
+  }
   return { identifier, keyword }
 }

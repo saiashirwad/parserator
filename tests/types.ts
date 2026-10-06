@@ -1,4 +1,3 @@
-import { describe, expect, test } from "vitest"
 import {
   char,
   choice,
@@ -125,8 +124,48 @@ const requiredDiagnosticPayloads = () => {
 }
 void requiredDiagnosticPayloads
 
-describe("type assertions", () => {
-  test("the compile-time assertions above are checked by tsc", () => {
-    expect(true).toBe(true)
+const strictPayloads = () => {
+  const span = { start: 0, end: 0 }
+  const expectedMessage: Diagnostic = {
+    kind: "expected",
+    expected: ["x"],
+    // @ts-expect-error Messages belong only to custom diagnostics.
+    message: "wrong",
+    span
+  }
+  const customExpected: Diagnostic = {
+    kind: "custom",
+    message: "wrong",
+    // @ts-expect-error Expectations belong only to expected diagnostics.
+    expected: ["x"],
+    span
+  }
+  // @ts-expect-error Expected diagnostics require at least one expectation.
+  const emptyExpected: Diagnostic = { kind: "expected", expected: [], span }
+  const unexpectedMessage: Diagnostic = {
+    kind: "unexpected",
+    found: "x",
+    // @ts-expect-error Unexpected diagnostics cannot carry custom messages.
+    message: "wrong",
+    span
+  }
+  void [expectedMessage, customExpected, emptyExpected, unexpectedMessage]
+}
+void strictPayloads
+
+const plainYieldIsUnknown = () =>
+  parser(function* () {
+    // @ts-expect-error Plain yield cannot promise the returned parser value's type.
+    const value: number = yield literal("text")
+    return value
   })
-})
+void plainYieldIsUnknown
+
+const delegated: Parser<{ tag: "node"; text: string; count: number }> = parser(
+  function* () {
+    const text = yield* literal("text")
+    const count = yield* literal("1").map(Number)
+    return { tag: "node" as const, text, count }
+  }
+)
+void delegated

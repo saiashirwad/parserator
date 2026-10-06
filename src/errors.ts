@@ -3,21 +3,28 @@ export type Span = { readonly start: number; readonly end: number }
 
 type DiagnosticDetails = {
   readonly span: Span
-  readonly expected?: readonly string[]
   readonly found?: string
-  readonly message?: string
   readonly context?: readonly string[]
   readonly hints?: readonly string[]
 }
 export type Diagnostic = DiagnosticDetails &
   (
-    | { readonly kind: "expected"; readonly expected: readonly string[] }
+    | {
+        readonly kind: "expected"
+        readonly expected: readonly [string, ...string[]]
+      }
     | { readonly kind: "unexpected"; readonly found: string }
     | { readonly kind: "custom"; readonly message: string }
   )
 export type DiagnosticJson = Diagnostic & {
   readonly sourceName?: string
   readonly fatal: boolean
+}
+
+export type SourcePosition = {
+  readonly line: number
+  readonly column: number
+  readonly offset: number
 }
 
 /** Source text shared by diagnostics and their renderers. */
@@ -86,14 +93,16 @@ export class SourceText {
 }
 
 export function diagnosticMessage(diagnostic: Diagnostic): string {
-  if (diagnostic.message) return diagnostic.message
-  if (diagnostic.kind === "expected") {
-    const expected = diagnostic.expected?.join(" or ") || "valid input"
-    return `Expected ${expected}${diagnostic.found ? `, found ${diagnostic.found}` : ""}`
+  switch (diagnostic.kind) {
+    case "custom":
+      return diagnostic.message
+    case "expected":
+      return `Expected ${diagnostic.expected.join(" or ")}${diagnostic.found ? `, found ${diagnostic.found}` : ""}`
+    case "unexpected":
+      return diagnostic.found
+        ? `Unexpected ${diagnostic.found}`
+        : "Unexpected input"
   }
-  return diagnostic.found
-    ? `Unexpected ${diagnostic.found}`
-    : "Unexpected input"
 }
 
 export function fatalMessage(message?: string): string {

@@ -10,7 +10,7 @@ import {
   replyFailure,
   combineCut
 } from "./parser.ts"
-import type { SourcePosition } from "./state.ts"
+import type { SourcePosition } from "./errors.ts"
 
 const digitTest = (c: string) => c >= "0" && c <= "9"
 const letterTest = (c: string) =>
@@ -127,8 +127,7 @@ export function notFollowedBy<T>(inner: Parser<T>): Parser<true> {
       {
         kind: "unexpected",
         span: { start: offset, end: offset },
-        found: source.charAt(offset),
-        message: "Unexpected following input"
+        found: source.charAt(offset)
       },
       offset
     )

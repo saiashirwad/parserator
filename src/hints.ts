@@ -48,8 +48,7 @@ const quotedString = makeParser<string>((source, offset) => {
       {
         kind: "expected",
         span: { start: end, end },
-        expected: ["closing quote"],
-        message: "Expected closing quote"
+        expected: ["closing quote"]
       },
       offset
     )

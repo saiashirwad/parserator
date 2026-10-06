@@ -12,7 +12,10 @@ describe("createLexemes", () => {
     expect(result.success).toBe(false)
     if (result.success) return
     expect(result.error.diagnostic.span).toEqual({ start: 2, end: 5 })
-    expect(result.error.diagnostic.message).toBe('"AND" is a reserved keyword')
+    expect(result.error.diagnostic).toMatchObject({
+      kind: "custom",
+      message: '"AND" is a reserved keyword'
+    })
     expect(result.error.format()).toContain("line 1, column 3")
   })
 
@@ -62,15 +65,16 @@ describe("createLexemes", () => {
     const keyword = lex.complete(literal("x")).parse("x AND")
     expect(keyword.success).toBe(false)
     if (!keyword.success) {
-      expect(keyword.error.diagnostic.expected).toEqual(["end of input"])
+      expect(keyword.error.diagnostic).toMatchObject({
+        kind: "expected",
+        expected: ["end of input"]
+      })
     }
 
     const identifier = lex.complete(literal("x")).parse("x AND.owner")
     expect(identifier.success).toBe(false)
     if (!identifier.success) {
-      expect(identifier.error.diagnostic.message).not.toBe(
-        'Unexpected trailing keyword "AND"'
-      )
+      expect(identifier.error.diagnostic).not.toHaveProperty("message")
     }
   })
 

@@ -77,7 +77,10 @@ describe("parse boundary and results", () => {
       literal("a").zipLeft(eof).context("top-level value").parse("ab")
     )
     expect(error.diagnostic.span).toEqual({ start: 1, end: 2 })
-    expect(error.diagnostic.expected).toContain("end of input")
+    expect(error.diagnostic).toMatchObject({
+      kind: "expected",
+      expected: ["end of input"]
+    })
     expect(error.diagnostic.context).toEqual(["top-level value"])
   })
 
@@ -180,7 +183,10 @@ describe("errors", () => {
       choice(literal("a"), literal("a"), literal("b")).parse("c")
     )
     expect(error.diagnostic.kind).toBe("expected")
-    expect(error.diagnostic.expected).toEqual(['"a"', '"b"'])
+    expect(error.diagnostic).toMatchObject({
+      kind: "expected",
+      expected: ['"a"', '"b"']
+    })
     const rendered = error.format({ style: "plain" })
     expect(rendered).toContain("a")
     expect(rendered).toContain("b")
@@ -189,8 +195,11 @@ describe("errors", () => {
   test("an explicit custom diagnostic wins over a primitive at the same offset", () => {
     const error = fails(choice(literal("b"), fail("custom token")).parse("c"))
     expect(error.diagnostic.kind).toBe("custom")
-    expect(error.diagnostic.message).toBe("custom token")
-    expect(error.diagnostic.expected).toBeUndefined()
+    expect(error.diagnostic).toMatchObject({
+      kind: "custom",
+      message: "custom token"
+    })
+    expect(error.diagnostic).not.toHaveProperty("expected")
     expect(error.format({ style: "plain" })).toContain("custom token")
   })
 

@@ -50,6 +50,27 @@ function failure<T>(result: ReturnType<Parser<T>["parse"]>) {
 }
 
 describe("flat runtime replies", () => {
+  test.each(["zip", "zipLeft", "zipRight"] as const)(
+    "%s executes children directly and combines local cuts",
+    method => {
+      const left = literal("a").commit()
+      const right = literal("b")
+      const map = vi.spyOn(right, "map")
+      const flatMap = vi.spyOn(left, "flatMap")
+      const source = new SourceText("ab")
+      const composed = left[method](right)
+      expect(runParser<unknown>(composed, source, 0)).toMatchObject({
+        ok: true,
+        offset: 2,
+        cut: true
+      })
+      expect(map).not.toHaveBeenCalled()
+      expect(flatMap).not.toHaveBeenCalled()
+      expect(
+        runParser<unknown>(left[method](fail("right failed")), source, 0)
+      ).toMatchObject({ ok: false, offset: 1, cut: true })
+    }
+  )
   test("each child gets only source and offset, and reports local cuts", () => {
     const observed: Reply<unknown>[] = []
     const child = makeParser((source, offset) => {

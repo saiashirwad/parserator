@@ -35,7 +35,7 @@ export interface Parser<T> {
   zip<B>(other: Parser<B>): Parser<[T, B]>
   zipRight<B>(other: Parser<B>): Parser<B>
   zipLeft<B>(other: Parser<B>): Parser<T>
-  [Symbol.iterator](): Generator<Parser<T>, T, any>
+  [Symbol.iterator](): Generator<Parser<T>, T, unknown>
   expected(description: string): Parser<T>
   context(description: string): Parser<T>
   withSpan<B>(f: (value: T, span: Span) => B): Parser<B>
@@ -93,22 +93,48 @@ class ParserValue<T> implements Parser<T> {
     })
   }
   zip<B>(other: Parser<B>): Parser<[T, B]> {
-    return this.flatMap(a => other.map(b => [a, b]))
+    return makeParser((source, offset) => {
+      const left = runParser(this, source, offset)
+      if (!left.ok) return left
+      const right = runParser(other, source, left.offset)
+      return right.ok
+        ? replySuccess(
+            [left.value, right.value],
+            right.offset,
+            left.cut || right.cut
+          )
+        : combineCut(right, left.cut)
+    })
   }
   zipRight<B>(other: Parser<B>): Parser<B> {
-    return this.flatMap(() => other)
+    return makeParser((source, offset) => {
+      const left = runParser(this, source, offset)
+      return left.ok
+        ? combineCut(runParser(other, source, left.offset), left.cut)
+        : left
+    })
   }
   zipLeft<B>(other: Parser<B>): Parser<T> {
-    return this.flatMap(a => other.map(() => a))
+    return makeParser((source, offset) => {
+      const left = runParser(this, source, offset)
+      if (!left.ok) return left
+      const right = runParser(other, source, left.offset)
+      return right.ok
+        ? replySuccess(left.value, right.offset, left.cut || right.cut)
+        : combineCut(right, left.cut)
+    })
   }
-  *[Symbol.iterator](): Generator<Parser<T>, T, any> {
-    return yield this
+  *[Symbol.iterator](): Generator<Parser<T>, T, unknown> {
+    return (yield this) as T
   }
   expected(description: string): Parser<T> {
     return makeParser((source, offset) => {
       const reply = runParser(this, source, offset)
       if (reply.ok || reply.fatal) return reply
-      const { message: _message, ...old } = reply.diagnostic
+      const old =
+        reply.diagnostic.kind === "custom"
+          ? (({ message: _message, ...details }) => details)(reply.diagnostic)
+          : reply.diagnostic
       return {
         ...reply,
         diagnostic: { ...old, kind: "expected", expected: [description] }
@@ -254,7 +280,9 @@ export function fatal(message: string): Parser<never> {
     )
   )
 }
-export function parser<T>(f: () => Generator<Parser<any>, T, any>): Parser<T> {
+export function parser<T>(
+  f: () => Generator<Parser<unknown>, T, unknown>
+): Parser<T> {
   return makeParser((source, offset) => {
     const iterator = f()
     let closed = false

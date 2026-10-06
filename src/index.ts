@@ -1,6 +1,6 @@
 export { fail, fatal, parser, recursive, succeed } from "./parser.ts"
 export type { Parser, ParseResult, PrefixParseResult } from "./parser.ts"
-export type { SourcePosition } from "./state.ts"
+export type { SourcePosition } from "./errors.ts"
 
 export {
   literal,
