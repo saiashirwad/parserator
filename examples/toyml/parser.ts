@@ -1,15 +1,16 @@
 import {
   attempt,
   char,
+  choice,
   commit,
   eof,
   fail,
   fatal,
+  literal,
   many,
   many1,
   notFollowedBy,
   optional,
-  choice,
   parser,
   recursive,
   regex,
@@ -18,7 +19,6 @@ import {
   sepEndBy,
   sepEndBy1,
   skipMany,
-  literal,
   succeed
 } from "../../src/index.ts"
 import type { Parser } from "../../src/index.ts"
@@ -42,8 +42,12 @@ const space = choice(whitespace, ocamlComment, haskellComment)
 
 const spaces = skipMany(space)
 
-function token<T>(p: Parser<T>): Parser<T> {
-  return spaces.zipRight(p)
+function token<T>(inner: Parser<T>): Parser<T> {
+  return spaces.zipRight(inner)
+}
+
+function punctuation<const T extends string>(value: T): Parser<T> {
+  return token(char(value))
 }
 
 const keywords = new Set([
@@ -191,7 +195,7 @@ const literalValue: Parser<Literal> = choice(
 
 const pattern: Parser<Pattern> = recursive<Pattern>(() => annotatedPattern)
 
-const wildcardPattern: Parser<Pattern> = token(char("_")).map(() =>
+const wildcardPattern: Parser<Pattern> = punctuation("_").map(() =>
   Pattern.wildcard()
 )
 
@@ -206,23 +210,23 @@ const constructorPattern: Parser<Pattern> = parser(function* () {
 })
 
 const tupleOrParenPattern: Parser<Pattern> = parser(function* () {
-  yield* token(char("("))
+  yield* punctuation("(")
   const first = yield* optional(pattern)
   if (first === undefined) {
-    yield* token(char(")")).expected("closing paren")
+    yield* punctuation(")").expected("closing paren")
     return Pattern.lit(Literal.unit())
   }
-  const rest = yield* many(token(char(",")).zipRight(pattern))
-  yield* token(char(")")).expected("closing paren for pattern")
+  const rest = yield* many(punctuation(",").zipRight(pattern))
+  yield* punctuation(")").expected("closing paren for pattern")
   if (rest.length === 0) return first
   return Pattern.tuple([first, ...rest])
 })
 
 const listPattern: Parser<Pattern> = parser(function* () {
-  yield* token(char("["))
+  yield* punctuation("[")
   yield* commit()
-  const elements = yield* sepBy(pattern, token(char(",")))
-  yield* token(char("]")).expected("closing bracket for list pattern")
+  const elements = yield* sepBy(pattern, punctuation(","))
+  yield* punctuation("]").expected("closing bracket for list pattern")
   return Pattern.list(elements)
 })
 
@@ -257,19 +261,13 @@ const asPattern: Parser<Pattern> = parser(function* () {
 
 const orPattern: Parser<Pattern> = parser(function* () {
   const first = yield* asPattern
-  const rest = yield* many(token(char("|")).zipRight(asPattern))
-  if (rest.length === 0) return first
+  const rest = yield* many(punctuation("|").zipRight(asPattern))
   return rest.reduce((acc, p) => Pattern.or(acc, p), first)
 })
 
 const annotatedPattern: Parser<Pattern> = parser(function* () {
   const pat = yield* orPattern
-  const annotation = yield* optional(
-    parser(function* () {
-      yield* token(char(":"))
-      return yield* typeExpr
-    })
-  )
+  const annotation = yield* optional(punctuation(":").zipRight(typeExpr))
   if (annotation) return Pattern.annotated(pat, annotation)
   return pat
 })
@@ -281,10 +279,10 @@ const typeConst: Parser<Type> = lowercaseIdent.map(Type.const)
 const typeVarP: Parser<Type> = typeVar.map(name => Type.var(name.slice(1)))
 
 const typeParens: Parser<Type> = parser(function* () {
-  yield* token(char("("))
+  yield* punctuation("(")
   const first = yield* typeExpr
-  const rest = yield* many(token(char("*")).zipRight(typeExpr))
-  yield* token(char(")")).expected("closing paren for type")
+  const rest = yield* many(punctuation("*").zipRight(typeExpr))
+  yield* punctuation(")").expected("closing paren for type")
   if (rest.length === 0) return first
   return Type.tuple([first, ...rest])
 })
@@ -303,7 +301,7 @@ const typeApplication: Parser<Type> = parser(function* () {
 
 const tupleType: Parser<Type> = parser(function* () {
   const first = yield* typeApplication
-  const rest = yield* many(token(char("*")).zipRight(typeApplication))
+  const rest = yield* many(punctuation("*").zipRight(typeApplication))
   if (rest.length === 0) return first
   return Type.tuple([first, ...rest])
 })
@@ -330,42 +328,42 @@ const varExpr: Parser<Expr> = lowercaseIdent.map(Expr.var)
 const constructorExpr: Parser<Expr> = uppercaseIdent.map(Expr.constructor)
 
 const tupleOrParenExpr: Parser<Expr> = parser(function* () {
-  yield* token(char("("))
+  yield* punctuation("(")
   const first = yield* optional(expr)
   if (first === undefined) {
     const op = yield* optional(operator)
-    yield* token(char(")")).expected("closing paren")
+    yield* punctuation(")").expected("closing paren")
     return op === undefined ? Expr.unit() : Expr.var(op)
   }
 
-  const rest = yield* many(token(char(",")).zipRight(expr))
-  yield* token(char(")")).expected("closing paren")
+  const rest = yield* many(punctuation(",").zipRight(expr))
+  yield* punctuation(")").expected("closing paren")
   if (rest.length === 0) return first
   return Expr.tuple([first, ...rest])
 })
 
 const listExpr: Parser<Expr> = parser(function* () {
-  yield* token(char("["))
+  yield* punctuation("[")
   yield* commit()
-  const elements = yield* sepEndBy(nonSequenceExpr, token(char(";")))
-  yield* token(char("]")).expected("closing bracket for list")
+  const elements = yield* sepEndBy(nonSequenceExpr, punctuation(";"))
+  yield* punctuation("]").expected("closing bracket for list")
   return Expr.list(elements)
 })
 
 const recordExpr: Parser<Expr> = attempt(
   parser(function* () {
-    yield* token(char("{"))
+    yield* punctuation("{")
     yield* commit()
     const fields = yield* sepEndBy1(
       parser(function* () {
         const label = yield* lowercaseIdent
-        yield* token(char("=")).expected("'=' in record field")
+        yield* punctuation("=").expected("'=' in record field")
         const value = yield* nonSequenceExpr.expected("value for record field")
         return { label, value }
       }),
-      token(char(";"))
+      punctuation(";")
     )
-    yield* token(char("}")).expected("closing brace for record")
+    yield* punctuation("}").expected("closing brace for record")
     return Expr.record(fields)
   })
 )
@@ -390,7 +388,7 @@ const ifExpr: Parser<Expr> = parser(function* () {
 })
 
 const matchCaseBody: Parser<Expr> = parser(function* () {
-  const peeked = yield* optional(token(char("|")))
+  const peeked = yield* optional(punctuation("|"))
   if (peeked !== undefined) {
     return yield* fatal(
       "empty match case body (found '|' instead of expression)"
@@ -400,7 +398,7 @@ const matchCaseBody: Parser<Expr> = parser(function* () {
 })
 
 const matchCase: Parser<MatchCase> = parser(function* () {
-  yield* optional(token(char("|")))
+  yield* optional(punctuation("|"))
   const pat = yield* pattern
   const guard = yield* optional(keyword("when").zipRight(expr))
   yield* token(literal("->")).expected("'->' in match case")
@@ -437,8 +435,8 @@ const functionExpr: Parser<Expr> = parser(function* () {
 const letBinding: Parser<LetBinding> = parser(function* () {
   const pat = yield* simplePattern.expected("pattern or function name")
   const params = yield* many(simplePattern)
-  const annotation = yield* optional(token(char(":")).zipRight(typeExpr))
-  yield* token(char("=")).expected("'=' in let binding")
+  const annotation = yield* optional(punctuation(":").zipRight(typeExpr))
+  yield* punctuation("=").expected("'=' in let binding")
   const value = yield* expr.expected("expression in let binding")
   return { pattern: pat, params, annotation, value }
 })
@@ -453,7 +451,6 @@ const letExpr: Parser<Expr> = parser(function* () {
   yield* keyword("in").expected("'in' after let bindings")
   const body = yield* expr.expected("body after 'in'")
   if (isRec) return Expr.letRec(bindings, body)
-  if (bindings.length === 1) return Expr.let(bindings[0]!, body)
   return bindings.reduceRight((acc, binding) => Expr.let(binding, acc), body)
 })
 
@@ -476,7 +473,7 @@ const applicationExpr: Parser<Expr> = parser(function* () {
   let func = yield* primaryExpr
   while (true) {
     const recordAccess = yield* optional(
-      token(char(".")).zipRight(lowercaseIdent)
+      punctuation(".").zipRight(lowercaseIdent)
     )
     if (recordAccess) {
       func = Expr.recordAccess(func, recordAccess)
@@ -492,7 +489,7 @@ const applicationExpr: Parser<Expr> = parser(function* () {
 const prefixExpr: Parser<Expr> = choice(
   parser(function* () {
     const op = yield* choice(
-      token(char("-")).zipLeft(notFollowedBy(regex(/[0-9]/))),
+      punctuation("-").zipLeft(notFollowedBy(regex(/[0-9]/))),
       keyword("not")
     )
     const arg = yield* applicationExpr
@@ -535,51 +532,45 @@ function makeInfixParser(
       }
       return left
     })
-  } else {
-    return parser(function* () {
+  }
+
+  return recursive<Expr>(self =>
+    parser(function* () {
       const left = yield* lower
       const op = yield* optional(opParser)
       if (op === undefined) return left
-      const right: Expr = yield* makeInfixParser(ops, assoc, lower).expected(
-        `expression after '${op}'`
-      )
+      const right = yield* self.expected(`expression after '${op}'`)
       return Expr.infix(left, op, right)
     })
-  }
+  )
 }
 
-let infixExpr = prefixExpr
-for (const level of infixOps) {
-  infixExpr = makeInfixParser(level.ops, level.assoc, infixExpr)
-}
+const infixExpr = infixOps.reduce(
+  (lower, level) => makeInfixParser(level.ops, level.assoc, lower),
+  prefixExpr
+)
 
 const simpleAnnotatedExpr: Parser<Expr> = parser(function* () {
   const e = yield* infixExpr
-  const annotation = yield* optional(
-    parser(function* () {
-      yield* token(char(":"))
-      return yield* typeExpr
-    })
-  )
+  const annotation = yield* optional(punctuation(":").zipRight(typeExpr))
   if (annotation) return Expr.annotated(e, annotation)
   return e
 })
 
 const sequenceExpr: Parser<Expr> = parser(function* () {
   const first = yield* simpleAnnotatedExpr
-  const rest = yield* many(token(char(";")).zipRight(simpleAnnotatedExpr))
-  if (rest.length === 0) return first
+  const rest = yield* many(punctuation(";").zipRight(simpleAnnotatedExpr))
   return rest.reduce((acc, e) => Expr.sequence(acc, e), first)
 })
 
 const typeParams: Parser<TypeParam[]> = choice(
   parser(function* () {
-    yield* token(char("("))
+    yield* punctuation("(")
     const params = yield* sepBy1(
       typeVar.map(s => s.slice(1)),
-      token(char(","))
+      punctuation(",")
     )
-    yield* token(char(")"))
+    yield* punctuation(")")
     return params
   }),
   typeVar.map(s => [s.slice(1)]),
@@ -591,16 +582,16 @@ const constructorDef: Parser<ConstructorDef> = parser(function* () {
   const hasOf = yield* optional(keyword("of"))
   if (!hasOf) return { name, args: [] }
   const first = yield* typeApplication
-  const rest = yield* many(token(char("*")).zipRight(typeApplication))
+  const rest = yield* many(punctuation("*").zipRight(typeApplication))
   return { name, args: [first, ...rest] }
 })
 
 const variantTypeDef: Parser<TypeDef> = parser(function* () {
   const params = yield* typeParams
   const name = yield* lowercaseIdent
-  yield* token(char("=")).expected("'=' in type definition")
-  yield* optional(token(char("|")))
-  const constructors = yield* sepBy1(constructorDef, token(char("|"))).expected(
+  yield* punctuation("=").expected("'=' in type definition")
+  yield* optional(punctuation("|"))
+  const constructors = yield* sepBy1(constructorDef, punctuation("|")).expected(
     "type constructor (e.g., 'None' or 'Some of int')"
   )
   return TypeDef.variant(params, name, constructors)
@@ -609,7 +600,7 @@ const variantTypeDef: Parser<TypeDef> = parser(function* () {
 const aliasTypeDef: Parser<TypeDef> = parser(function* () {
   const params = yield* typeParams
   const name = yield* lowercaseIdent
-  yield* token(char("=")).expected("'=' in type alias")
+  yield* punctuation("=").expected("'=' in type alias")
   const target = yield* typeExpr.expected("type expression")
   return TypeDef.alias(params, name, target)
 })
@@ -618,7 +609,7 @@ const recordField: Parser<{ label: string; type: Type; mutable: boolean }> =
   parser(function* () {
     const isMutable = (yield* optional(keyword("mutable"))) !== undefined
     const label = yield* lowercaseIdent
-    yield* token(char(":")).expected("':' in record field")
+    yield* punctuation(":").expected("':' in record field")
     const fieldType = yield* typeExpr.expected("type for record field")
     return { label, type: fieldType, mutable: isMutable }
   })
@@ -626,11 +617,11 @@ const recordField: Parser<{ label: string; type: Type; mutable: boolean }> =
 const recordTypeDef: Parser<TypeDef> = parser(function* () {
   const params = yield* typeParams
   const name = yield* lowercaseIdent
-  yield* token(char("=")).expected("'=' in record type definition")
-  yield* token(char("{"))
+  yield* punctuation("=").expected("'=' in record type definition")
+  yield* punctuation("{")
   yield* commit()
-  const fields = yield* sepEndBy1(recordField, token(char(";")))
-  yield* token(char("}")).expected("'}' in record type definition")
+  const fields = yield* sepEndBy1(recordField, punctuation(";"))
+  yield* punctuation("}").expected("'}' in record type definition")
   return TypeDef.record(params, name, fields)
 })
 
@@ -664,7 +655,7 @@ const exceptionDecl: Parser<Declaration> = parser(function* () {
   const hasOf = yield* optional(keyword("of"))
   if (!hasOf) return Declaration.exception(name, [])
   const first = yield* typeApplication
-  const rest = yield* many(token(char("*")).zipRight(typeApplication))
+  const rest = yield* many(punctuation("*").zipRight(typeApplication))
   return Declaration.exception(name, [first, ...rest])
 })
 
