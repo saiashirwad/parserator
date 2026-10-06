@@ -4,9 +4,9 @@
 
 ```ts
 const lex = createLexemes({
-	trivia: regex(/\s*/),
-	identifier: /[A-Za-z_][A-Za-z0-9_.]*/,
-	keywords: ["AND", "OR"] as const
+  trivia: regex(/\s*/),
+  identifier: /[A-Za-z_][A-Za-z0-9_.]*/,
+  keywords: ["AND", "OR"] as const
 })
 const query = lex.complete(expression).context("query")
 const result = query.parsePrefix(input)
@@ -20,8 +20,19 @@ Keep fluent composition, `yield*`, recursion, named repetition helpers, full-inp
 ```ts
 type Run<T> = (source: SourceText, offset: number) => Reply<T>
 type Reply<T> =
-	| { readonly ok: true; readonly value: T; readonly offset: number; readonly cut: boolean }
-	| { readonly ok: false; readonly offset: number; readonly diagnostic: Diagnostic; readonly cut: boolean; readonly fatal: boolean }
+  | {
+      readonly ok: true
+      readonly value: T
+      readonly offset: number
+      readonly cut: boolean
+    }
+  | {
+      readonly ok: false
+      readonly offset: number
+      readonly diagnostic: Diagnostic
+      readonly cut: boolean
+      readonly fatal: boolean
+    }
 ```
 
 Each invocation reports only cuts made inside that invocation. Child calls receive no inherited cut state. Sequence accumulates cuts. Recovery boundaries inspect the failing child's effects before combining them with earlier successful effects. Successful `attempt` retains cuts. Failed `attempt` clears ordinary cuts, never fatality. Lookahead isolates ordinary cuts on both outcomes.
@@ -64,3 +75,29 @@ Temporary breakage is confined to worker worktrees between these gates. Commits 
 ## Completion predicate
 
 The library has one runner representation and one reply type. Cut generations, the runner registry, successful completion context, the global source cache, unused utilities, the formatter class, and the precedence adapter are absent. Every supported caller uses the new contracts. Full verification passes, control behavior matches the captured baseline except named diagnostic/progress changes, and benchmark results are recorded without unsupported speed claims.
+
+## Measurements
+
+Node v24.21.0, macOS arm64, Apple M5. Baseline source: `89c3a58`; redesigned source: `2ecabb8`. Each timing is the displayed Mitata mean from one process, not a median or a speed guarantee. The baseline has substantial timing tails. Parser construction is excluded except for operations inherently constructed by grammar execution. The corrected CSV benchmark shares primitive parsers and returns identical flat row tuples in both variants.
+
+| Workload                          | Input UTF-16 units | Baseline mean | Redesigned mean |
+| --------------------------------- | -----------------: | ------------: | --------------: |
+| JSON small                        |                116 |      40.01 µs |        12.13 µs |
+| JSON medium                       |             34,566 |      10.36 ms |         3.40 ms |
+| JSON large                        |          1,480,160 |     529.03 ms |       151.01 ms |
+| JSON strings                      |             67,781 |      11.91 ms |         4.08 ms |
+| JSON numbers                      |             11,189 |       1.46 ms |         1.20 ms |
+| Corrected generator CSV           |             21,402 |     551.07 µs |       400.83 µs |
+| Corrected zip CSV                 |             21,402 |     379.59 µs |       202.68 µs |
+| Identifier separated list         |             19,389 |     139.79 µs |        85.26 µs |
+| Malformed start, parse and format |                  5 |       4.12 µs |         3.80 µs |
+| Malformed end, parse and format   |                  5 |       4.19 µs |         3.86 µs |
+
+Raw outputs are under `/private/var/folders/_f/yb2trsh50c1gv2dpybhtbw7r0000gn/T/opencode/`:
+
+- `parserator-baseline-json.txt`
+- `parserator-corrected-baseline-micro.txt`
+- `parserator-final-json.txt`
+- `parserator-final-micro.txt`
+
+The original generator CSV benchmark built primitive parsers during execution and returned a different shape from the zip benchmark. Its original timing is not a comparison target. No allocation claim follows from the reporter's invalid `Infinity` and `NaN` rows. These measurements do not cover large malformed documents, concurrent parsing, or retained advanced replies.
