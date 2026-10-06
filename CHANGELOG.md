@@ -1,5 +1,74 @@
 # Changelog
 
+## Unreleased
+
+### BREAKING: reader and runner contracts
+
+- `Parser<T>` is opaque and type-only. Replace public constructor usage with
+  combinators, `parser(function* () { ... })`, or advanced `makeParser`.
+  Fluent composition and `yield*` remain supported; parsers are not thenables.
+- Prefix successes are flat. After checking `result.success`, migrate:
+
+  ```ts
+  // Before
+  const { value, offset, rest } = result.value
+  // After
+  const { value, offset, rest } = result
+  ```
+
+- Advanced runners now receive `(source: SourceText, offset: number)`, not a
+  parser state. Call `runParser(p, source, offset)`. Replace nested result/state
+  fields with flat replies: `{ ok: true, value, offset, cut }` or
+  `{ ok: false, offset, diagnostic, cut, fatal }`. Failure offsets remain
+  independent of diagnostic spans. `replySuccess` and `replyFailure` accept
+  offsets directly. Cuts are call-local effects, not generations; failed
+  `attempt` clears ordinary cuts, successful `attempt` retains them, and fatal
+  failures never recover.
+- `SourceText` is no longer a root export; use `parserator/advanced` or
+  `parserator/diagnostics`. Hint ranking utilities belong to diagnostics.
+  Source sessions own their lazy line index; there is no global source cache.
+- Lexemes take an identifier regular expression, not an identifier parser:
+
+  ```ts
+  // Before
+  createLexemes({ trivia, identifier: regex(/[A-Za-z_][A-Za-z0-9_.]*/) })
+  // After
+  createLexemes({ trivia, identifier: /[A-Za-z_][A-Za-z0-9_.]*/ })
+  ```
+
+  This one scanner defines identifiers, whole-word keywords, and typo spans.
+  Dotted and Unicode continuations count as part of a word when included in
+  the expression. Keywords must be nonempty complete identifier matches;
+  unconfigured keyword requests and zero-width identifier matches throw.
+
+- Each precedence level accepts one `operator` parser. Combine alternatives
+  explicitly:
+
+  ```ts
+  // Before
+  { associativity: "left", operators: [add, subtract] }
+  // After
+  { associativity: "left", operator: choice(add, subtract) }
+  ```
+
+- Context is failure-only. To label completion errors, replace
+  `expression.context("query").parse(input)` with
+  `lex.complete(expression).context("query").parse(input)` (or wrap an explicit
+  `zipLeft(eof)`). Successful context does not annotate the implicit EOF check.
+- Fatality is separate from diagnostic kind: replace
+  `error.diagnostic.kind === "fatal"` with `error.fatal`; serialized errors
+  expose `fatal` too. Expected diagnostics require nonempty labels, unexpected
+  diagnostics require `found`, and custom diagnostics require `message`.
+  Replace expected/message combinations with either an expected diagnostic
+  or a custom diagnostic; prose no longer overrides expected labels.
+- Replace `ErrorFormatter` instances with the pure
+  `formatError(error, options)` from `parserator/diagnostics`, or `error.format(options)`.
+- Named repetition helpers share progress rules: finite `count(p, n)` allows
+  zero-width successes, but `many`, `many1`, `skipMany`, and `atLeast` reject
+  them. Every separated-list item must advance, including the first. Below a
+  required minimum, failures preserve the item diagnostic instead of replacing
+  it with a generic minimum-count error. Counts must be safe nonnegative integers.
+
 ## 0.2.0
 
 This release defines a smaller, safer public API. It is a breaking release;
