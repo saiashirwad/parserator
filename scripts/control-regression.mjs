@@ -356,15 +356,13 @@ const records = grammars.map(grammar => {
     diagnosticHash: diagnosticHash.digest("hex")
   }
 })
-function allowsMinimumDiagnosticChange(ast) {
+function hasMinimumRepetition(ast) {
   return (
     ast[0] === "many1" ||
     ast[0] === "atLeast" ||
     ast
       .slice(1)
-      .some(
-        child => Array.isArray(child) && allowsMinimumDiagnosticChange(child)
-      )
+      .some(child => Array.isArray(child) && hasMinimumRepetition(child))
   )
 }
 const baseline = {
@@ -377,71 +375,118 @@ const baseline = {
 }
 const args = process.argv.slice(2)
 assert.ok(
-  args.length === 0 || (args.length === 1 && args[0] === "--capture"),
-  "Usage: node scripts/control-regression.mjs [--capture]"
+  args.length === 0 ||
+    (args.length === 1 && args[0] === "--approve-minimum-diagnostics"),
+  "Usage: node scripts/control-regression.mjs [--approve-minimum-diagnostics]"
 )
-if (args[0] === "--capture") {
+const approvalsFile = new URL("./control-diagnostics.json", import.meta.url)
+const approving = args[0] === "--approve-minimum-diagnostics"
+const expected = JSON.parse(await readFile(fixture, "utf8"))
+assert.ok(
+  serialize(expected.inputs) === serialize(inputs) &&
+    expected.grammars.length === records.length &&
+    expected.version === baseline.version &&
+    expected.seed === baseline.seed &&
+    expected.corpusHash === baseline.corpusHash &&
+    serialize(expected.summary) === serialize(summary),
+  "Control regression corpus/version/summary mismatch"
+)
+const overrides = new Map()
+if (approving) {
   await assert.rejects(
-    readFile(fixture),
+    readFile(approvalsFile),
     { code: "ENOENT" },
-    "Refusing to overwrite baseline; rerecording requires parent approval"
+    "Refusing to overwrite diagnostic approvals"
   )
-  await writeFile(fixture, JSON.stringify(baseline, null, 2) + "\n")
-  console.log("Captured current-source baseline")
 } else {
-  const expected = JSON.parse(await readFile(fixture, "utf8"))
-  const controlDifferences = []
-  const diagnosticDifferences = []
-  const allowedDiagnosticDifferences = []
-  records.forEach((record, i) => {
-    const previous = expected.grammars[i]
-    if (
-      record.id !== previous?.id ||
-      record.controlHash !== previous?.controlHash
+  const approvals = JSON.parse(await readFile(approvalsFile, "utf8"))
+  assert.equal(approvals.corpusHash, expected.corpusHash)
+  assert.equal(approvals.diagnostics.length, 20)
+  for (const entry of approvals.diagnostics) {
+    const i = grammars.findIndex(grammar => grammar.id === entry.id)
+    assert.ok(i >= 0, `Dangling diagnostic approval: ${entry.id}`)
+    assert.ok(
+      !overrides.has(entry.id),
+      `Duplicate diagnostic approval: ${entry.id}`
     )
-      controlDifferences.push(i)
-    if (record.diagnosticHash !== previous?.diagnosticHash) {
-      const bucket =
-        previous?.id === record.id &&
-        allowsMinimumDiagnosticChange(grammars[i].ast)
-          ? allowedDiagnosticDifferences
-          : diagnosticDifferences
-      bucket.push(i)
-    }
-  })
-  function report(label, differences, key) {
-    console.log(`${label}: ${differences.length}`)
-    for (const i of differences.slice(0, 10)) {
-      const grammar = grammars[i]
-      console.log(
-        `${grammar.id}: ${grammar.name}\nAST: ${JSON.stringify(grammar.ast)}\nexpected: ${expected.grammars[i]?.[key]}\nactual:   ${records[i][key]}`
-      )
-    }
+    assert.ok(
+      hasMinimumRepetition(grammars[i].ast),
+      `Not a minimum repetition: ${entry.id}`
+    )
+    assert.equal(expected.grammars[i].id, entry.id)
+    assert.match(entry.newHash, /^[a-f0-9]{64}$/)
+    assert.notEqual(entry.newHash, expected.grammars[i].diagnosticHash)
+    assert.ok(typeof entry.reason === "string" && entry.reason.trim())
+    overrides.set(entry.id, entry.newHash)
   }
-  report("Control mismatches", controlDifferences, "controlHash")
-  report("Diagnostic mismatches", diagnosticDifferences, "diagnosticHash")
-  report(
-    "Allowed many1/atLeast minimum-location diagnostic changes",
-    allowedDiagnosticDifferences,
-    "diagnosticHash"
-  )
-  if (
-    controlDifferences.length ||
-    diagnosticDifferences.length ||
-    serialize(expected.inputs) !== serialize(inputs) ||
-    expected.grammars.length !== records.length ||
-    expected.version !== baseline.version ||
-    expected.seed !== baseline.seed ||
-    expected.corpusHash !== baseline.corpusHash ||
-    serialize(expected.summary) !== serialize(summary)
-  ) {
-    console.error(
-      "Control regression mismatch; check reported hashes and corpus/version/summary"
+}
+const controlDifferences = []
+const diagnosticDifferences = []
+const minimumChanges = []
+const usedOverrides = new Set()
+records.forEach((record, i) => {
+  const previous = expected.grammars[i]
+  if (record.id !== previous.id || record.controlHash !== previous.controlHash)
+    controlDifferences.push(i)
+  const approvedHash = overrides.get(record.id)
+  if (approvedHash) usedOverrides.add(record.id)
+  if (record.diagnosticHash !== (approvedHash ?? previous.diagnosticHash)) {
+    if (
+      approving &&
+      record.id === previous.id &&
+      hasMinimumRepetition(grammars[i].ast)
     )
-    process.exitCode = 1
-  } else
+      minimumChanges.push({
+        id: record.id,
+        newHash: record.diagnosticHash,
+        reason:
+          "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+      })
+    else diagnosticDifferences.push(i)
+  }
+})
+assert.equal(usedOverrides.size, overrides.size, "Unused diagnostic approvals")
+function report(label, differences, key) {
+  console.log(`${label}: ${differences.length}`)
+  for (const i of differences.slice(0, 10)) {
+    const grammar = grammars[i]
+    const expectedHash =
+      key === "diagnosticHash"
+        ? (overrides.get(grammar.id) ?? expected.grammars[i][key])
+        : expected.grammars[i][key]
     console.log(
-      "Control regression baseline matches (apart from explicitly reported allowed diagnostics)"
+      `${grammar.id}: ${grammar.name}\nAST: ${JSON.stringify(grammar.ast)}\nexpected: ${expectedHash}\nactual:   ${records[i][key]}`
     )
+  }
+}
+report("CONTROL mismatches", controlDifferences, "controlHash")
+report("DIAGNOSTIC mismatches", diagnosticDifferences, "diagnosticHash")
+if (controlDifferences.length || diagnosticDifferences.length) {
+  console.error("Control regression mismatch")
+  process.exitCode = 1
+} else if (approving) {
+  assert.equal(
+    minimumChanges.length,
+    20,
+    "Expected exactly 20 minimum diagnostic changes"
+  )
+  await writeFile(
+    approvalsFile,
+    JSON.stringify(
+      {
+        sourceCommit: "6d5a4ff",
+        originalBaselineCommit: "8c9bf25",
+        corpusHash: expected.corpusHash,
+        diagnostics: minimumChanges
+      },
+      null,
+      2
+    ) + "\n",
+    { flag: "wx" }
+  )
+  console.log(`Approved minimum changes: ${minimumChanges.length}`)
+} else {
+  console.log(`Approved minimum changes: ${overrides.size}`)
+  console.log("Control regression baseline and pinned diagnostics match")
 }
 console.log(JSON.stringify(summary, null, 2))

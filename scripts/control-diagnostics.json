@@ -1,0 +1,107 @@
+{
+  "sourceCommit": "6d5a4ff",
+  "originalBaselineCommit": "8c9bf25",
+  "corpusHash": "adff88cfd8911c8180d52a7c6c628283b7f898bfc816e8f4a9db4bbad9e472c2",
+  "diagnostics": [
+    {
+      "id": "named-61",
+      "newHash": "ab40e002b9d06156fa57e73a00929eca291f5ae0952bc3448ac704410fd4acfe",
+      "reason": "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+    },
+    {
+      "id": "named-62",
+      "newHash": "74477301c8a467681548e04e20dfa46d0f1ec3a1fcd2550f50747d2b222c49b8",
+      "reason": "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+    },
+    {
+      "id": "named-63",
+      "newHash": "ab40e002b9d06156fa57e73a00929eca291f5ae0952bc3448ac704410fd4acfe",
+      "reason": "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+    },
+    {
+      "id": "named-64",
+      "newHash": "74477301c8a467681548e04e20dfa46d0f1ec3a1fcd2550f50747d2b222c49b8",
+      "reason": "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+    },
+    {
+      "id": "named-65",
+      "newHash": "6f472b35d3cd871d5a0f690d92c450e93b570526afb2ee4e256db2442c8b7a30",
+      "reason": "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+    },
+    {
+      "id": "named-66",
+      "newHash": "87027eff33225b5ec32fd07e336675a346469686a08cbd407da1225b285980ed",
+      "reason": "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+    },
+    {
+      "id": "named-67",
+      "newHash": "3d9db6a9a2937b11103280ce787b22dd088febd2dd6335465d878bd0e4448d53",
+      "reason": "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+    },
+    {
+      "id": "named-68",
+      "newHash": "5bf2ef69460e4d7190a54c3acebda9082a704e8509c455585c2a59244326961c",
+      "reason": "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+    },
+    {
+      "id": "named-69",
+      "newHash": "3d9db6a9a2937b11103280ce787b22dd088febd2dd6335465d878bd0e4448d53",
+      "reason": "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+    },
+    {
+      "id": "named-70",
+      "newHash": "5bf2ef69460e4d7190a54c3acebda9082a704e8509c455585c2a59244326961c",
+      "reason": "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+    },
+    {
+      "id": "named-71",
+      "newHash": "18780932f41dea1b821c006f59249fff0cf5ab2e4909c74766815ae83b759d04",
+      "reason": "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+    },
+    {
+      "id": "named-72",
+      "newHash": "f4b8fa986dd0fcd21788023bd53fe12f1062ef9aa32e4fd2f2566c49d242f349",
+      "reason": "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+    },
+    {
+      "id": "named-230",
+      "newHash": "ab40e002b9d06156fa57e73a00929eca291f5ae0952bc3448ac704410fd4acfe",
+      "reason": "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+    },
+    {
+      "id": "named-231",
+      "newHash": "74206f0fde083541374e50e517ae3c9735ef74eaa0f2a3cbf662cc6ff22fc0ed",
+      "reason": "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+    },
+    {
+      "id": "named-233",
+      "newHash": "ab40e002b9d06156fa57e73a00929eca291f5ae0952bc3448ac704410fd4acfe",
+      "reason": "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+    },
+    {
+      "id": "named-234",
+      "newHash": "77d663ddc2738a4fe7ad2b4ad45e61ce67c473a5f8b4760a6f495d2c3903b59f",
+      "reason": "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+    },
+    {
+      "id": "named-236",
+      "newHash": "6f472b35d3cd871d5a0f690d92c450e93b570526afb2ee4e256db2442c8b7a30",
+      "reason": "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+    },
+    {
+      "id": "named-237",
+      "newHash": "36342d3663bcbd2f0cbd282106b02509b6184c28543924b7425b367c64e7735a",
+      "reason": "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+    },
+    {
+      "id": "named-239",
+      "newHash": "3d9db6a9a2937b11103280ce787b22dd088febd2dd6335465d878bd0e4448d53",
+      "reason": "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+    },
+    {
+      "id": "named-240",
+      "newHash": "3d9db6a9a2937b11103280ce787b22dd088febd2dd6335465d878bd0e4448d53",
+      "reason": "Unmet many1/atLeast minimum now preserves the stopping child failure span instead of synthesizing a zero-width minimum failure."
+    }
+  ]
+}
