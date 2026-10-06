@@ -1,20 +1,19 @@
 import {
   attempt,
   char,
+  choice,
   commit,
   digit,
   eof,
   fatal,
+  literal,
+  lookahead,
   many,
   many1,
   optional,
-  choice,
   parser,
-  recursive,
   regex,
   skipMany,
-  literal,
-  lookahead,
   takeUpto
 } from "../src/index.ts"
 import type { Parser } from "../src/index.ts"
@@ -61,15 +60,15 @@ export namespace LispExpr {
 }
 
 export const LispExpr = {
-  symbol: (name: string): LispExpr.LispExpr => ({ type: "Symbol", name }),
+  symbol: (name: string): LispExpr.Symbol => ({ type: "Symbol", name }),
 
-  number: (value: number): LispExpr.LispExpr => ({ type: "Number", value }),
+  number: (value: number): LispExpr.Number => ({ type: "Number", value }),
 
-  string: (value: string): LispExpr.LispExpr => ({ type: "String", value }),
+  string: (value: string): LispExpr.String => ({ type: "String", value }),
 
-  bool: (value: boolean): LispExpr.LispExpr => ({ type: "Boolean", value }),
+  bool: (value: boolean): LispExpr.Boolean => ({ type: "Boolean", value }),
 
-  list: (items: LispExpr.LispExpr[]): LispExpr.LispExpr => ({
+  list: (items: LispExpr.LispExpr[]): LispExpr.List => ({
     type: "List",
     items
   }),
@@ -78,9 +77,9 @@ export const LispExpr = {
     condition: LispExpr.LispExpr,
     consequent: LispExpr.LispExpr,
     alternate: LispExpr.LispExpr
-  ): LispExpr.LispExpr => ({ type: "If", condition, consequent, alternate }),
+  ): LispExpr.If => ({ type: "If", condition, consequent, alternate }),
 
-  lambda: (params: string[], body: LispExpr.LispExpr): LispExpr.LispExpr => ({
+  lambda: (params: string[], body: LispExpr.LispExpr): LispExpr.Lambda => ({
     type: "Lambda",
     params,
     body
@@ -89,7 +88,7 @@ export const LispExpr = {
   let: (
     bindings: Array<{ name: string; value: LispExpr.LispExpr }>,
     body: LispExpr.LispExpr
-  ): LispExpr.LispExpr => ({ type: "Let", bindings, body })
+  ): LispExpr.Let => ({ type: "Let", bindings, body })
 }
 
 const whitespace = regex(/\s+/).context("whitespace")
@@ -100,20 +99,14 @@ const space = choice(whitespace, lineComment)
 
 const spaces = skipMany(space)
 
-function token<T>(parser: Parser<T>): Parser<T> {
-  return spaces.zipRight(parser)
+function token<T>(inner: Parser<T>): Parser<T> {
+  return spaces.zipRight(inner)
 }
 
-export let expr: Parser<LispExpr.LispExpr>
-
 const symbol = token(
-  parser(function* () {
-    const name = yield* regex(/[^()\s;]+/).context("symbol name")
-    if (name === "") {
-      return yield* fatal("Empty symbol")
-    }
-    return LispExpr.symbol(name)
-  })
+  regex(/[^()\s;]+/)
+    .context("symbol name")
+    .map(LispExpr.symbol)
 )
 
 const number = token(
@@ -156,12 +149,22 @@ const boolean = token(
 
 const atom = choice(boolean, number, stringLiteral, symbol)
 
+export const expr: Parser<LispExpr.LispExpr> = parser(function* () {
+  yield* spaces
+
+  const isList = (yield* optional(lookahead(char("(")))) !== undefined
+  const result = yield* isList ? listParser : atom
+
+  yield* spaces
+  return result
+})
+
 const list = attempt(
   parser(function* () {
     yield* token(char("("))
     yield* commit()
 
-    const items = yield* many(recursive(() => expr))
+    const items = yield* many(expr)
 
     yield* token(char(")")).expected("closing parenthesis ')'")
     return items
@@ -170,20 +173,15 @@ const list = attempt(
 
 const lambdaParser = (items: LispExpr.LispExpr[]) =>
   parser(function* () {
-    const [lambdaSymbol, paramsExpr, bodyExpr] = items
+    const [, paramsExpr, bodyExpr] = items
     if (
       items.length !== 3 ||
-      lambdaSymbol === undefined ||
       paramsExpr === undefined ||
       bodyExpr === undefined
     ) {
       return yield* fatal(
         "Lambda requires exactly 3 elements: (lambda (params...) body)"
       )
-    }
-
-    if (lambdaSymbol.type !== "Symbol" || lambdaSymbol.name !== "lambda") {
-      return yield* fatal("Expected 'lambda' keyword")
     }
 
     if (paramsExpr.type !== "List") {
@@ -203,20 +201,15 @@ const lambdaParser = (items: LispExpr.LispExpr[]) =>
 
 const letParser = (items: LispExpr.LispExpr[]) =>
   parser(function* () {
-    const [letSymbol, bindingsExpr, bodyExpr] = items
+    const [, bindingsExpr, bodyExpr] = items
     if (
       items.length !== 3 ||
-      letSymbol === undefined ||
       bindingsExpr === undefined ||
       bodyExpr === undefined
     ) {
       return yield* fatal(
         "Let requires exactly 3 elements: (let ((var val)...) body)"
       )
-    }
-
-    if (letSymbol.type !== "Symbol" || letSymbol.name !== "let") {
-      return yield* fatal("Expected 'let' keyword")
     }
 
     if (bindingsExpr.type !== "List") {
@@ -253,10 +246,9 @@ const letParser = (items: LispExpr.LispExpr[]) =>
 
 const ifParser = (items: LispExpr.LispExpr[]) =>
   parser(function* () {
-    const [ifSymbol, condition, consequent, alternate] = items
+    const [, condition, consequent, alternate] = items
     if (
       items.length !== 4 ||
-      ifSymbol === undefined ||
       condition === undefined ||
       consequent === undefined ||
       alternate === undefined
@@ -266,43 +258,28 @@ const ifParser = (items: LispExpr.LispExpr[]) =>
       )
     }
 
-    if (ifSymbol.type !== "Symbol" || ifSymbol.name !== "if") {
-      return yield* fatal("Expected 'if' keyword")
-    }
-
     return LispExpr.if(condition, consequent, alternate)
   })
 
-const listParser = list.flatMap(items =>
-  parser(function* () {
-    const [first] = items
-    if (first === undefined) {
-      return yield* fatal("Empty list not allowed")
+const listParser = parser(function* () {
+  const items = yield* list
+  const [first] = items
+  if (first === undefined) {
+    return yield* fatal("Empty list not allowed")
+  }
+
+  if (first.type === "Symbol") {
+    switch (first.name) {
+      case "lambda":
+        return yield* lambdaParser(items)
+      case "let":
+        return yield* letParser(items)
+      case "if":
+        return yield* ifParser(items)
     }
+  }
 
-    if (first.type === "Symbol") {
-      switch (first.name) {
-        case "lambda":
-          return yield* lambdaParser(items)
-        case "let":
-          return yield* letParser(items)
-        case "if":
-          return yield* ifParser(items)
-      }
-    }
-
-    return LispExpr.list(items)
-  })
-)
-
-expr = parser(function* () {
-  yield* spaces
-
-  const isList = yield* optional(lookahead(char("("))).map(x => x === "(")
-  const result = yield* isList ? listParser : atom
-
-  yield* spaces
-  return result
+  return LispExpr.list(items)
 })
 
 export const program = parser(function* () {
