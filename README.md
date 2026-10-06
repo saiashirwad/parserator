@@ -70,7 +70,7 @@ if (!result.success) {
   result.error.diagnostic
   // {
   //   kind: "expected", span: { start: 22, end: 22 },
-  //   expected: ["query value"], context: ["comparison"]
+  //   expected: ["query value"], context: ["comparison", "query"]
   // }
   console.error(result.error.format({ style: "plain" }))
 }
@@ -85,9 +85,15 @@ if (!keyword.success) keyword.error.diagnostic.hints // ["AND", "OR"]
 
 ## The core idea
 
-`parser(function* () {})` sequences parsers with `yield*`. The yielded value
-has the parser's result type, and the generator's `return` type becomes the
-new parser's type.
+`parser(function* () {})` sequences parsers with `yield*`. The delegated
+expression has the parser's result type, and the generator's `return` type
+becomes the new parser's type. Use `yield*`, not plain `yield`: a plain yield
+resumes with `unknown` and must not supply unchecked typed values.
+
+On cancellation, the runner forces the iterator to unwind until it is done,
+skipping parser effects yielded from cleanup. Put resource-release code in
+non-yielding `finally` blocks, including nested `finally` blocks. During normal
+completion, parsers yielded from `finally` may execute.
 
 `choice(a, b, c)` tries alternatives in order and backtracks input by default,
 even when an alternative consumed text. Use `commit()` after the input has
@@ -144,7 +150,17 @@ real `Error` with a source span, structured expectations, context, and a stable
 `toJSON()` representation. `error.fatal` and `error.toJSON().fatal` report
 fatality independently of `diagnostic.kind`. Diagnostic kinds are `expected`
 (with nonempty expectation labels), `unexpected` (with `found`), and `custom`
-(with `message`). Custom messages do not override expected diagnostics.
+(with `message`). The `message` field belongs only to custom diagnostics;
+expected diagnostics cannot have one.
+
+When merging alternative failures, the furthest `span.start` wins. At that
+position, kind priority is **custom → unexpected → expected**. Within the
+winning kind, the diagnostic with the deepest context wins (first encountered
+on a tie). If expected diagnostics win, their labels merge in encounter order
+with duplicates removed, and their span extends to the largest expected
+`span.end`. Hints merge from all diagnostics tied at that position, also in
+encounter order with duplicates removed.
+
 `format()` supports plain and ANSI output; `formatError(error, options)` from
 `parserator/diagnostics` is the pure function form, not a formatter class.
 
@@ -293,9 +309,13 @@ and diagnostic types. Import `SourceText` from `parserator/advanced` or
 - Failure: `{ ok: false, offset, diagnostic, cut, fatal }`.
 
 The failure offset is execution position, independent of the diagnostic span.
-Report only cuts made by this invocation; child runners receive no inherited
-cut state. Reuse the same `SourceText` when composing runners. One public
-parse call creates one source session with a lazy line index.
+Custom runners are trusted low-level code: input and returned offsets must be
+safe integers between zero and `source.text.length`, inclusive. The runner
+API does not validate these bounds. Report only cuts made by this invocation;
+child runners receive no inherited cut state. When composing child runners,
+combine their returned cut effects explicitly. Reuse the same `SourceText`
+when composing runners. One public parse call creates one source session with
+a lazy line index.
 
 Here is a custom scanner for a single Unicode code point:
 

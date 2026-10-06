@@ -7,6 +7,11 @@
 - `Parser<T>` is opaque and type-only. Replace public constructor usage with
   combinators, `parser(function* () { ... })`, or advanced `makeParser`.
   Fluent composition and `yield*` remain supported; parsers are not thenables.
+  Use `yield*` for typed results: plain `yield` resumes with `unknown` and must
+  not supply unchecked typed values. Cancellation forces iterator unwinding
+  until done without running parser effects yielded from cleanup. Release
+  resources in non-yielding `finally` blocks, including nested ones; normal
+  completion may execute parsers yielded from `finally`.
 - Prefix successes are flat. After checking `result.success`, migrate:
 
   ```ts
@@ -23,7 +28,9 @@
   independent of diagnostic spans. `replySuccess` and `replyFailure` accept
   offsets directly. Cuts are call-local effects, not generations; failed
   `attempt` clears ordinary cuts, successful `attempt` retains them, and fatal
-  failures never recover.
+  failures never recover. Custom runners are trusted: input and returned
+  offsets must be safe integers within the source length (inclusive), without
+  runtime bounds validation. Compose returned child cut effects explicitly.
 - `SourceText` is no longer a root export; use `parserator/advanced` or
   `parserator/diagnostics`. Hint ranking utilities belong to diagnostics.
   Source sessions own their lazy line index; there is no global source cache.
@@ -60,7 +67,12 @@
   expose `fatal` too. Expected diagnostics require nonempty labels, unexpected
   diagnostics require `found`, and custom diagnostics require `message`.
   Replace expected/message combinations with either an expected diagnostic
-  or a custom diagnostic; prose no longer overrides expected labels.
+  or a custom diagnostic: `message` belongs only to custom diagnostics.
+  At the furthest `span.start`, merge priority is custom → unexpected → expected.
+  The deepest context wins within that kind, with encounter order breaking
+  ties. Winning expectations and all hints at that position merge in stable
+  encounter order with duplicates removed; expected spans extend to the
+  largest expected end offset.
 - Replace `ErrorFormatter` instances with the pure
   `formatError(error, options)` from `parserator/diagnostics`, or `error.format(options)`.
 - Named repetition helpers share progress rules: finite `count(p, n)` allows
