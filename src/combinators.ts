@@ -389,6 +389,7 @@ export const commit = (): Parser<void> =>
 export function attempt<T>(inner: Parser<T>): Parser<T> {
   return makeParser((source, offset) => {
     const reply = runParser(inner, source, offset)
-    return reply.ok || reply.fatal ? reply : { ...reply, offset, cut: false }
+    if (reply.ok) return reply
+    return { ...reply, offset: reply.fatal ? reply.offset : offset, cut: false }
   })
 }

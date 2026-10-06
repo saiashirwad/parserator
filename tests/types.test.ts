@@ -9,7 +9,15 @@ import {
   sequence,
   type Parser
 } from "../src/index"
-import type { ParseResult, SourcePosition } from "../src/index"
+import type { Diagnostic, ParseResult, SourcePosition } from "../src/index"
+import {
+  makeParser,
+  replyFailure,
+  replySuccess,
+  runParser,
+  SourceText,
+  type Reply
+} from "../src/advanced.ts"
 
 // This file is included by the repository's strict tsc check. The assignments
 // below are compile-time assertions; `void` keeps the assertion values live
@@ -53,6 +61,8 @@ if (generatorResult.success) {
 
 const parsePrefixResult = literal("ok").parsePrefix("ok!")
 if (parsePrefixResult.success) {
+  const value: "ok" = parsePrefixResult.value
+  void value
   const offset: number = parsePrefixResult.offset
   const rest: string = parsePrefixResult.rest
   void offset
@@ -76,6 +86,44 @@ const assertNotConstructible = () => {
   })
 }
 void assertNotConstructible
+
+const advanced = makeParser((source, offset) =>
+  source.charAt(offset) === "x"
+    ? replySuccess(42 as const, offset + 1)
+    : replyFailure(
+        {
+          kind: "expected",
+          expected: ["x"],
+          span: { start: offset, end: offset }
+        },
+        offset
+      )
+)
+const advancedReply: Reply<42> = runParser(advanced, new SourceText("x"), 0)
+void advancedReply
+const requiredDiagnosticPayloads = () => {
+  // @ts-expect-error Expected diagnostics must carry expectations.
+  const expected: Diagnostic = { kind: "expected", span: { start: 0, end: 0 } }
+  // @ts-expect-error Unexpected diagnostics must identify the found input.
+  const unexpected: Diagnostic = {
+    kind: "unexpected",
+    span: { start: 0, end: 0 }
+  }
+  // @ts-expect-error Custom diagnostics must have a message.
+  const custom: Diagnostic = { kind: "custom", span: { start: 0, end: 0 } }
+  const fatal: Diagnostic = {
+    // @ts-expect-error Fatality belongs to reply control, not diagnostic kind.
+    kind: "fatal",
+    message: "broken",
+    span: { start: 0, end: 0 }
+  }
+  // @ts-expect-error Construction no longer accepts a state-based runner.
+  makeParser((state: { source: string; offset: number }) =>
+    replySuccess(state.source, state.offset)
+  )
+  void [expected, unexpected, custom, fatal]
+}
+void requiredDiagnosticPayloads
 
 describe("type assertions", () => {
   test("the compile-time assertions above are checked by tsc", () => {

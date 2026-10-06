@@ -49,7 +49,7 @@ export function wordScanner(expression: RegExp, vocabulary: readonly string[]) {
       const word = scan(source, offset)
       if (word !== undefined && candidates.includes(word))
         return replySuccess(word, offset + word.length)
-      const found = word ?? source.charAt(offset)
+      const found = word?.toWellFormed() ?? source.charAt(offset)
       const hints = generateHints(found, vocabulary)
       return replyFailure(
         {

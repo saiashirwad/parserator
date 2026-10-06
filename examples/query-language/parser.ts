@@ -61,7 +61,7 @@ const comparison: Parser<QueryNode> = parser(function* () {
   return Query.comparison(field, operator, parsedValue)
 })
 
-const expression: Parser<QueryNode> = recursive(self => {
+const expressionBody: Parser<QueryNode> = recursive(self => {
   const grouped = between(lex.symbol("("), lex.symbol(")"), self).context(
     "parenthesized expression"
   )
@@ -84,13 +84,14 @@ const expression: Parser<QueryNode> = recursive(self => {
   ])
 })
 
-/** A complete, whitespace-tolerant query parser. */
 const expectedOperator = choice(lex.keyword("AND"), lex.keyword("OR")).flatMap(
   word => fail(`Unexpected trailing keyword ${JSON.stringify(word)}`)
 )
+export const expression: Parser<QueryNode> = expressionBody.zipLeft(
+  choice(expectedOperator, eof)
+)
 
+/** A complete, whitespace-tolerant query parser. */
 export const query: Parser<QueryNode> = lex
-  .complete(expression.zipLeft(choice(expectedOperator, eof)))
+  .complete(expression)
   .context("query")
-
-export { expression }
