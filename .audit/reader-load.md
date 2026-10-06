@@ -70,11 +70,13 @@ Use a durable baseline replay before changing execution. Implement coupled runti
 5. Update examples, type tests, package consumers, migration notes, and public exports. Delete legacy mechanisms.
 6. Inspect comments and the complete diff. Run typecheck, build, tests, lint, formatting, control replay, offline package smoke, and benchmarks. Review the decision trail.
 
-Temporary breakage is confined to worker worktrees between these gates. Commits are local. Pushes, releases, and pull requests are outside this run.
+Temporary breakage is confined to worker worktrees and explicitly verified regression-first test commits between these gates. Commits are local. The user later authorized a fast-forward to local `main` after verification and review. Pushes, releases, and pull requests are outside this run.
 
 ## Completion predicate
 
 The library has one runner representation and one reply type. Cut generations, the runner registry, successful completion context, the global source cache, unused utilities, the formatter class, and the precedence adapter are absent. Every supported caller uses the new contracts. Full verification passes, control behavior matches the captured baseline except named diagnostic/progress changes, and benchmark results are recorded without unsupported speed claims.
+
+All implementation gates passed at `09f43f4`: 157 tests, typecheck, build, lint, formatting, 148,666 exact replay comparisons, offline installed-package checks, README examples, and independent artifact review. Twenty intentional repetition diagnostic differences are pinned individually; the original baseline fixture is unchanged. Vite coverage proves bundling, not browser execution, and the replay does not prove arbitrary advanced-runner or recursive-grammar equivalence.
 
 ## Measurements
 
