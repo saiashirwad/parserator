@@ -14,13 +14,19 @@ import {
 import type { Parser } from "../src/index.ts"
 
 const whitespace = regex(/[ \t]+/).context("whitespace")
+
 const lineBreak = choice(literal("\r\n"), literal("\n"), literal("\r")).context(
   "line break"
 )
+
 const blankLine = regex(/[ \t]*[\r\n]/).context("blank line")
+
 const comment = regex(/[;#][^\n\r]*/).context("comment")
+
 const space = choice(whitespace, comment)
+
 const spaces = skipMany(space)
+
 const spacesNewlines = skipMany(choice(space, lineBreak, blankLine))
 
 function token<T>(parser: Parser<T>): Parser<T> {

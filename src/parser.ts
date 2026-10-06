@@ -14,10 +14,13 @@ export type Reply<T> =
       readonly cut: boolean
       readonly fatal: boolean
     }
+
 export type Run<T> = (source: SourceText, offset: number) => Reply<T>
+
 export type ParseResult<T> =
   | { readonly success: true; readonly value: T }
   | { readonly success: false; readonly error: ParseError }
+
 export type PrefixParseResult<T> =
   | {
       readonly success: true
@@ -26,56 +29,79 @@ export type PrefixParseResult<T> =
       readonly rest: string
     }
   | { readonly success: false; readonly error: ParseError }
+
 const runner = Symbol("parser runner")
 
 export interface Parser<T> {
   readonly [runner]: Run<T>
+
   map<B>(f: (value: T) => B): Parser<B>
+
   flatMap<B>(f: (value: T) => Parser<B>): Parser<B>
+
   zip<B>(other: Parser<B>): Parser<[T, B]>
+
   zipRight<B>(other: Parser<B>): Parser<B>
+
   zipLeft<B>(other: Parser<B>): Parser<T>
+
   [Symbol.iterator](): Generator<Parser<T>, T, unknown>
+
   expected(description: string): Parser<T>
+
   context(description: string): Parser<T>
+
   withSpan<B>(f: (value: T, span: Span) => B): Parser<B>
+
   validate(
     predicate: (value: T) => boolean | string,
     message?: string
   ): Parser<T>
+
   trim(trivia: Parser<unknown>): Parser<T>
+
   trimLeft(trivia: Parser<unknown>): Parser<T>
+
   trimRight(trivia: Parser<unknown>): Parser<T>
+
   commit(): Parser<T>
+
   parse(
     input: string,
     options?: { readonly sourceName?: string }
   ): ParseResult<T>
+
   parsePrefix(
     input: string,
     options?: { readonly sourceName?: string }
   ): PrefixParseResult<T>
+
   parseOrThrow(input: string, options?: { readonly sourceName?: string }): T
 }
+
 export const replySuccess = <T>(
   value: T,
   offset: number,
   cut = false
 ): Reply<T> => ({ ok: true, value, offset, cut })
+
 export const replyFailure = (
   diagnostic: Diagnostic,
   offset: number,
   cut = false,
   fatal = false
 ): Reply<never> => ({ ok: false, diagnostic, offset, cut, fatal })
+
 export const combineCut = <T>(reply: Reply<T>, cut: boolean): Reply<T> =>
   cut && !reply.cut ? { ...reply, cut: true } : reply
 
 class ParserValue<T> implements Parser<T> {
   readonly [runner]: Run<T>
+
   constructor(run: Run<T>) {
     this[runner] = run
   }
+
   map<B>(f: (value: T) => B): Parser<B> {
     return makeParser((source, offset) => {
       const reply = runParser(this, source, offset)
@@ -84,6 +110,7 @@ class ParserValue<T> implements Parser<T> {
         : reply
     })
   }
+
   flatMap<B>(f: (value: T) => Parser<B>): Parser<B> {
     return makeParser((source, offset) => {
       const reply = runParser(this, source, offset)
@@ -92,6 +119,7 @@ class ParserValue<T> implements Parser<T> {
         : reply
     })
   }
+
   zip<B>(other: Parser<B>): Parser<[T, B]> {
     return makeParser((source, offset) => {
       const left = runParser(this, source, offset)
@@ -106,6 +134,7 @@ class ParserValue<T> implements Parser<T> {
         : combineCut(right, left.cut)
     })
   }
+
   zipRight<B>(other: Parser<B>): Parser<B> {
     return makeParser((source, offset) => {
       const left = runParser(this, source, offset)
@@ -114,6 +143,7 @@ class ParserValue<T> implements Parser<T> {
         : left
     })
   }
+
   zipLeft<B>(other: Parser<B>): Parser<T> {
     return makeParser((source, offset) => {
       const left = runParser(this, source, offset)
@@ -124,9 +154,11 @@ class ParserValue<T> implements Parser<T> {
         : combineCut(right, left.cut)
     })
   }
+
   *[Symbol.iterator](): Generator<Parser<T>, T, unknown> {
     return (yield this) as T
   }
+
   expected(description: string): Parser<T> {
     return makeParser((source, offset) => {
       const reply = runParser(this, source, offset)
@@ -141,6 +173,7 @@ class ParserValue<T> implements Parser<T> {
       }
     })
   }
+
   context(description: string): Parser<T> {
     return makeParser((source, offset) => {
       const reply = runParser(this, source, offset)
@@ -155,6 +188,7 @@ class ParserValue<T> implements Parser<T> {
           }
     })
   }
+
   withSpan<B>(f: (value: T, span: Span) => B): Parser<B> {
     return makeParser((source, offset) => {
       const reply = runParser(this, source, offset)
@@ -167,6 +201,7 @@ class ParserValue<T> implements Parser<T> {
         : reply
     })
   }
+
   validate(
     predicate: (value: T) => boolean | string,
     message = "valid value"
@@ -178,21 +213,26 @@ class ParserValue<T> implements Parser<T> {
         : fail(typeof result === "string" ? result : message)
     })
   }
+
   trim(trivia: Parser<unknown>): Parser<T> {
     return trivia.zipRight(this).zipLeft(trivia)
   }
+
   trimLeft(trivia: Parser<unknown>): Parser<T> {
     return trivia.zipRight(this)
   }
+
   trimRight(trivia: Parser<unknown>): Parser<T> {
     return this.zipLeft(trivia)
   }
+
   commit(): Parser<T> {
     return makeParser((source, offset) => {
       const reply = runParser(this, source, offset)
       return reply.ok ? combineCut(reply, true) : reply
     })
   }
+
   parse(
     input: string,
     options: { readonly sourceName?: string } = {}
@@ -222,6 +262,7 @@ class ParserValue<T> implements Parser<T> {
       }
     return { success: true, value: reply.value }
   }
+
   parsePrefix(
     input: string,
     options: { readonly sourceName?: string } = {}
@@ -240,6 +281,7 @@ class ParserValue<T> implements Parser<T> {
           error: new ParseError(reply.diagnostic, source, reply.fatal)
         }
   }
+
   parseOrThrow(
     input: string,
     options: { readonly sourceName?: string } = {}
@@ -249,6 +291,7 @@ class ParserValue<T> implements Parser<T> {
     return result.value
   }
 }
+
 export function runParser<T>(
   parser: Parser<T>,
   source: SourceText,
@@ -256,12 +299,15 @@ export function runParser<T>(
 ): Reply<T> {
   return parser[runner](source, offset)
 }
+
 export function makeParser<T>(run: Run<T>): Parser<T> {
   return new ParserValue(run)
 }
+
 export function succeed<T>(value: T): Parser<T> {
   return makeParser((_source, offset) => replySuccess(value, offset))
 }
+
 export function fail(message: string): Parser<never> {
   return makeParser((_source, offset) =>
     replyFailure(
@@ -270,6 +316,7 @@ export function fail(message: string): Parser<never> {
     )
   )
 }
+
 export function fatal(message: string): Parser<never> {
   return makeParser((_source, offset) =>
     replyFailure(
@@ -280,6 +327,7 @@ export function fatal(message: string): Parser<never> {
     )
   )
 }
+
 export function parser<T>(
   f: () => Generator<Parser<unknown>, T, unknown>
 ): Parser<T> {
@@ -300,13 +348,12 @@ export function parser<T>(
       return replySuccess(current.value, offset, cut)
     } finally {
       if (!completed) {
-        while (!iterator.return(undefined as never).done) {
-          // Continue cancellation without running parsers yielded by finalizers.
-        }
+        while (!iterator.return(undefined as never).done) {}
       }
     }
   })
 }
+
 export function recursive<T>(
   builder: (self: Parser<T>) => Parser<T>
 ): Parser<T> {

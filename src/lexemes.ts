@@ -7,6 +7,7 @@ export type LexemeOptions<K extends readonly string[]> = {
   readonly identifier: RegExp
   readonly keywords?: K
 }
+
 export type Lexemes<K extends readonly string[]> = {
   readonly trivia: Parser<unknown>
   readonly identifier: Parser<string>

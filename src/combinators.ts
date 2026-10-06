@@ -13,8 +13,10 @@ import {
 import type { SourcePosition } from "./errors.ts"
 
 const digitTest = (c: string) => c >= "0" && c <= "9"
+
 const letterTest = (c: string) =>
   (c >= "a" && c <= "z") || (c >= "A" && c <= "Z")
+
 const expected = (
   source: SourceText,
   offset: number,
@@ -52,12 +54,14 @@ function literalDiagnostic(
     expected: [JSON.stringify(value)]
   }
 }
+
 export const literal = <const S extends string>(value: S): Parser<S> =>
   makeParser((source, offset) =>
     source.text.startsWith(value, offset)
       ? replySuccess(value, offset + value.length)
       : replyFailure(literalDiagnostic(source, offset, value), offset)
   )
+
 export const oneOfLiterals = <
   const Values extends readonly [string, ...string[]]
 >(
@@ -81,6 +85,7 @@ export const oneOfLiterals = <
     )
   })
 }
+
 export const char = <const C extends string>(value: C): Parser<C> => {
   const code = value.codePointAt(0)
   if (
@@ -95,6 +100,7 @@ export const char = <const C extends string>(value: C): Parser<C> => {
       : expected(source, offset, JSON.stringify(value))
   )
 }
+
 export function satisfy(
   predicate: (char: string) => boolean,
   description = "character"
@@ -106,19 +112,25 @@ export function satisfy(
       : expected(source, offset, description)
   })
 }
+
 export function anyChar(): Parser<string> {
   return satisfy(() => true, "any character")
 }
+
 export const digit = satisfy(digitTest, "digit")
+
 export const asciiLetter = satisfy(letterTest, "ASCII letter")
+
 export const asciiAlphanumeric = satisfy(
   c => letterTest(c) || digitTest(c),
   "ASCII alphanumeric character"
 )
+
 export const whitespace = satisfy(
   c => c === " " || c === "\t" || c === "\n" || c === "\r",
   "whitespace"
 )
+
 export function notFollowedBy<T>(inner: Parser<T>): Parser<true> {
   return makeParser((source, offset) => {
     const reply = runParser(inner, source, offset)
@@ -133,6 +145,7 @@ export function notFollowedBy<T>(inner: Parser<T>): Parser<true> {
     )
   })
 }
+
 export function lookahead<T>(inner: Parser<T>): Parser<T> {
   return makeParser((source, offset) => {
     const reply = runParser(inner, source, offset)
@@ -142,9 +155,11 @@ export function lookahead<T>(inner: Parser<T>): Parser<T> {
       : { ...reply, offset, cut: false }
   })
 }
+
 export function probe<T>(inner: Parser<T>): Parser<T | undefined> {
   return optional(lookahead(inner))
 }
+
 export function takeWhileChar(
   predicate: (char: string) => boolean
 ): Parser<string> {
@@ -155,6 +170,7 @@ export function takeWhileChar(
     return replySuccess(source.text.slice(offset, end), end)
   })
 }
+
 export function takeWhileChar1(
   predicate: (char: string) => boolean,
   description: string
@@ -167,6 +183,7 @@ export function takeWhileChar1(
       : reply
   })
 }
+
 export function between<T>(
   start: Parser<unknown>,
   end: Parser<unknown>,
@@ -174,22 +191,26 @@ export function between<T>(
 ): Parser<T> {
   return start.zipRight(inner).zipLeft(end.expected("closing delimiter"))
 }
+
 function ensureCount(n: number): void {
   if (!Number.isSafeInteger(n) || n < 0)
     throw new RangeError("count must be a safe nonnegative integer")
 }
+
 function repeat<T>(
   inner: Parser<T>,
   min: number,
   max: number,
   collect: true
 ): Parser<T[]>
+
 function repeat<T>(
   inner: Parser<T>,
   min: number,
   max: number,
   collect: false
 ): Parser<void>
+
 function repeat<T>(
   inner: Parser<T>,
   min: number,
@@ -214,32 +235,50 @@ function repeat<T>(
     return replySuccess(values, offset, cut)
   })
 }
+
+type ParserPayload<P> = P extends Parser<infer T> ? T : never
+
 export function many<T>(inner: Parser<T>): Parser<T[]>
-export function many(inner: Parser<any>): Parser<any>
-export function many<T>(inner: Parser<T>): Parser<T[]> {
+
+export function many<P extends Parser<unknown>>(
+  inner: P
+): Parser<ParserPayload<P>[]>
+
+export function many(inner: Parser<unknown>): Parser<unknown> {
   return repeat(inner, 0, Infinity, true)
 }
+
 export function many1<T>(inner: Parser<T>): Parser<T[]>
-export function many1(inner: Parser<any>): Parser<any>
-export function many1<T>(inner: Parser<T>): Parser<T[]> {
+
+export function many1<P extends Parser<unknown>>(
+  inner: P
+): Parser<ParserPayload<P>[]>
+
+export function many1(inner: Parser<unknown>): Parser<unknown> {
   return repeat(inner, 1, Infinity, true)
 }
-export function skipMany<T>(inner: Parser<T>): Parser<void>
-export function skipMany(inner: Parser<any>): Parser<any>
-export function skipMany<T>(inner: Parser<T>): Parser<void> {
+
+export function skipMany(inner: Parser<unknown>): Parser<void> {
   return repeat(inner, 0, Infinity, false)
 }
+
 export function atLeast<T>(inner: Parser<T>, n: number): Parser<T[]> {
   ensureCount(n)
   return repeat(inner, n, Infinity, true)
 }
+
 export function count<T>(inner: Parser<T>, n: number): Parser<T[]> {
   ensureCount(n)
   return repeat(inner, n, n, true)
 }
+
 export function optional<T>(inner: Parser<T>): Parser<T | undefined>
-export function optional(inner: Parser<any>): Parser<any>
-export function optional<T>(inner: Parser<T>): Parser<T | undefined> {
+
+export function optional<P extends Parser<unknown>>(
+  inner: P
+): Parser<ParserPayload<P> | undefined>
+
+export function optional(inner: Parser<unknown>): Parser<unknown> {
   return makeParser((source, offset) => {
     const reply = runParser(inner, source, offset)
     return reply.ok || reply.fatal || reply.cut
@@ -247,6 +286,7 @@ export function optional<T>(inner: Parser<T>): Parser<T | undefined> {
       : replySuccess(undefined, offset)
   })
 }
+
 function list<T, S>(
   inner: Parser<T>,
   separator: Parser<S>,
@@ -285,22 +325,27 @@ function list<T, S>(
     }
   })
 }
+
 export const sepBy = <T, S>(
   inner: Parser<T>,
   separator: Parser<S>
 ): Parser<T[]> => list(inner, separator, false, false)
+
 export const sepBy1 = <T, S>(
   inner: Parser<T>,
   separator: Parser<S>
 ): Parser<T[]> => list(inner, separator, false, true)
+
 export const sepEndBy = <T, S>(
   inner: Parser<T>,
   separator: Parser<S>
 ): Parser<T[]> => list(inner, separator, true, false)
+
 export const sepEndBy1 = <T, S>(
   inner: Parser<T>,
   separator: Parser<S>
 ): Parser<T[]> => list(inner, separator, true, true)
+
 function scanUntil<T>(inner: Parser<T>, consumeMatch: boolean): Parser<string> {
   return makeParser((source, offset) => {
     let current = offset
@@ -318,17 +363,22 @@ function scanUntil<T>(inner: Parser<T>, consumeMatch: boolean): Parser<string> {
     }
   })
 }
+
 export const takeUntil = <T>(inner: Parser<T>): Parser<string> =>
   scanUntil(inner, true)
+
 export const takeUpto = <T>(inner: Parser<T>): Parser<string> =>
   scanUntil(inner, false)
+
 export const skipUntil = <T>(inner: Parser<T>): Parser<void> =>
   scanUntil(inner, true).map(() => undefined)
+
 export function choice<
   Parsers extends readonly [Parser<any>, ...Parser<any>[]]
 >(
   ...parsers: Parsers
 ): Parser<Parsers[number] extends Parser<infer T> ? T : never>
+
 export function choice(...parsers: Parser<any>[]): Parser<any> {
   if (!parsers.length)
     throw new TypeError("choice requires at least one parser")
@@ -345,6 +395,7 @@ export function choice(...parsers: Parser<any>[]): Parser<any> {
     )
   })
 }
+
 export const sequence = <const Parsers extends readonly Parser<unknown>[]>(
   parsers: Parsers
 ): Parser<{
@@ -359,6 +410,7 @@ export const sequence = <const Parsers extends readonly Parser<unknown>[]>(
         : never
     }
   })
+
 export const regex = (expression: RegExp): Parser<string> => {
   const sticky = new RegExp(
     expression.source,
@@ -375,16 +427,20 @@ export const regex = (expression: RegExp): Parser<string> => {
       : expected(source, offset, expression.toString())
   })
 }
+
 export const eof = makeParser<void>((source, offset) =>
   offset >= source.text.length
     ? replySuccess(undefined, offset)
     : expected(source, offset, "end of input")
 )
+
 export const position: Parser<SourcePosition> = makeParser((source, offset) =>
   replySuccess({ ...source.positionAt(offset), offset }, offset)
 )
+
 export const commit = (): Parser<void> =>
   makeParser((_source, offset) => replySuccess(undefined, offset, true))
+
 export function attempt<T>(inner: Parser<T>): Parser<T> {
   return makeParser((source, offset) => {
     const reply = runParser(inner, source, offset)

@@ -1,10 +1,3 @@
-/**
- * Macro benchmark: JSON parsing.
- *
- * Compares the parserator JSON example parser against Parsimmon (the
- * long-standing reference JS combinator library) and native JSON.parse
- * (the theoretical ceiling). Run with: pnpm bench:json
- */
 import { bench, group, run, summary } from "mitata"
 import { json as parseratorJson } from "../examples/json-parser.ts"
 import { parseJson as parsimmonJson } from "./json-parsimmon.ts"
@@ -22,7 +15,6 @@ function parserator(input: string): unknown {
   return result.value
 }
 
-// Sanity: all parsers must agree with JSON.parse before we measure anything.
 for (const [name, fixture] of Object.entries({
   jsonSmall,
   jsonMedium,

@@ -1,7 +1,3 @@
-/**
- * JSON parser written in Parsimmon, mirroring examples/json-parser.ts as
- * closely as possible so the comparison is apples-to-apples.
- */
 import P from "parsimmon"
 
 const whitespace = P.regexp(/\s*/)

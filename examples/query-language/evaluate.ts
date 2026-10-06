@@ -22,7 +22,6 @@ function compare(
   return actual <= expected
 }
 
-/** Evaluate a parsed query against a flat or dotted-path object. */
 export function evaluate(
   query: Query,
   record: Record<string, unknown>

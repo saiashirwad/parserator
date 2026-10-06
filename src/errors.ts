@@ -7,6 +7,7 @@ type DiagnosticDetails = {
   readonly context?: readonly string[]
   readonly hints?: readonly string[]
 }
+
 export type Diagnostic = DiagnosticDetails &
   (
     | {
@@ -16,6 +17,7 @@ export type Diagnostic = DiagnosticDetails &
     | { readonly kind: "unexpected"; readonly found: string }
     | { readonly kind: "custom"; readonly message: string }
   )
+
 export type DiagnosticJson = Diagnostic & {
   readonly sourceName?: string
   readonly fatal: boolean
@@ -27,10 +29,11 @@ export type SourcePosition = {
   readonly offset: number
 }
 
-/** Source text shared by diagnostics and their renderers. */
 export class SourceText {
   readonly text: string
+
   readonly name: string | undefined
+
   #lineStarts: number[] | undefined
 
   constructor(text: string, name?: string) {
@@ -110,9 +113,9 @@ export function fatalMessage(message?: string): string {
   return `Fatal: ${detail}`
 }
 
-/** The stable public parse error. */
 export class ParseError extends Error {
   readonly diagnostic: Diagnostic
+
   readonly source: SourceText
 
   readonly fatal: boolean

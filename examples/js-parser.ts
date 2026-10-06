@@ -21,16 +21,16 @@ import {
 } from "../src/index.ts"
 import type { Parser } from "../src/index.ts"
 
-// =============================================================================
-// Lexical Elements
-// =============================================================================
-
 const whitespace = regex(/\s+/).context("whitespace")
+
 const lineComment = regex(/\/\/[^\r\n\u2028\u2029]*/).context("line comment")
+
 const blockComment = regex(/\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\//).context(
   "block comment"
 )
+
 const space = choice(whitespace, lineComment, blockComment)
+
 const spaces = skipMany(space)
 
 function token<T>(parser: Parser<T>): Parser<T> {
@@ -48,6 +48,7 @@ const keywords = [
   "false",
   "null"
 ]
+
 const keyword = (k: string) =>
   token(literal(k).zipLeft(regex(/(?![a-zA-Z0-9_])/)))
 
@@ -63,7 +64,6 @@ const identifier: Parser<string> = token(
     )
 )
 
-// Literals
 const numberLiteral = token(
   regex(/-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/)
     .map(Number)
@@ -86,7 +86,6 @@ const booleanLiteral = token(
 
 const nullLiteral = token(keyword("null").map(() => null)).context("null")
 
-// Operators
 const assignmentOp = token(
   choice(
     literal("="),
@@ -96,11 +95,8 @@ const assignmentOp = token(
     literal("/=")
   )
 )
-const unaryOp = token(choice(literal("!"), literal("-"), literal("+")))
 
-// =============================================================================
-// AST Types
-// =============================================================================
+const unaryOp = token(choice(literal("!"), literal("-"), literal("+")))
 
 type Expression =
   | { type: "identifier"; name: string }
@@ -131,37 +127,27 @@ type Statement =
   | { type: "return"; value?: Expression | undefined }
   | { type: "block"; body: Statement[] }
 
-// =============================================================================
-// Expression Parsers
-// =============================================================================
-
-// Forward declaration for recursive parsers
 let expression: Parser<Expression>
 
-// Primary expressions
 const primaryExpression: Parser<Expression> = choice(
-  // Literals
   numberLiteral.map(value => ({ type: "literal" as const, value })),
   stringLiteral.map(value => ({ type: "literal" as const, value })),
   booleanLiteral.map(value => ({ type: "literal" as const, value })),
   nullLiteral.map(value => ({ type: "literal" as const, value })),
 
-  // Function expression
   attempt(
     parser(function* () {
       yield* keyword("function")
       yield* token(char("(")).expected("opening parenthesis after 'function'")
       const params = yield* sepBy(identifier, token(char(",")))
       yield* token(char(")")).expected("closing parenthesis")
-      const body = yield* blockStatement.expected("function body")
+      const body = yield* speculativeBlockStatement.expected("function body")
       return { type: "function" as const, params, body: body.body }
     })
   ),
 
-  // Identifier (after function expressions, so `function` gets its branch).
   identifier.map(name => ({ type: "identifier" as const, name })),
 
-  // Object literal
   attempt(
     parser(function* () {
       yield* token(char("{"))
@@ -186,7 +172,6 @@ const primaryExpression: Parser<Expression> = choice(
     })
   ),
 
-  // Array literal
   attempt(
     parser(function* () {
       yield* token(char("["))
@@ -200,7 +185,6 @@ const primaryExpression: Parser<Expression> = choice(
     })
   ),
 
-  // Parenthesized expression
   between(
     token(char("(")),
     token(char(")")),
@@ -208,14 +192,12 @@ const primaryExpression: Parser<Expression> = choice(
   )
 )
 
-// Postfix expressions (function calls, member access)
 const postfixExpression: Parser<Expression> = parser(function* () {
   let expr = yield* primaryExpression
 
   while (true) {
     const next = yield* optional(
       choice(
-        // Function call
         attempt(
           parser(function* () {
             yield* token(char("("))
@@ -229,7 +211,6 @@ const postfixExpression: Parser<Expression> = parser(function* () {
             return { type: "call" as const, args }
           })
         ),
-        // Member access
         attempt(
           parser(function* () {
             yield* token(char("."))
@@ -254,7 +235,6 @@ const postfixExpression: Parser<Expression> = parser(function* () {
   return expr
 })
 
-// Unary expressions
 const unaryExpression: Parser<Expression> = choice(
   parser(function* () {
     const op = yield* unaryOp
@@ -264,7 +244,6 @@ const unaryExpression: Parser<Expression> = choice(
   postfixExpression
 )
 
-// Binary expressions, from tightest to loosest precedence.
 const binaryOperator = <T extends string>(
   operator: Parser<T>
 ): Parser<(left: Expression, right: Expression) => Expression> =>
@@ -322,13 +301,12 @@ const binaryExpression: Parser<Expression> = precedence(unaryExpression, [
   }
 ])
 
-// Assignment expression
 expression = parser(function* () {
   const left = yield* binaryExpression
   const assignment = yield* optional(
     parser(function* () {
       const op = yield* assignmentOp
-      yield* commit() // After seeing assignment op, we're committed
+      yield* commit()
       const right = yield* expression.expected(
         "expression after assignment operator"
       )
@@ -337,7 +315,6 @@ expression = parser(function* () {
   )
 
   if (assignment) {
-    // Validate left-hand side
     if (left.type !== "identifier" && left.type !== "member") {
       return yield* fatal("Invalid assignment target")
     }
@@ -352,21 +329,17 @@ expression = parser(function* () {
   return left
 })
 
-// =============================================================================
-// Statement Parsers
-// =============================================================================
-
 let statement: Parser<Statement>
 
-const blockStatement: Parser<Extract<Statement, { type: "block" }>> = attempt(
-  parser(function* () {
-    yield* token(char("{"))
-    // Don't commit immediately - this could be an object literal
-    const body = yield* many(recursive<Statement>(() => statement))
-    yield* token(char("}")).expected("closing brace for block")
-    return { type: "block" as const, body }
-  })
-)
+const speculativeBlockStatement: Parser<Extract<Statement, { type: "block" }>> =
+  attempt(
+    parser(function* () {
+      yield* token(char("{"))
+      const body = yield* many(recursive<Statement>(() => statement))
+      yield* token(char("}")).expected("closing brace for block")
+      return { type: "block" as const, body }
+    })
+  )
 
 const variableStatement: Parser<Statement> = parser(function* () {
   const kind = (yield* choice(keyword("let"), keyword("const"))) as
@@ -398,7 +371,7 @@ const functionStatement: Parser<Statement> = parser(function* () {
   yield* token(char("(")).expected("opening parenthesis")
   const params = yield* sepBy(identifier, token(char(",")))
   yield* token(char(")")).expected("closing parenthesis")
-  const body = yield* blockStatement.expected("function body")
+  const body = yield* speculativeBlockStatement.expected("function body")
 
   return { type: "function" as const, name, params, body: body.body }
 })
@@ -438,7 +411,6 @@ const returnStatement: Parser<Statement> = parser(function* () {
   return { type: "return" as const, value }
 })
 
-// Expression statement
 const expressionStatement: Parser<Statement> = parser(function* () {
   const expr = yield* expression
   yield* token(char(";")).expected("semicolon after expression")
@@ -446,7 +418,7 @@ const expressionStatement: Parser<Statement> = parser(function* () {
 })
 
 statement = choice(
-  blockStatement,
+  speculativeBlockStatement,
   variableStatement,
   functionStatement,
   ifStatement,
@@ -454,7 +426,6 @@ statement = choice(
   expressionStatement
 )
 
-// Program parser
 export const program = parser(function* () {
   yield* spaces
   const statements = yield* many(statement)

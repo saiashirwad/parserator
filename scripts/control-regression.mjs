@@ -94,16 +94,15 @@ function compile(ast, events) {
 
 function normalize(result, metadata) {
   if (result.success) {
-    const prefix = "offset" in result ? result : result.value
     return {
       success: true,
-      value: prefix.value,
-      offset: prefix.offset,
-      rest: prefix.rest
+      value: result.value,
+      offset: result.offset,
+      rest: result.rest
     }
   }
   const { diagnostic, source } = result.error
-  const fatal = result.error.fatal ?? diagnostic.kind === "fatal"
+  const fatal = result.error.fatal
   return {
     success: false,
     fatal,
@@ -135,7 +134,6 @@ function observe(ast, input, wrapped, metadata) {
       events
     }
   } catch (error) {
-    // Only known progress guards and the deliberate callback sentinel are outcomes.
     if (
       !(error instanceof Error) ||
       (!error.message.includes("must consume input") &&

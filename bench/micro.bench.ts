@@ -1,8 +1,3 @@
-/**
- * Micro benchmarks for individual combinators — these isolate the primitives
- * that dominate real parser workloads so regressions are attributable.
- * Run with: pnpm bench:micro
- */
 import assert from "node:assert/strict"
 import { bench, group, run, summary } from "mitata"
 import {
@@ -98,7 +93,6 @@ group("repetition: sepBy identifiers", () => {
 })
 
 group("failure path: choice with failing alternatives", () => {
-  // Measures the cost of constructing errors that get discarded (backtracking)
   const p = many(
     choice(
       literal("nope1"),

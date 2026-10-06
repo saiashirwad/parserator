@@ -44,7 +44,7 @@ import {
 } from "../src/advanced.ts"
 import { generateHints, levenshteinDistance } from "../src/diagnostics.ts"
 
-function failure<T>(result: ReturnType<Parser<T>["parse"]>) {
+function failure(result: ReturnType<Parser<unknown>["parse"]>) {
   if (result.success) throw new Error("expected failure")
   return result.error
 }

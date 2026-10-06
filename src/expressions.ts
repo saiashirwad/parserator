@@ -9,9 +9,9 @@ import {
 } from "./parser.ts"
 
 export type BinaryOperator<T> = Parser<(left: T, right: T) => T>
+
 export type UnaryOperator<T> = Parser<(value: T) => T>
 
-/** Parse one or more terms, folding operators from left to right. */
 export function chainLeft1<T>(
   term: Parser<T>,
   operator: BinaryOperator<T>
@@ -46,7 +46,6 @@ export function chainLeft1<T>(
   })
 }
 
-/** Parse one or more terms, folding operators from right to left. */
 export function chainRight1<T>(
   term: Parser<T>,
   operator: BinaryOperator<T>
@@ -88,7 +87,6 @@ export function chainRight1<T>(
   })
 }
 
-/** Parse zero or more prefix operators and apply them from right to left. */
 export function prefix<T>(
   operator: UnaryOperator<T>,
   operand: Parser<T>
@@ -103,7 +101,6 @@ export function prefix<T>(
   })
 }
 
-/** Parse zero or more postfix operators and apply them from left to right. */
 export function postfix<T>(
   operand: Parser<T>,
   operator: UnaryOperator<T>

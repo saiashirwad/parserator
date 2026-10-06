@@ -20,8 +20,8 @@ type JsonValue =
   | JsonValue[]
   | { [key: string]: JsonValue }
 
-// JSON permits only space, tab, carriage return, and line feed as whitespace.
 const whitespace = regex(/[ \t\r\n]*/)
+
 const token = <T>(p: Parser<T>): Parser<T> =>
   whitespace.zipRight(p).zipLeft(whitespace)
 
@@ -56,12 +56,8 @@ const escape = char("\\").zipRight(
   )
 )
 
-// Hoisted out of the generator: constructing parsers inside a parse loop
-// would recompile the regex and reallocate the `choice` on every iteration.
 const stringPart = choice(
   escape,
-  // JSON strings cannot contain unescaped control characters. Keep this as a
-  // predicate so lint does not mistake the source for a control character.
   takeWhileChar1(
     char => char !== '"' && char !== "\\" && (char.codePointAt(0) ?? 0) > 0x1f,
     "JSON string character"

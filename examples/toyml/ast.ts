@@ -1,8 +1,3 @@
-// ToyML AST Types
-// An ML-like language without modules
-
-// Literals
-
 export type Literal =
   | { readonly tag: "Int"; value: number }
   | { readonly tag: "Float"; value: number }
@@ -19,8 +14,6 @@ export const Literal = {
   bool: (value: boolean): Literal => ({ tag: "Bool", value }),
   unit: (): Literal => ({ tag: "Unit" })
 }
-
-// Patterns (for let bindings and match expressions)
 
 export type Pattern =
   | { readonly tag: "PWildcard" }
@@ -63,8 +56,6 @@ export const Pattern = {
   })
 }
 
-// Types
-
 export type Type =
   | { readonly tag: "TConst"; name: string }
   | { readonly tag: "TVar"; name: string }
@@ -85,7 +76,6 @@ export const Type = {
   }),
   list: (element: Type): Type => ({ tag: "TList", element }),
 
-  // Common type constructors
   int: (): Type => Type.const("int"),
   float: (): Type => Type.const("float"),
   bool: (): Type => Type.const("bool"),
@@ -93,8 +83,6 @@ export const Type = {
   char: (): Type => Type.const("char"),
   unit: (): Type => Type.const("unit")
 }
-
-// Expressions
 
 export type Expr =
   | { readonly tag: "ELit"; literal: Literal }
@@ -198,7 +186,6 @@ export const Expr = {
     type
   }),
 
-  // Convenience constructors
   int: (n: number): Expr => Expr.lit(Literal.int(n)),
   float: (n: number): Expr => Expr.lit(Literal.float(n)),
   bool: (b: boolean): Expr => Expr.lit(Literal.bool(b)),
@@ -206,8 +193,6 @@ export const Expr = {
   char: (c: string): Expr => Expr.lit(Literal.char(c)),
   unit: (): Expr => Expr.lit(Literal.unit())
 }
-
-// Type Definitions
 
 export type TypeParam = string
 
@@ -260,8 +245,6 @@ export const TypeDef = {
   })
 }
 
-// Top-level Declarations
-
 export type Declaration =
   | { readonly tag: "DLet"; recursive: boolean; bindings: LetBinding[] }
   | { readonly tag: "DType"; definitions: TypeDef[] }
@@ -283,7 +266,5 @@ export const Declaration = {
     args
   })
 }
-
-// Program
 
 export type Program = Declaration[]

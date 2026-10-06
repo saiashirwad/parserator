@@ -1,5 +1,7 @@
 export { fail, fatal, parser, recursive, succeed } from "./parser.ts"
+
 export type { Parser, ParseResult, PrefixParseResult } from "./parser.ts"
+
 export type { SourcePosition } from "./errors.ts"
 
 export {
@@ -40,6 +42,7 @@ export {
 } from "./combinators.ts"
 
 export { createLexemes } from "./lexemes.ts"
+
 export type { LexemeOptions, Lexemes } from "./lexemes.ts"
 export {
   chainLeft1,
@@ -48,6 +51,7 @@ export {
   postfix,
   precedence
 } from "./expressions.ts"
+
 export type {
   BinaryOperator,
   UnaryOperator,
@@ -55,7 +59,9 @@ export type {
 } from "./expressions.ts"
 
 export { ParseError, SourceText } from "./errors.ts"
+
 export type { Diagnostic, DiagnosticJson, Span } from "./errors.ts"
+
 export type { ErrorFormatterOptions } from "./error-formatter.ts"
 
 export {

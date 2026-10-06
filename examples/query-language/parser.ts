@@ -25,7 +25,6 @@ const lex = createLexemes({
   keywords: ["AND", "OR"] as const
 })
 
-/** The lexical layer is exported so applications can reuse its keyword rules. */
 export const queryLexemes = lex
 
 const quotedValue: Parser<string> = lex.token(
@@ -33,6 +32,7 @@ const quotedValue: Parser<string> = lex.token(
 )
 
 const bareValue: Parser<string> = lex.token(regex(/[A-Za-z0-9_./-]+/))
+
 const numberValue: Parser<number> = lex
   .token(
     regex(/-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?/).zipLeft(
@@ -40,6 +40,7 @@ const numberValue: Parser<number> = lex
     )
   )
   .map(Number)
+
 const value: Parser<Value> = choice(numberValue, quotedValue, bareValue)
   .expected("query value")
   .context("comparison")
@@ -87,11 +88,11 @@ const expressionBody: Parser<QueryNode> = recursive(self => {
 const expectedOperator = choice(lex.keyword("AND"), lex.keyword("OR")).flatMap(
   word => fail(`Unexpected trailing keyword ${JSON.stringify(word)}`)
 )
+
 export const expression: Parser<QueryNode> = expressionBody.zipLeft(
   choice(expectedOperator, eof)
 )
 
-/** A complete, whitespace-tolerant query parser. */
 export const query: Parser<QueryNode> = lex
   .complete(expression)
   .context("query")

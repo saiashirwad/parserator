@@ -33,9 +33,13 @@ import type {
 } from "./ast.ts"
 
 const whitespace = regex(/[ \t\n\r]+/)
+
 const ocamlComment = regex(/\(\*[^*]*\*+(?:[^(*][^*]*\*+)*\)/)
+
 const haskellComment = regex(/--[^\n]*/)
+
 const space = choice(whitespace, ocamlComment, haskellComment)
+
 const spaces = skipMany(space)
 
 function token<T>(p: Parser<T>): Parser<T> {
@@ -308,7 +312,7 @@ const arrowType: Parser<Type> = parser(function* () {
   const first = yield* tupleType
   const rest = yield* many(token(literal("->")).zipRight(tupleType))
   if (rest.length === 0) return first
-  const last = rest[rest.length - 1]! // non-empty: checked above
+  const last = rest[rest.length - 1]!
   return [first, ...rest.slice(0, -1)].reduceRight(
     (acc, t) => Type.arrow(t, acc),
     last
@@ -316,6 +320,7 @@ const arrowType: Parser<Type> = parser(function* () {
 })
 
 const expr: Parser<Expr> = recursive<Expr>(() => sequenceExpr)
+
 const nonSequenceExpr: Parser<Expr> = recursive<Expr>(() => simpleAnnotatedExpr)
 
 const litExpr: Parser<Expr> = literalValue.map(Expr.lit)

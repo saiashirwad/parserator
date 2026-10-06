@@ -1,7 +1,3 @@
-/**
- * Summarizes a V8 .cpuprofile: self-time per function, aggregated.
- * Usage: node bench/analyze-profile.ts bench/.profiles/<file>.cpuprofile
- */
 import { readFileSync } from "node:fs"
 
 const path = process.argv[2]

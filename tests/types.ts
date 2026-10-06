@@ -3,6 +3,10 @@ import {
   choice,
   digit,
   literal,
+  many,
+  many1,
+  optional,
+  skipMany,
   parser,
   position,
   sequence,
@@ -17,10 +21,6 @@ import {
   SourceText,
   type Reply
 } from "../src/advanced.ts"
-
-// This file is included by the repository's strict tsc check. The assignments
-// below are compile-time assertions; `void` keeps the assertion values live
-// without adding runtime tests.
 
 const literalResult: ParseResult<"let"> = literal("let").parse("let")
 const parsedPosition: SourcePosition = position.parseOrThrow("")
@@ -77,7 +77,6 @@ const opaqueCheck = () => {
 }
 void opaqueCheck
 
-// The implementation constructor is intentionally not part of the public API.
 const assertNotConstructible = () => {
   // @ts-expect-error Parser values must come from parser/combinator factories.
   new Parser(() => {
@@ -169,3 +168,25 @@ const delegated: Parser<{ tag: "node"; text: string; count: number }> = parser(
   }
 )
 void delegated
+
+const unionInference = (inner: Parser<"a"> | Parser<42>) => {
+  const repeated = many(inner).parseOrThrow("")
+  const nonempty = many1(inner).parseOrThrow("")
+  const maybe = optional(inner).parseOrThrow("")
+  const skipped = skipMany(inner).parseOrThrow("")
+  const values: ("a" | 42)[] = repeated
+  const nonemptyValues: ("a" | 42)[] = nonempty
+  const optionalValue: "a" | 42 | undefined = maybe
+  const skippedValue: void = skipped
+  // @ts-expect-error Repetition must not erase union payloads to any.
+  const invalidRepeated: boolean = repeated[0]!
+  // @ts-expect-error Nonempty repetition must not erase union payloads to any.
+  const invalidNonempty: boolean = nonempty[0]!
+  // @ts-expect-error Optional must not erase union payloads to any.
+  const invalidOptional: boolean = maybe!
+  // @ts-expect-error Skipping always returns void, never any.
+  const invalidSkipped: boolean = skipped
+  void [values, nonemptyValues, optionalValue, skippedValue]
+  void [invalidRepeated, invalidNonempty, invalidOptional, invalidSkipped]
+}
+void unionInference

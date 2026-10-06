@@ -18,6 +18,7 @@ export const keywordWithHints = (keywords: readonly string[]) => {
     return scanner.keyword([keyword])
   }
 }
+
 export function anyKeywordWithHints(
   keywords: readonly string[]
 ): Parser<string> {
@@ -54,6 +55,7 @@ const quotedString = makeParser<string>((source, offset) => {
     )
   return replySuccess(value, end + 1)
 })
+
 export function stringWithHints(
   validStrings: readonly string[]
 ): Parser<string> {

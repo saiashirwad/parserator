@@ -1,7 +1,3 @@
-/**
- * Deterministic benchmark fixtures. No Math.random so runs are comparable.
- */
-
 function mulberry32(seed: number) {
   let a = seed
   return () => {
@@ -76,7 +72,6 @@ export const jsonLarge = JSON.stringify(
   Array.from({ length: 900 }, () => randomValue(4))
 )
 
-// A long string-heavy document (exercises string parsing hot path)
 export const jsonStrings = JSON.stringify(
   Array.from({ length: 500 }, (_, i) => ({
     key: `item_${i}`,
@@ -85,12 +80,10 @@ export const jsonStrings = JSON.stringify(
   }))
 )
 
-// Number-heavy document
 export const jsonNumbers = JSON.stringify(
   Array.from({ length: 2000 }, (_, i) => i * 1.5 - 1000)
 )
 
-// CSV-like line-based fixture for micro benches
 export const csvLines = Array.from(
   { length: 1000 },
   (_, i) => `${i},${words[i % words.length]},${(i * 1.5).toFixed(2)},true`
