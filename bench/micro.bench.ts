@@ -3,6 +3,7 @@
  * that dominate real parser workloads so regressions are attributable.
  * Run with: pnpm bench:micro
  */
+import assert from "node:assert/strict"
 import { bench, group, run, summary } from "mitata"
 import {
   char,
@@ -55,23 +56,34 @@ group("sequence: generator vs zip chain", () => {
   summary(() => {
     const num = regex(/[0-9]+/).map(Number)
     const word = regex(/[a-z]+/)
+    const comma = char(",")
+    const decimal = regex(/[0-9.]+/)
+    const boolean = choice(literal("true"), literal("false"))
+    const newline = char("\n")
     const genRow = parser(function* () {
       const a = yield* num
-      yield* char(",")
+      yield* comma
       const b = yield* word
-      yield* char(",")
-      const c = yield* regex(/[0-9.]+/)
-      yield* char(",")
-      const d = yield* choice(literal("true"), literal("false"))
+      yield* comma
+      const c = yield* decimal
+      yield* comma
+      const d = yield* boolean
       return [a, b, c, d] as const
     })
     const zipRow = num
-      .zipLeft(char(","))
-      .zip(word.zipLeft(char(",")))
-      .zip(regex(/[0-9.]+/).zipLeft(char(",")))
-      .zip(choice(literal("true"), literal("false")))
-    const genCsv = sepBy(genRow, char("\n"))
-    const zipCsv = sepBy(zipRow, char("\n"))
+      .zipLeft(comma)
+      .zip(word.zipLeft(comma))
+      .zip(decimal.zipLeft(comma))
+      .zip(boolean)
+      .map(([[[a, b], c], d]) => [a, b, c, d] as const)
+    const genCsv = sepBy(genRow, newline)
+    const zipCsv = sepBy(zipRow, newline)
+    const expected = csvLines.split("\n").map(line => {
+      const [a, b, c, d] = line.split(",")
+      return [Number(a), b, c, d]
+    })
+    assert.deepEqual(genCsv.parseOrThrow(csvLines), expected)
+    assert.deepEqual(zipCsv.parseOrThrow(csvLines), expected)
     bench("generator rows (csv 1000 lines)", () =>
       genCsv.parseOrThrow(csvLines))
     bench("zip-chain rows (csv 1000 lines)", () =>
@@ -96,6 +108,31 @@ group("failure path: choice with failing alternatives", () => {
     )
   )
   bench("choice failure-heavy x2000", () => p.parseOrThrow(spacedWords + " "))
+})
+
+group("diagnostics: tiny malformed input, parse + format", () => {
+  const p = literal("[")
+    .zipRight(regex(/[0-9]+/))
+    .zipLeft(literal("]"))
+  for (const [name, input, offset] of [
+    ["start", "!123]", 0],
+    ["end", "[123!", 4]
+  ] as const) {
+    const parseAndFormat = () => {
+      const result = p.parse(input, { sourceName: "tiny.txt" })
+      if (result.success) throw new Error("Expected malformed input to fail")
+      return result.error.format({ style: "plain" })
+    }
+    const result = p.parse(input)
+    assert.equal(result.success, false)
+    if (!result.success)
+      assert.equal(result.error.diagnostic.span.start, offset)
+    const formatted = parseAndFormat()
+    assert.ok(formatted.includes(`tiny.txt:line 1, column ${offset + 1}:`))
+    assert.ok(formatted.includes(input))
+    assert.ok(formatted.includes("^"))
+    bench(`malformed ${name} (${input.length} UTF-16 units)`, parseAndFormat)
+  }
 })
 
 await run()

@@ -28,9 +28,19 @@ The JSON comparison is a workload comparison, not a product claim. Native
 `JSON.parse` is a useful correctness reference and is expected to be faster.
 Parsimmon is a familiar combinator baseline, not a target identity.
 
-The next benchmark expansion should include malformed input failing near the
-start, malformed input failing near the end, and alternative-heavy failures.
-Those cases matter for parser diagnostics and backtracking costs.
+The micro CSV comparison constructs shared primitive parsers before timing and
+normalizes generator and zip-chain results to the same flat row tuples. Both
+results are checked against independently split CSV fixtures before timing.
+Older results that constructed primitives inside the generator or returned
+nested zip tuples are not directly comparable to this corrected harness.
+
+Tiny malformed-start and malformed-end cases measure parsing plus plain error
+formatting, including source names. Their failure offsets and formatted output
+are checked before timing. They complement the alternative-heavy backtracking
+case; they do not represent large-document diagnostic costs.
+
+Mitata's displayed average is a mean, not a median. Preserve raw output and
+report repeated-run variation rather than relabeling these averages as medians.
 
 ## Benchmark hygiene
 

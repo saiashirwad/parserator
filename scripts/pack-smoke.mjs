@@ -23,7 +23,16 @@ function run(command, args, cwd = root) {
 
 const packJson = execFileSync(
   "npm",
-  ["pack", "--json", "--pack-destination", temp],
+  [
+    "pack",
+    "--offline",
+    "--no-audit",
+    "--no-fund",
+    "--ignore-scripts",
+    "--json",
+    "--pack-destination",
+    temp
+  ],
   { cwd: root, encoding: "utf8" }
 )
 const packed = JSON.parse(packJson)
@@ -41,18 +50,39 @@ writeFileSync(
 )
 run(
   "npm",
-  ["install", "--ignore-scripts", "--no-package-lock", tarballPath],
+  [
+    "install",
+    "--offline",
+    "--no-audit",
+    "--no-fund",
+    "--ignore-scripts",
+    "--no-package-lock",
+    tarballPath
+  ],
   consumer
 )
 
 writeFileSync(
   join(consumer, "index.mjs"),
   [
+    'import assert from "node:assert/strict"',
     'import { literal } from "parserator"',
     'import { makeParser } from "parserator/advanced"',
     'import { ParseError } from "parserator/diagnostics"',
-    'if (!literal("ok").parseOrThrow("ok")) process.exit(1)',
-    'if (typeof makeParser !== "function" || typeof ParseError !== "function") process.exit(1)',
+    'const parser = literal("ok")',
+    'assert.equal(parser.parseOrThrow("ok"), "ok")',
+    'assert.equal(typeof makeParser, "function")',
+    'assert.equal("then" in parser, false)',
+    "assert.equal(await Promise.resolve(parser), parser)",
+    'const result = parser.parse("no", { sourceName: "consumer.txt" })',
+    "assert.equal(result.success, false)",
+    "assert.ok(result.error instanceof ParseError)",
+    'const plain = result.error.format({ style: "plain" })',
+    'const ansi = result.error.format({ style: "ansi" })',
+    "assert.match(plain, /consumer\\.txt:line 1, column 1:/)",
+    'assert.ok(!plain.includes("\\x1b["))',
+    'assert.ok(ansi.includes("\\x1b["))',
+    'assert.equal(ansi.replace(/\\x1b\\[[0-9;]*m/g, ""), plain)',
     ""
   ].join("\n")
 )
@@ -61,33 +91,47 @@ run(process.execPath, ["index.mjs"], consumer)
 writeFileSync(
   join(consumer, "index.ts"),
   [
-    'import { literal } from "parserator"',
+    'import { literal, parser, choice, sequence } from "parserator"',
     'import { makeParser } from "parserator/advanced"',
     'import { ParseError, type Span } from "parserator/diagnostics"',
-    'const parser = literal("ok")',
-    'parser.parseOrThrow("ok")',
-    "void [makeParser, ParseError, {} as Span]",
+    "type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false",
+    'const value = literal("ok").parseOrThrow("ok")',
+    "const generated = parser(function* () {",
+    '  const yielded = yield* literal("ok")',
+    '  const exact: Equal<typeof yielded, "ok"> = true',
+    "  void exact",
+    "  return yielded",
+    '}).parseOrThrow("ok")',
+    'const union = choice(literal("yes"), literal("no")).parseOrThrow("yes")',
+    'const tuple = sequence([literal("a"), literal("b")]).parseOrThrow("ab")',
+    'const checks: [Equal<typeof value, "ok">, Equal<typeof generated, "ok">, Equal<typeof union, "yes" | "no">, Equal<typeof tuple, ["a", "b"]>] = [true, true, true, true]',
+    "void [makeParser, ParseError, {} as Span, checks]",
     ""
   ].join("\n")
 )
 const tsc = resolve(root, "node_modules/typescript/bin/tsc")
-run(
-  process.execPath,
-  [
-    tsc,
-    "--ignoreConfig",
-    "--noEmit",
-    "--skipLibCheck",
-    "--target",
-    "ES2022",
-    "--module",
-    "NodeNext",
-    "--moduleResolution",
-    "NodeNext",
-    "index.ts"
-  ],
-  consumer
-)
+for (const [module, resolution] of [
+  ["NodeNext", "NodeNext"],
+  ["ESNext", "Bundler"]
+]) {
+  run(
+    process.execPath,
+    [
+      tsc,
+      "--ignoreConfig",
+      "--noEmit",
+      "--strict",
+      "--target",
+      "ES2022",
+      "--module",
+      module,
+      "--moduleResolution",
+      resolution,
+      "index.ts"
+    ],
+    consumer
+  )
+}
 
 writeFileSync(
   join(consumer, "index.html"),
@@ -99,7 +143,9 @@ writeFileSync(
     'import { literal } from "parserator"',
     'import { makeParser } from "parserator/advanced"',
     'import { ParseError } from "parserator/diagnostics"',
-    'literal("ok"); void [makeParser, ParseError]',
+    'const result = literal("ok").parse("bad", { sourceName: "browser.txt" })',
+    'document.body.textContent = result.success ? result.value : result.error.format({ style: "plain" })',
+    "globalThis.parseratorSmoke = { makeParser, ParseError }",
     ""
   ].join("\n")
 )
