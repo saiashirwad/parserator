@@ -10,7 +10,7 @@ export function textInput(initial = ""): IncrementalInput<string> {
     append(chunk) {
       if (typeof chunk !== "string")
         throw new TypeError("Text parsers expect a string")
-      source += chunk
+      source = chunk
     }
   }
 }
