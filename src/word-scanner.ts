@@ -1,3 +1,4 @@
+import { expectedAt } from "./diagnostic.ts"
 import { SourceText } from "./source-text.ts"
 import {
   makeParser,
@@ -33,15 +34,7 @@ export function wordScanner(expression: RegExp, vocabulary: readonly string[]) {
   const identifier = makeParser((source, offset) => {
     const word = scan(source, offset)
     return word === undefined
-      ? replyFailure(
-          {
-            kind: "expected",
-            span: { start: offset, end: offset + source.charWidthAt(offset) },
-            expected: [expression.toString()],
-            ...(source.charAt(offset) ? { found: source.charAt(offset) } : {})
-          },
-          offset
-        )
+      ? replyFailure(expectedAt(source, offset, expression.toString()), offset)
       : replySuccess(word, offset + word.length)
   })
   const keyword = (candidates: readonly string[]): Parser<string> => {

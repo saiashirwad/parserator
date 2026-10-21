@@ -1,4 +1,4 @@
-import { mergeDiagnostics, type Diagnostic } from "./diagnostic.ts"
+import { expectedAt, mergeDiagnostics, type Diagnostic } from "./diagnostic.ts"
 import {
   type Parser,
   type Reply,
@@ -20,16 +20,7 @@ const expected = (
   source: SourceText,
   offset: number,
   item: string
-): Reply<never> =>
-  replyFailure(
-    {
-      kind: "expected",
-      span: { start: offset, end: offset + source.charWidthAt(offset) },
-      expected: [item],
-      ...(source.charAt(offset) ? { found: source.charAt(offset) } : {})
-    },
-    offset
-  )
+): Reply<never> => replyFailure(expectedAt(source, offset, item), offset)
 
 function literalDiagnostic(
   source: SourceText,
@@ -39,12 +30,7 @@ function literalDiagnostic(
   for (const point of value) {
     const width = source.charWidthAt(offset)
     if (source.text.slice(offset, offset + width) !== point)
-      return {
-        kind: "expected",
-        span: { start: offset, end: offset + width },
-        expected: [JSON.stringify(value)],
-        ...(source.charAt(offset) ? { found: source.charAt(offset) } : {})
-      }
+      return expectedAt(source, offset, JSON.stringify(value))
     offset += width
   }
   return {

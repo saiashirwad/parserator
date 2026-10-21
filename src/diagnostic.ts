@@ -1,3 +1,5 @@
+import type { SourceText } from "./source-text.ts"
+
 /** A half-open span into a JavaScript string (UTF-16 code-unit offsets). */
 export type Span = { readonly start: number; readonly end: number }
 
@@ -28,6 +30,20 @@ export function diagnosticMessage(diagnostic: Diagnostic): string {
       return diagnostic.found
         ? `Unexpected ${diagnostic.found}`
         : "Unexpected input"
+  }
+}
+
+export function expectedAt(
+  source: SourceText,
+  offset: number,
+  item: string
+): Diagnostic {
+  const found = source.charAt(offset)
+  return {
+    kind: "expected",
+    span: { start: offset, end: offset + source.charWidthAt(offset) },
+    expected: [item],
+    ...(found ? { found } : {})
   }
 }
 

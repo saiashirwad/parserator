@@ -5,6 +5,7 @@ import {
   runParser,
   type Parser
 } from "./parser.ts"
+import { expectedAt } from "./diagnostic.ts"
 import { defaultWord, wordScanner } from "./word-scanner.ts"
 import { generateHints } from "./suggestions.ts"
 
@@ -29,15 +30,7 @@ export function anyKeywordWithHints(
 
 const quotedString = makeParser<string>((source, offset) => {
   if (source.charAt(offset) !== '"')
-    return replyFailure(
-      {
-        kind: "expected",
-        span: { start: offset, end: offset + source.charWidthAt(offset) },
-        expected: ["string literal"],
-        ...(source.charAt(offset) ? { found: source.charAt(offset) } : {})
-      },
-      offset
-    )
+    return replyFailure(expectedAt(source, offset, "string literal"), offset)
   let end = offset + 1
   let value = ""
   while (end < source.text.length && source.charAt(end) !== '"') {

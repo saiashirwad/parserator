@@ -1,4 +1,4 @@
-import type { Diagnostic, Span } from "./diagnostic.ts"
+import { expectedAt, type Diagnostic, type Span } from "./diagnostic.ts"
 import { ParseError } from "./parse-error.ts"
 import { SourceText } from "./source-text.ts"
 
@@ -203,15 +203,7 @@ export class Parser<T> {
       return {
         success: false,
         error: new ParseError(
-          {
-            kind: "expected",
-            span: {
-              start: reply.offset,
-              end: reply.offset + source.charWidthAt(reply.offset)
-            },
-            expected: ["end of input"],
-            found: source.charAt(reply.offset)
-          },
+          expectedAt(source, reply.offset, "end of input"),
           source
         )
       }
