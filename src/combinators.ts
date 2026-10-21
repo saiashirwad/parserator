@@ -1,5 +1,4 @@
-import type { Diagnostic, SourceText } from "./errors.ts"
-import { mergeDiagnostics } from "./diagnostic-merge.ts"
+import { mergeDiagnostics, type Diagnostic } from "./diagnostic.ts"
 import {
   type Parser,
   type Reply,
@@ -10,7 +9,7 @@ import {
   replyFailure,
   combineCut
 } from "./parser.ts"
-import type { SourcePosition } from "./errors.ts"
+import type { SourcePosition, SourceText } from "./source-text.ts"
 
 const digitTest = (c: string) => c >= "0" && c <= "9"
 

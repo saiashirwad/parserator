@@ -1,4 +1,35 @@
-import type { Diagnostic } from "./errors.ts"
+/** A half-open span into a JavaScript string (UTF-16 code-unit offsets). */
+export type Span = { readonly start: number; readonly end: number }
+
+type DiagnosticDetails = {
+  readonly span: Span
+  readonly found?: string
+  readonly context?: readonly string[]
+  readonly hints?: readonly string[]
+}
+
+export type Diagnostic = DiagnosticDetails &
+  (
+    | {
+        readonly kind: "expected"
+        readonly expected: readonly [string, ...string[]]
+      }
+    | { readonly kind: "unexpected"; readonly found: string }
+    | { readonly kind: "custom"; readonly message: string }
+  )
+
+export function diagnosticMessage(diagnostic: Diagnostic): string {
+  switch (diagnostic.kind) {
+    case "custom":
+      return diagnostic.message
+    case "expected":
+      return `Expected ${diagnostic.expected.join(" or ")}${diagnostic.found ? `, found ${diagnostic.found}` : ""}`
+    case "unexpected":
+      return diagnostic.found
+        ? `Unexpected ${diagnostic.found}`
+        : "Unexpected input"
+  }
+}
 
 export function mergeDiagnostics(
   diagnostics: readonly [Diagnostic, ...Diagnostic[]]
@@ -34,4 +65,8 @@ export function mergeDiagnostics(
     }
   }
   return hints.length ? { ...diagnostic, hints } : diagnostic
+}
+
+export function spanAt(start: number, end = start): Span {
+  return { start, end }
 }

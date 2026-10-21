@@ -2,7 +2,7 @@ export { fail, fatal, parser, recursive, succeed } from "./parser.ts"
 
 export type { Parser, ParseResult, PrefixParseResult } from "./parser.ts"
 
-export type { SourcePosition } from "./errors.ts"
+export type { SourcePosition } from "./source-text.ts"
 
 export {
   literal,
@@ -58,9 +58,10 @@ export type {
   PrecedenceLevel
 } from "./expressions.ts"
 
-export { ParseError } from "./errors.ts"
+export { ParseError } from "./parse-error.ts"
 
-export type { Diagnostic, DiagnosticJson, Span } from "./errors.ts"
+export type { DiagnosticJson } from "./parse-error.ts"
+export type { Diagnostic, Span } from "./diagnostic.ts"
 
 export type { ErrorFormatterOptions } from "./error-formatter.ts"
 

@@ -1,4 +1,4 @@
-import { SourceText } from "./errors.ts"
+import { SourceText } from "./source-text.ts"
 import {
   makeParser,
   replyFailure,

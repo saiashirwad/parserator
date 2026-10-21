@@ -1,4 +1,4 @@
-import { type ParseError } from "./errors.ts"
+import type { ParseError } from "./parse-error.ts"
 
 export type ErrorFormatterOptions = {
   style?: "plain" | "ansi"

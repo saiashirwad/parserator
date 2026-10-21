@@ -8,8 +8,11 @@ import {
   regex,
   stringWithHints
 } from "../src/index.ts"
-import { diagnosticMessage, type Diagnostic } from "../src/errors.ts"
-import { mergeDiagnostics } from "../src/diagnostic-merge.ts"
+import {
+  diagnosticMessage,
+  mergeDiagnostics,
+  type Diagnostic
+} from "../src/diagnostic.ts"
 
 test("an empty custom message wins tied expectations without being rewritten", () => {
   const expected: Diagnostic = {

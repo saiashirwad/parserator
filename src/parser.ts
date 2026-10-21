@@ -1,4 +1,6 @@
-import { ParseError, SourceText, type Diagnostic, type Span } from "./errors.ts"
+import type { Diagnostic, Span } from "./diagnostic.ts"
+import { ParseError } from "./parse-error.ts"
+import { SourceText } from "./source-text.ts"
 
 export type Reply<T> =
   | {
