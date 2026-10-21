@@ -2,20 +2,22 @@ import { expectedAt, type Diagnostic, type Span } from "./diagnostic.ts"
 import { ParseError } from "./parse-error.ts"
 import { SourceText } from "./source-text.ts"
 
-export type Reply<T> =
-  | {
-      readonly ok: true
-      readonly value: T
-      readonly offset: number
-      readonly cut: boolean
-    }
-  | {
-      readonly ok: false
-      readonly offset: number
-      readonly diagnostic: Diagnostic
-      readonly cut: boolean
-      readonly fatal: boolean
-    }
+type Success<T> = {
+  readonly ok: true
+  readonly value: T
+  readonly offset: number
+  readonly cut: boolean
+}
+
+type Failure = {
+  readonly ok: false
+  readonly offset: number
+  readonly diagnostic: Diagnostic
+  readonly cut: boolean
+  readonly fatal: boolean
+}
+
+export type Reply<T> = Success<T> | Failure
 
 export type Run<T> = (source: SourceText, offset: number) => Reply<T>
 
@@ -46,6 +48,9 @@ export const replyFailure = (
   cut = false,
   fatal = false
 ): Reply<never> => ({ ok: false, diagnostic, offset, cut, fatal })
+
+export const recoverable = (failure: Failure): boolean =>
+  !failure.fatal && !failure.cut
 
 export const combineCut = <T>(reply: Reply<T>, cut: boolean): Reply<T> =>
   cut && !reply.cut ? { ...reply, cut: true } : reply

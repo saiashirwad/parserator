@@ -7,7 +7,8 @@ import {
   runParser,
   replySuccess,
   replyFailure,
-  combineCut
+  combineCut,
+  recoverable
 } from "./parser.ts"
 import type { SourcePosition, SourceText } from "./source-text.ts"
 
@@ -208,7 +209,7 @@ function repeat<T>(
     for (let n = 0; n < max; n++) {
       const reply = runParser(inner, source, offset)
       if (!reply.ok) {
-        if (reply.fatal || reply.cut || n < min) return combineCut(reply, cut)
+        if (!recoverable(reply) || n < min) return combineCut(reply, cut)
         return replySuccess(values, offset, cut)
       }
       if (max === Infinity && reply.offset <= offset)
@@ -266,9 +267,9 @@ export function optional<P extends Parser<unknown>>(
 export function optional(inner: Parser<unknown>): Parser<unknown> {
   return makeParser((source, offset) => {
     const reply = runParser(inner, source, offset)
-    return reply.ok || reply.fatal || reply.cut
-      ? reply
-      : replySuccess(undefined, offset)
+    return !reply.ok && recoverable(reply)
+      ? replySuccess(undefined, offset)
+      : reply
   })
 }
 
@@ -281,7 +282,7 @@ function list<T, S>(
   return makeParser((source, offset) => {
     const first = runParser(inner, source, offset)
     if (!first.ok)
-      return !requireOne && !first.fatal && !first.cut
+      return !requireOne && recoverable(first)
         ? replySuccess([], offset)
         : first
     if (first.offset <= offset) throw new Error("list item must consume input")
@@ -291,12 +292,12 @@ function list<T, S>(
     while (true) {
       const sep = runParser(separator, source, offset)
       if (!sep.ok)
-        return sep.fatal || sep.cut
-          ? combineCut(sep, cut)
-          : replySuccess(values, offset, cut)
+        return recoverable(sep)
+          ? replySuccess(values, offset, cut)
+          : combineCut(sep, cut)
       const item = runParser(inner, source, sep.offset)
       if (!item.ok) {
-        if (item.fatal || item.cut || sep.cut || !allowTrailing)
+        if (!recoverable(item) || sep.cut || !allowTrailing)
           return combineCut(item, cut || sep.cut)
         return replySuccess(values, sep.offset, cut)
       }
@@ -371,7 +372,7 @@ export function choice(...parsers: Parser<any>[]): Parser<any> {
     const diagnostics: Diagnostic[] = []
     for (const alternative of parsers) {
       const reply = runParser(alternative, source, offset)
-      if (reply.ok || reply.fatal || reply.cut) return reply
+      if (reply.ok || !recoverable(reply)) return reply
       diagnostics.push(reply.diagnostic)
     }
     return replyFailure(

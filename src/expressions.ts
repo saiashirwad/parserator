@@ -3,6 +3,7 @@ import {
   makeParser,
   combineCut,
   parser,
+  recoverable,
   replySuccess,
   runParser,
   type Parser
@@ -26,9 +27,7 @@ export function chainLeft1<T>(
     while (true) {
       const operation = runParser(operator, source, current)
       if (!operation.ok) {
-        if (operation.fatal || operation.cut) {
-          return combineCut(operation, cut)
-        }
+        if (!recoverable(operation)) return combineCut(operation, cut)
         return replySuccess(value, current, cut)
       }
 
@@ -61,9 +60,7 @@ export function chainRight1<T>(
     while (true) {
       const operation = runParser(operator, source, current)
       if (!operation.ok) {
-        if (operation.fatal || operation.cut) {
-          return combineCut(operation, cut)
-        }
+        if (!recoverable(operation)) return combineCut(operation, cut)
 
         let value: T = values[values.length - 1] as T
         for (let index = operations.length - 1; index >= 0; index--) {
