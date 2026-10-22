@@ -152,32 +152,35 @@ const readme = readFileSync(join(root, "README.md"), "utf8")
 const snippets = [...readme.matchAll(/```ts\n([\s\S]*?)```/g)].map(
   match => match[1]
 )
+const commandGrammar = "import { choice, createLexemes, parser, regex }"
 const examples = [
   {
-    start: "import { char, parser, regex }",
+    start: commandGrammar,
+    extra: [
+      "const result = command.parse(",
+      "const number = regex(",
+      "const positiveInteger = integer.validate("
+    ],
     check:
-      'if (point.parseOrThrow("(10,20)").y !== 20) throw new Error("point")',
-    extra: ["const result = point.parse(", "const prefix = number.parsePrefix("]
+      'const rotated = command.parseOrThrow("  rotate 90  "); const resized = command.parseOrThrow("resize 640 x 480"); if (rotated.type !== "rotate" || rotated.degrees !== 90 || resized.type !== "resize" || resized.height !== 480 || result.success || positiveInteger.parse("0").success || !number.parsePrefix("42 more").success) throw new Error("command")'
   },
   {
-    start: "import { commit, literal, parser, regex }",
+    start: commandGrammar,
+    extra: ["import { sepBy1 }"],
     check:
-      'if (letExpression.parseOrThrow("letx=") !== "x") throw new Error("commit")'
+      'if (commands.parseOrThrow("rotate 90; resize 640 x 480").length !== 2) throw new Error("sepBy1")'
   },
   {
-    start: "import { createLexemes, regex }",
-    check:
-      'if (lex.complete(and).parseOrThrow(" AND ") !== "AND" || lex.keyword("AND").parsePrefix("AND.é").success || lex.identifier.parseOrThrow("AND.é") !== "AND.é") throw new Error("lexemes")'
-  },
-  {
-    start: "import { choice, literal, precedence, regex }",
+    start: commandGrammar,
+    extra: ["import { literal, precedence }"],
     check:
       'if (expression.parseOrThrow("2+3*4") !== 14) throw new Error("precedence")'
   },
   {
-    start: "import { makeParser, runParser, SourceText }",
+    start: commandGrammar,
+    extra: ["import { commit, literal }"],
     check:
-      'if (!reply.ok || reply.value !== "😀" || reply.offset !== 2) throw new Error("scanner")'
+      'if (nameOrAssignment.parseOrThrow("size") !== "size" || nameOrAssignment.parse("size=").success) throw new Error("commit")'
   }
 ]
 const readmeFiles = examples.map((example, index) => {
