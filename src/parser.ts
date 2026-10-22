@@ -55,6 +55,48 @@ export const recoverable = (failure: Failure): boolean =>
 export const combineCut = <T>(reply: Reply<T>, cut: boolean): Reply<T> =>
   cut && !reply.cut ? { ...reply, cut: true } : reply
 
+// Classifying runs near the stack limit, so it avoids regular expressions, which can overflow themselves.
+const overflowed = (error: unknown): boolean =>
+  error instanceof RangeError
+    ? error.message.includes("call stack")
+    : error instanceof Error &&
+      error.name === "InternalError" &&
+      error.message.includes("recursion")
+
+const descend = (depth: number): number =>
+  depth === 0 ? 0 : 1 + descend(depth - 1)
+
+// Near the stack limit V8 may surface an overflow as a TypeError or SyntaxError, so a failed probe is the signal.
+const exhausted = (): boolean => {
+  try {
+    descend(256)
+    return false
+  } catch {
+    return true
+  }
+}
+
+const tooDeep = (offset: number): Reply<never> =>
+  replyFailure(
+    {
+      kind: "custom",
+      span: { start: offset, end: offset },
+      message: "input nests too deeply to parse"
+    },
+    offset,
+    false,
+    true
+  )
+
+const run = <T>(parser: Parser<T>, source: SourceText): Reply<T> => {
+  try {
+    return runParser(parser, source, 0)
+  } catch (error) {
+    if (overflowed(error)) return tooDeep(0)
+    throw error
+  }
+}
+
 export class Parser<T> {
   readonly [runner]: Run<T>
 
@@ -198,7 +240,7 @@ export class Parser<T> {
     options: { readonly sourceName?: string } = {}
   ): ParseResult<T> {
     const source = new SourceText(input, options.sourceName)
-    const reply = runParser(this, source, 0)
+    const reply = run(this, source)
     if (!reply.ok)
       return {
         success: false,
@@ -220,7 +262,7 @@ export class Parser<T> {
     options: { readonly sourceName?: string } = {}
   ): PrefixParseResult<T> {
     const source = new SourceText(input, options.sourceName)
-    const reply = runParser(this, source, 0)
+    const reply = run(this, source)
     return reply.ok
       ? {
           success: true,
@@ -298,6 +340,9 @@ export function parser<T>(
       }
       completed = true
       return replySuccess(current.value, offset, cut)
+    } catch (error) {
+      if (overflowed(error) || exhausted()) return tooDeep(offset)
+      throw error
     } finally {
       if (!completed) {
         while (!iterator.return(undefined as never).done) {}
