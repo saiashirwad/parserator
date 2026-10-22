@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1
+
+- `parse()`, `parsePrefix()`, and `parseOrThrow()` no longer throw a `RangeError`
+  when input nests deeper than the call stack. They fail with a fatal
+  `input nests too deeply to parse` diagnostic, placed where the innermost
+  `parser(function* () { ... })` gave up, or at the start of the input for
+  combinator-only grammars.
+
 ## 0.4.0
 
 ### BREAKING: reader and runner contracts
