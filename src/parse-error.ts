@@ -1,6 +1,7 @@
 import { diagnosticMessage, type Diagnostic } from "./diagnostic.ts"
 import { formatError, type ErrorFormatterOptions } from "./error-formatter.ts"
 import { SourceText } from "./source-text.ts"
+import { resolveHints } from "./suggestions.ts"
 
 export type DiagnosticJson = Diagnostic & {
   readonly sourceName?: string
@@ -31,7 +32,7 @@ export class ParseError extends Error {
     )
     this.fatal = fatal
     this.name = "ParseError"
-    this.diagnostic = diagnostic
+    this.diagnostic = resolveHints(diagnostic)
     this.source = typeof source === "string" ? new SourceText(source) : source
   }
 

@@ -3,11 +3,18 @@ import type { SourceText } from "./source-text.ts"
 /** A half-open span into a JavaScript string (UTF-16 code-unit offsets). */
 export type Span = { readonly start: number; readonly end: number }
 
+/** Typo-hint candidates, ranked into `hints` only when a parse error is reported. */
+export type Suggestion = {
+  readonly found: string
+  readonly vocabulary: readonly string[]
+}
+
 type DiagnosticDetails = {
   readonly span: Span
   readonly found?: string
   readonly context?: readonly string[]
   readonly hints?: readonly string[]
+  readonly suggestions?: readonly Suggestion[]
 }
 
 export type Diagnostic = DiagnosticDetails &
@@ -66,6 +73,7 @@ export function mergeDiagnostics(
       : best
   )
   const hints = [...new Set(tied.flatMap(d => d.hints ?? []))]
+  const suggestions = tied.flatMap(d => d.suggestions ?? [])
   let diagnostic = base
   if (!custom.length && base.kind === "expected") {
     const first = base.expected[0]
@@ -80,7 +88,12 @@ export function mergeDiagnostics(
       expected: [head, ...items]
     }
   }
-  return hints.length ? { ...diagnostic, hints } : diagnostic
+  if (!hints.length && !suggestions.length) return diagnostic
+  return {
+    ...diagnostic,
+    ...(hints.length ? { hints } : {}),
+    ...(suggestions.length ? { suggestions } : {})
+  }
 }
 
 export function spanAt(start: number, end = start): Span {

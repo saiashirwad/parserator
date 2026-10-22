@@ -1,3 +1,5 @@
+import type { Diagnostic } from "./diagnostic.ts"
+
 export function levenshteinDistance(a: string, b: string): number {
   let previous = Array.from({ length: a.length + 1 }, (_, index) => index)
   for (let j = 1; j <= b.length; j++) {
@@ -25,4 +27,18 @@ export function generateHints(
     .sort((a, b) => a.distance - b.distance)
     .slice(0, maxHints)
     .map(item => item.word)
+}
+
+export function resolveHints(diagnostic: Diagnostic): Diagnostic {
+  if (!diagnostic.suggestions) return diagnostic
+  const { suggestions, ...rest } = diagnostic
+  const hints = [
+    ...new Set([
+      ...(rest.hints ?? []),
+      ...suggestions.flatMap(({ found, vocabulary }) =>
+        generateHints(found, vocabulary)
+      )
+    ])
+  ]
+  return hints.length ? { ...rest, hints } : rest
 }

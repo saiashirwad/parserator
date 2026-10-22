@@ -6,7 +6,6 @@ import {
   replySuccess,
   type Parser
 } from "./parser.ts"
-import { generateHints } from "./suggestions.ts"
 
 export const defaultWord = /[\p{L}_][\p{L}\p{N}_'.-]*/u
 
@@ -50,14 +49,13 @@ export function wordScanner(expression: RegExp, vocabulary: readonly string[]) {
       if (word !== undefined && candidates.includes(word))
         return replySuccess(word, offset + word.length)
       const found = word?.toWellFormed() ?? source.charAt(offset)
-      const hints = generateHints(found, vocabulary)
       return replyFailure(
         {
           kind: "expected",
           span: { start: offset, end: offset + found.length },
           expected,
           ...(found ? { found } : {}),
-          ...(hints.length ? { hints } : {})
+          suggestions: [{ found, vocabulary }]
         },
         offset
       )

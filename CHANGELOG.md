@@ -80,6 +80,9 @@
   them. Every separated-list item must advance, including the first. Below a
   required minimum, failures preserve the item diagnostic instead of replacing
   it with a generic minimum-count error. Counts must be safe nonnegative integers.
+- Keyword typo hints are ranked only when a `ParseError` is built. Failed
+  keyword attempts during backtracking carry `suggestions` instead of `hints`;
+  `ParseError.diagnostic.hints` is unchanged.
 
 ## 0.2.0
 
